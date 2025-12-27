@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SessionHeartbeat from "@/components/SessionHeartbeat";
+import AppsNavBar from "@/components/AppsNavBar";
 import { prisma } from "@/lib/prisma";
 
 export default async function App3Page() {
@@ -21,22 +22,20 @@ export default async function App3Page() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-black">
+    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       <SessionHeartbeat />
-      <div className="h-12 bg-gray-900 border-b border-gray-700 flex items-center justify-between px-4">
-        <h1 className="text-white font-bold">Match Data Hub - Pro Scout - Análisis de Tiros</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-gray-400 text-sm">Usuario: {session.user.name}</span>
-          <a href="/dashboard" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
-            Volver al Dashboard
-          </a>
+      <AppsNavBar userName={session.user.name || "Usuario"} />
+      
+      {/* Contenedor del iframe con estilo mejorado */}
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="h-full rounded-xl overflow-hidden shadow-2xl border border-gray-700/50 bg-black">
+          <iframe 
+            src="/SHOOTING31.html"
+            className="w-full h-full"
+            title="Shooting Analysis"
+          />
         </div>
       </div>
-      <iframe 
-        src="/SHOOTING31.html"
-        className="flex-1 w-full border-none"
-        title="Shooting Analysis"
-      />
     </div>
   );
 }
