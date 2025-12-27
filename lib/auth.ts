@@ -4,6 +4,16 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+// Clase personalizada para errores de autenticación
+class AuthError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+    this.name = "AuthError";
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -50,7 +60,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // Si es un usuario normal (no ADMIN), rechazar el login
             if (user.role !== 'ADMIN') {
               console.error("[AUTH] Device already active for user:", credentials.username, "- last seen", Math.floor(timeSinceLastSeen / 1000), "seconds ago");
-              throw new Error("Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.");
+              // Lanzar error específico que será capturado por NextAuth
+              throw new AuthError("Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.", "DeviceAlreadyActive");
             }
             // Si es ADMIN, permitir sobrescribir y eliminar el lock previo
             console.warn("[AUTH] ADMIN override - removing existing session lock for:", credentials.username);
@@ -72,7 +83,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return { id: user.id, name: user.username, email: user.email, role: user.role };
         } catch (error) {
           console.error("[AUTH] Authorization error:", error);
-          // NextAuth capturará este error y lo pasará al frontend
+          // NextAuth capturará este error, intentamos pasar el mensaje si es posible
+          if (error instanceof AuthError) {
+            throw error;
+          }
           throw error;
         }
       }

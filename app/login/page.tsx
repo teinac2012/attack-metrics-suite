@@ -26,6 +26,49 @@ export default function LoginPage() {
     setError(''); 
     setShowToast(false);
     
+    // Primero validar las credenciales para obtener errores específicos
+    try {
+      const validateRes = await fetch('/api/validate-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const validateData = await validateRes.json();
+      
+      if (!validateRes.ok) {
+        // Error detectado en validación
+        const errorCode = validateData?.code || '';
+        const errorMsg = validateData?.error || '';
+        
+        if (errorCode === 'NO_LICENSE') {
+          setError('No tienes una licencia activa. Contacta al administrador.');
+          setToastType('warning');
+        } else if (errorCode === 'DEVICE_ALREADY_ACTIVE') {
+          setError('Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.');
+          setToastType('warning');
+        } else if (errorCode === 'INVALID_CREDENTIALS') {
+          setError('Usuario o contraseña no válida');
+          setToastType('error');
+        } else {
+          setError(errorMsg || 'Error al validar credenciales');
+          setToastType('error');
+        }
+        
+        setShowToast(true);
+        setLoading(false);
+        setTimeout(() => setShowToast(false), 4000);
+        return;
+      }
+    } catch (err) {
+      console.error('Validation error:', err);
+      setError('Error al validar credenciales');
+      setToastType('error');
+      setShowToast(true);
+      setLoading(false);
+      return;
+    }
+    
     // Asegurar que se invalida la sesión previa antes de autenticar de nuevo
     try { await signOut({ redirect: false }); } catch {}
     
@@ -40,23 +83,9 @@ export default function LoginPage() {
         window.location.href = '/dashboard';
       }, 800);
     } else {
-      // Determinar el tipo de error basado en el mensaje de error de NextAuth
-      const errorMsg = res?.error || '';
-      
-      if (errorMsg.includes('licencia') || errorMsg.includes('license')) {
-        setError('No tienes una licencia activa. Contacta al administrador.');
-        setToastType('warning');
-      } else if (errorMsg.includes('dispositivo activo') || errorMsg.includes('Device already active') || errorMsg.includes('otro dispositivo')) {
-        setError('Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.');
-        setToastType('warning');
-      } else if (errorMsg.includes('Credenciales')) {
-        setError('Por favor, completa usuario y contraseña');
-        setToastType('warning');
-      } else {
-        setError('Usuario o contraseña no válida');
-        setToastType('error');
-      }
-      
+      // Fallback en caso de que signIn falle por otra razón
+      setError('Usuario o contraseña no válida');
+      setToastType('error');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 4000);
     }
