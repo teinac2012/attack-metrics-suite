@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import Link from "next/link";
 import AdminCreateUserForm from "./AdminCreateUserForm";
 import LicenseEditor from "./LicenseEditor";
-import PasswordToggle from "./PasswordToggle";
+import LicenseKeyDisplay from "./LicenseKeyDisplay";
 import DeleteUserButton from "./DeleteUserButton";
 
 export default async function AdminPage() {
@@ -80,7 +80,7 @@ export default async function AdminPage() {
                 <tr className="border-b border-gray-700/50 bg-gray-900/50">
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Usuario</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Email</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Contraseña</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Clave Licencia</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Rol</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Licencia</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Estado</th>
@@ -104,7 +104,7 @@ export default async function AdminPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-400">{user.email || "—"}</td>
                       <td className="px-6 py-4">
-                        <PasswordToggle password={user.passwordHash} />
+                        <LicenseKeyDisplay licenseId={license?.id || ""} />
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
