@@ -41,10 +41,13 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-3 border border-red-500/30 bg-red-500/10 rounded-lg p-4"
+            className="lg:col-span-3 flex items-start gap-3 p-3 rounded-lg bg-red-500/15 border border-red-500/30 backdrop-blur-sm"
           >
-            <p className="text-red-300 font-semibold">Licencia vencida</p>
-            <p className="text-sm text-red-200/80">Tu acceso está restringido. Contacta al administrador para renovar tu licencia y recuperar acceso.</p>
+            <div className="text-2xl mt-0.5">⚠️</div>
+            <div className="flex-1">
+              <p className="text-red-300 font-semibold text-sm">Licencia vencida</p>
+              <p className="text-xs text-red-200/70 mt-1">Tu acceso está restringido. Contacta para renovar.</p>
+            </div>
           </motion.div>
         )}
         {/* Información Principal */}

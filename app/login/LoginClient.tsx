@@ -175,19 +175,25 @@ export default function LoginClient() {
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
             
             <div className="relative p-8">
+              {licenseExpired && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 flex items-start gap-3 p-3 rounded-lg bg-red-500/15 border border-red-500/30 backdrop-blur-sm"
+                >
+                  <div className="text-2xl mt-0.5">⚠️</div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-300 text-sm">Licencia vencida</p>
+                    <p className="text-xs text-red-200/70 mt-1">Contacta para renovar tu acceso</p>
+                    <a href={`mailto:${contactEmail}?subject=Renovación%20de%20licencia`} className="text-xs text-red-400 hover:text-red-300 mt-2 inline-block underline">
+                      {contactEmail}
+                    </a>
+                  </div>
+                </motion.div>
+              )}
               <h2 className="text-3xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
                 Iniciar Sesión
               </h2>
-              {licenseExpired && (
-                <div className="mb-6 border border-red-500/40 bg-red-500/10 rounded-xl p-4 text-red-300">
-                  <p className="font-semibold mb-1">Licencia vencida</p>
-                  <p className="text-sm text-red-200/80">Tu periodo ha terminado. Para reactivar el acceso, contacta al administrador.</p>
-                  <div className="mt-3 flex gap-3">
-                    <a href={`mailto:${contactEmail}?subject=Renovación%20de%20licencia`} className="px-3 py-2 bg-red-600/30 hover:bg-red-600/40 rounded-lg text-sm">Contactar por email</a>
-                    <a href="https://wa.me/" target="_blank" rel="noopener" className="px-3 py-2 bg-green-600/30 hover:bg-green-600/40 rounded-lg text-sm">WhatsApp</a>
-                  </div>
-                </div>
-              )}
               
               <form onSubmit={onSubmit} className="space-y-6">
                 {/* Usuario */}
