@@ -53,30 +53,26 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   return (
     <>
-      {/* Alerta de Licencia con animación */}
+      {/* Alerta de Licencia Compacta y Profesional */}
       {daysLeft <= 7 && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8 relative overflow-hidden"
+          transition={{ duration: 0.4 }}
+          className="mb-8 flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-sm"
+          style={{
+            borderColor: daysLeft > 3 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+            backgroundColor: daysLeft > 3 ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)'
+          }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 backdrop-blur-sm" />
-          <div className="relative border border-red-500/30 rounded-2xl p-6 shadow-lg shadow-red-500/10">
-            <motion.div 
-              className="flex items-center gap-4"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <span className="text-4xl">⚠️</span>
-              <div>
-                <h3 className="text-2xl font-bold text-red-300 mb-1">¡Licencia por Vencer!</h3>
-                <p className="text-red-200/90">
-                  Tu licencia vence en <span className="font-bold text-red-100">{daysLeft} días</span>. 
-                  Contacta al administrador para renovarla.
-                </p>
-              </div>
-            </motion.div>
+          <svg className="h-5 w-5 flex-shrink-0" style={{color: daysLeft > 3 ? '#fbbf24' : '#ef4444'}} fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{color: daysLeft > 3 ? '#f59e0b' : '#ef4444'}}>
+              Licencia por vencer en {daysLeft} día{daysLeft !== 1 ? 's' : ''}
+            </p>
+            <p className="text-xs opacity-80">Contacta al administrador para renovarla</p>
           </div>
         </motion.div>
       )}
