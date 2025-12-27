@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
-import ChangePasswordForm from "@/components/ChangePasswordForm";
 import SessionHeartbeat from "@/components/SessionHeartbeat";
+import PerfilClient from "./PerfilClient";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 export default async function PerfilPage() {
   const session = await auth();
@@ -25,76 +25,37 @@ export default async function PerfilPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
       <SessionHeartbeat />
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">👤 Mi Perfil</h1>
-            <p className="text-gray-400">Gestiona tu cuenta y configuración</p>
-          </div>
-          <Link
-            href="/dashboard"
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          >
-            ← Volver
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Información del Usuario */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-6">Información Personal</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-400">Usuario</label>
-                <p className="text-lg font-semibold">{user.username}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm text-gray-400">Email</label>
-                <p className="text-lg">{user.email || "No configurado"}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm text-gray-400">Rol</label>
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  user.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
-                }`}>
-                  {user.role}
-                </span>
-              </div>
-              
-              <div>
-                <label className="text-sm text-gray-400">Licencia</label>
-                <div className={`mt-2 inline-block px-4 py-2 rounded-lg ${
-                  daysLeft > 30 ? 'bg-green-500/20 text-green-300 border-green-500/30' : 
-                  daysLeft > 7 ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' : 
-                  'bg-red-500/20 text-red-300 border-red-500/30'
-                } border`}>
-                  <span className="font-semibold">{daysLeft}</span> días restantes
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400">Miembro desde</label>
-                <p className="text-lg">
-                  {new Date(user.createdAt).toLocaleDateString("es-MX", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+      <div className="container mx-auto px-4 py-12 relative z-10">
+        <PerfilClient 
+          username={user.username}
+          email={user.email}
+          role={user.role}
+          daysLeft={daysLeft}
+          createdAt={user.createdAt}
+          userId={user.id}
+        />
+        
+        {/* Password Form placed outside for proper server component */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div /> {/* Spacer */}
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-md" />
+            <div className="absolute inset-0 border border-gray-700/50 rounded-2xl" />
+            <div className="relative p-8">
+              <h2 className="text-3xl font-bold mb-8 flex items-center gap-3">
+                <span className="text-orange-400">🔐</span>
+                Cambiar Contraseña
+              </h2>
+              <ChangePasswordForm userId={user.id} />
             </div>
-          </div>
-
-          {/* Cambiar Contraseña */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-6">Cambiar Contraseña</h2>
-            <ChangePasswordForm userId={user.id} />
           </div>
         </div>
       </div>
