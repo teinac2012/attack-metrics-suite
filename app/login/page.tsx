@@ -6,22 +6,102 @@ import Link from 'next/link';
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const onSubmit = async (e: React.FormEvent) => { e.preventDefault(); setLoading(true); setError(''); const res = await signIn('credentials', { username, password, redirect: false }); setLoading(false); if (res?.ok) window.location.href = '/dashboard'; else setError('Credenciales inválidas o licencia expirada.'); };
+
+  const onSubmit = async (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    setLoading(true); 
+    setError(''); 
+    const res = await signIn('credentials', { username, password, redirect: false }); 
+    setLoading(false); 
+    if (res?.ok) {
+      window.location.href = '/dashboard'; 
+    } else {
+      setError('❌ Usuario no encontrado, contraseña inválida o licencia expirada.');
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-      <div className="w-full max-w-sm bg-gray-800 p-6 rounded-xl shadow">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-bold">Iniciar Sesión</h1>
-          <Link href="/admin" className="text-sm text-blue-400 hover:underline">Admin Access</Link>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
+      <div className="w-full max-w-md">
+        {/* Logo/Title */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2">Attack Metrics Suite</h1>
+          <p className="text-gray-400">Plataforma de Análisis de Partidos</p>
         </div>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input className="w-full p-2 rounded bg-gray-700" placeholder="Usuario" value={username} onChange={e=>setUsername(e.target.value)} />
-          <input type="password" className="w-full p-2 rounded bg-gray-700" placeholder="Contraseña" value={password} onChange={e=>setPassword(e.target.value)} />
-          {error && <div className="text-red-400 text-sm">{error}</div>}
-          <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded">{loading? 'Accediendo...' : 'Entrar'}</button>
-        </form>
+
+        {/* Login Card */}
+        <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8 backdrop-blur">
+          <h2 className="text-2xl font-bold mb-6">Iniciar Sesión</h2>
+          
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* Usuario */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Usuario</label>
+              <input 
+                className="w-full px-4 py-2 rounded-lg bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors" 
+                placeholder="Tu usuario" 
+                value={username} 
+                onChange={e=>setUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Contraseña */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Contraseña</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  className="w-full px-4 py-2 rounded-lg bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors" 
+                  placeholder="Tu contraseña" 
+                  value={password} 
+                  onChange={e=>setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                >
+                  {showPassword ? "👁️" : "👁️‍🗨️"}
+                </button>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="px-4 py-3 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Login Button */}
+            <button 
+              disabled={loading} 
+              className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '⏳ Accediendo...' : '✓ Entrar'}
+            </button>
+          </form>
+
+          {/* Admin Link */}
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            <Link 
+              href="/admin" 
+              className="block text-center px-4 py-2 text-purple-400 hover:text-purple-300 font-medium transition-colors"
+            >
+              🔐 Acceso Administrador
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-gray-500 text-sm">
+          <p>© 2025 Attack Metrics Suite. Todos los derechos reservados.</p>
+        </div>
       </div>
     </div>
   );

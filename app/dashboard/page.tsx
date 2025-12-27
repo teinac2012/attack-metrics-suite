@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import SessionHeartbeat from "@/components/SessionHeartbeat";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -9,6 +10,17 @@ export default async function DashboardPage() {
   if (!session?.user) {
     redirect("/login");
   }
+
+  // Obtener licencia del usuario
+  const user = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    include: { licenses: { where: { isActive: true }, take: 1 } }
+  });
+
+  const license = user?.licenses[0];
+  const daysLeft = license 
+    ? Math.ceil((new Date(license.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : 0;
 
   const apps = [
     {
@@ -50,6 +62,19 @@ export default async function DashboardPage() {
             <p className="text-gray-400">
               Bienvenido, <span className="text-orange-500 font-semibold">{session.user.name}</span>
             </p>
+            
+            {/* Información de Licencia */}
+            <div className={`mt-3 inline-block px-4 py-2 rounded-lg ${
+              daysLeft > 30 ? 'bg-green-500/20 text-green-300' : 
+              daysLeft > 7 ? 'bg-yellow-500/20 text-yellow-300' : 
+              'bg-red-500/20 text-red-300'
+            } border ${
+              daysLeft > 30 ? 'border-green-500/30' :
+              daysLeft > 7 ? 'border-yellow-500/30' :
+              'border-red-500/30'
+            }`}>
+              <span className="font-semibold">📅 Licencia:</span> {daysLeft} días restantes
+            </div>
           </div>
           <div className="flex gap-3">
             {(session.user as any).role === "ADMIN" && (
