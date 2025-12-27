@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import SessionHeartbeat from "@/components/SessionHeartbeat";
 
 export default async function App2Page() {
   const session = await auth();
@@ -10,6 +11,7 @@ export default async function App2Page() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-black">
+      <SessionHeartbeat />
       <div className="h-12 bg-gray-900 border-b border-gray-700 flex items-center justify-between px-4">
         <h1 className="text-white font-bold">Attack Metrics v3.1 - Análisis de Ataques</h1>
         <div className="flex items-center gap-4">

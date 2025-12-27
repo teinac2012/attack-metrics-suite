@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import AdminCreateUserForm from "./AdminCreateUserForm";
+import LicenseEditor from "./LicenseEditor";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -24,6 +26,8 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen p-8">
       <h1 className="text-3xl font-bold mb-6">Panel de Administración</h1>
+
+      <AdminCreateUserForm />
       
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -34,6 +38,7 @@ export default async function AdminPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Días restantes</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado sesión</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Editar licencia (días)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -60,6 +65,9 @@ export default async function AdminPage() {
                     <span className={isOnline ? "text-green-600" : "text-gray-400"}>
                       {isOnline ? "En línea" : "Desconectado"}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <LicenseEditor userId={user.id} initialDaysLeft={daysLeft} />
                   </td>
                 </tr>
               );
