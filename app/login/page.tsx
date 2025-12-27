@@ -43,11 +43,11 @@ export default function LoginPage() {
       // Determinar el tipo de error basado en el mensaje de error de NextAuth
       const errorMsg = res?.error || '';
       
-      if (errorMsg.includes('licencia')) {
+      if (errorMsg.includes('licencia') || errorMsg.includes('license')) {
         setError('No tienes una licencia activa. Contacta al administrador.');
         setToastType('warning');
-      } else if (errorMsg.includes('dispositivo') || errorMsg.includes('session') || errorMsg.includes('device')) {
-        setError('Ya hay un dispositivo activo en esta cuenta');
+      } else if (errorMsg.includes('dispositivo activo') || errorMsg.includes('Device already active') || errorMsg.includes('otro dispositivo')) {
+        setError('Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.');
         setToastType('warning');
       } else if (errorMsg.includes('Credenciales')) {
         setError('Por favor, completa usuario y contraseña');
