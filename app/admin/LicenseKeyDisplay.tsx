@@ -8,7 +8,7 @@ export default function LicenseKeyDisplay({ licenseId }: { licenseId: string }) 
     return <span className="text-gray-500">Sin licencia</span>;
   }
 
-  // Mostrar solo los últimos 8 caracteres
+  // Mostrar solo los últimos 8 caracteres (código corto)
   const displayId = licenseId.slice(-8).toUpperCase();
   const fullId = licenseId.toUpperCase();
 
@@ -26,11 +26,12 @@ export default function LicenseKeyDisplay({ licenseId }: { licenseId: string }) 
       </button>
       <button
         onClick={() => {
-          navigator.clipboard.writeText(fullId);
-          alert("Clave de licencia copiada!");
+          // Copiar por defecto el código corto (últimos 8)
+          navigator.clipboard.writeText(displayId);
+          alert("Código de licencia copiado: " + displayId);
         }}
         className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
-        title="Copiar"
+        title="Copiar código corto"
       >
         📋
       </button>

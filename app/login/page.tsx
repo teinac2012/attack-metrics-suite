@@ -1,6 +1,6 @@
 ﻿"use client";
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { signIn, useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -9,9 +9,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const sessionState = useSession();
+  const status = sessionState?.status as 'authenticated' | 'unauthenticated' | 'loading' | undefined;
+
+  // Si ya hay sesión activa, redirige al dashboard
+  useEffect(() => {
+    if (status === 'authenticated') {
+      window.location.href = '/dashboard';
+    }
+  }, [status]);
 
   const onSubmit = async (e: React.FormEvent) => { 
     e.preventDefault(); 
+    if (!username || !password) {
+      setError('Por favor, introduce usuario y contraseña.');
+      return;
+    }
     setLoading(true); 
     setError(''); 
     const res = await signIn('credentials', { username, password, redirect: false }); 
@@ -80,22 +93,12 @@ export default function LoginPage() {
 
             {/* Login Button */}
             <button 
-              disabled={loading} 
+              disabled={loading || !username || !password} 
               className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '⏳ Accediendo...' : '✓ Entrar'}
             </button>
           </form>
-
-          {/* Admin Link */}
-          <div className="mt-6 pt-6 border-t border-gray-700">
-            <Link 
-              href="/admin" 
-              className="block text-center px-4 py-2 text-purple-400 hover:text-purple-300 font-medium transition-colors"
-            >
-              🔐 Acceso Administrador
-            </Link>
-          </div>
         </div>
 
         {/* Footer */}
