@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import SessionHeartbeat from "@/components/SessionHeartbeat";
 import AdminCreateUserForm from "./AdminCreateUserForm";
 import LicenseEditor from "./LicenseEditor";
 import SavedPasswordDisplay from "./SavedPasswordDisplay";
@@ -35,6 +36,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <SessionHeartbeat />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

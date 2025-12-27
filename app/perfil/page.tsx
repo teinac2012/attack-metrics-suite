@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import ChangePasswordForm from "@/components/ChangePasswordForm";
+import SessionHeartbeat from "@/components/SessionHeartbeat";
 
 export default async function PerfilPage() {
   const session = await auth();
@@ -25,6 +26,7 @@ export default async function PerfilPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+      <SessionHeartbeat />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
