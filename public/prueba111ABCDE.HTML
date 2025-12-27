@@ -749,6 +749,7 @@
     
     <button class="btn-tool" style="background:#3498db" onclick="downloadPitchImg()">📷</button>
     <button class="btn-tool" style="background:#2ecc71" onclick="downloadExcel()">📊</button>
+    <button class="btn-tool" style="background:#9b59b6" onclick="showSaveModal()">📦 BD</button>
 </header>
 
 <div class="layout">
@@ -3574,6 +3575,126 @@ function calculateLiverpoolMetrics() {
 
     return Object.values(stats);
 }
+
+// ===== GUARDAR EN BASE DE DATOS =====
+function showSaveModal() {
+    const modal = document.getElementById('saveModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('analysisTitle').focus();
+    }
+}
+
+function closeSaveModal() {
+    document.getElementById('saveModal').style.display = 'none';
+    document.getElementById('analysisTitle').value = '';
+    document.getElementById('analysisTags').value = '';
+    document.getElementById('analysisNotes').value = '';
+}
+
+async function saveAnalysisToDB() {
+    const title = document.getElementById('analysisTitle').value.trim();
+    const tags = document.getElementById('analysisTags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const notes = document.getElementById('analysisNotes').value.trim();
+
+    if (!title) {
+        alert('❌ El título es obligatorio');
+        return;
+    }
+
+    if (DB.length === 0) {
+        alert('❌ No hay datos para guardar');
+        return;
+    }
+
+    const saveBtn = document.getElementById('saveBtnModal');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Guardando...';
+
+    try {
+        const response = await fetch('/api/analyses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                appName: 'Attack Metrics',
+                title,
+                data: {
+                    actions: DB,
+                    timestamp: new Date().toISOString()
+                },
+                tags,
+                notes
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('✅ Análisis guardado correctamente');
+            closeSaveModal();
+        } else {
+            alert('❌ Error: ' + (result.error || 'No se pudo guardar'));
+        }
+    } catch (error) {
+        console.error('Error guardando análisis:', error);
+        alert('❌ Error de conexión al guardar');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Guardar';
+    }
+}
+
+// Cargar análisis desde URL
+window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    const analysisId = params.get('load');
+    if (analysisId) {
+        loadAnalysisFromDB(analysisId);
+    }
+});
+
+async function loadAnalysisFromDB(id) {
+    try {
+        const response = await fetch(`/api/analyses?id=${id}`);
+        const result = await response.json();
+        
+        if (response.ok && result.analysis) {
+            const data = JSON.parse(result.analysis.data);
+            DB = data.actions || [];
+            updateDash();
+            drawPitch();
+            alert('✅ Análisis cargado: ' + result.analysis.title);
+        } else {
+            alert('❌ No se pudo cargar el análisis');
+        }
+    } catch (error) {
+        console.error('Error cargando análisis:', error);
+        alert('❌ Error al cargar');
+    }
+}
+</script>
+
+<!-- Modal para Guardar Análisis -->
+<div id="saveModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#1e1e1e; border-radius:8px; padding:20px; width:90%; max-width:500px; border:1px solid #444;">
+        <h3 style="margin-top:0; color:#fff;">💾 Guardar Análisis</h3>
+        
+        <label style="display:block; margin-bottom:5px; color:#aaa; font-size:0.8rem;">Título *</label>
+        <input type="text" id="analysisTitle" placeholder="Ej: Real Madrid vs Barcelona" style="width:100%; margin-bottom:15px; padding:8px; font-size:0.9rem; background:#333; color:#fff; border:1px solid #555;">
+        
+        <label style="display:block; margin-bottom:5px; color:#aaa; font-size:0.8rem;">Tags (separados por comas)</label>
+        <input type="text" id="analysisTags" placeholder="Ej: LaLiga, 2024, Attack" style="width:100%; margin-bottom:15px; padding:8px; font-size:0.9rem; background:#333; color:#fff; border:1px solid #555;">
+        
+        <label style="display:block; margin-bottom:5px; color:#aaa; font-size:0.8rem;">Notas</label>
+        <textarea id="analysisNotes" placeholder="Observaciones adicionales..." style="width:100%; margin-bottom:15px; padding:8px; font-size:0.9rem; min-height:60px; resize:vertical; background:#333; color:#fff; border:1px solid #555;"></textarea>
+        
+        <div style="display:flex; gap:10px;">
+            <button id="saveBtnModal" onclick="saveAnalysisToDB()" style="flex:1; background:#9b59b6; padding:10px; font-size:0.9rem; border:none; color:#fff; border-radius:4px; cursor:pointer;">💾 Guardar</button>
+            <button onclick="closeSaveModal()" style="flex:1; background:#555; padding:10px; font-size:0.9rem; border:none; color:#fff; border-radius:4px; cursor:pointer;">❌ Cancelar</button>
+        </div>
+    </div>
+</div>
+
 </script>
 </body>
 </html>

@@ -23,6 +23,19 @@ export default function AnalysisCard({ analysis }: { analysis: Analysis }) {
     "Shooting Analysis": "from-cyan-500/20 to-cyan-600/20 border-cyan-500/30",
   };
 
+  const appLinks: Record<string, string> = {
+    "IA Pases Táctico": "/apps/app1",
+    "Attack Metrics": "/apps/app2",
+    "Shooting Analysis": "/apps/app3",
+  };
+
+  function handleLoad() {
+    const link = appLinks[analysis.appName];
+    if (link) {
+      window.location.href = `${link}?load=${analysis.id}`;
+    }
+  }
+
   async function handleDelete() {
     if (!confirm(`¿Eliminar "${analysis.title}"?`)) return;
 
@@ -101,6 +114,15 @@ export default function AnalysisCard({ analysis }: { analysis: Analysis }) {
               <button
                 onClick={() => {
                   setShowMenu(false);
+                  handleLoad();
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors rounded-t-lg"
+              >
+                📂 Cargar
+              </button>
+              <button
+                onClick={() => {
+                  setShowMenu(false);
                   handleRename();
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors"
@@ -112,7 +134,7 @@ export default function AnalysisCard({ analysis }: { analysis: Analysis }) {
                   setShowMenu(false);
                   handleDelete();
                 }}
-                className="w-full text-left px-4 py-2 hover:bg-red-500/20 text-red-400 transition-colors"
+                className="w-full text-left px-4 py-2 hover:bg-red-500/20 text-red-400 transition-colors rounded-b-lg"
               >
                 🗑️ Eliminar
               </button>
