@@ -1,6 +1,4 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { validateLoginAttempt, generateDeviceHash } from "@/lib/auth-security";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -14,52 +12,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { username },
-      include: { licenses: { where: { isActive: true, endDate: { gt: new Date() } } } }
-    });
+    // Obtener información del cliente
+    const ipAddress = req.headers.get("x-forwarded-for") || 
+                     req.headers.get("x-client-ip") ||
+                     req.headers.get("cf-connecting-ip") ||
+                     "unknown";
+    const userAgent = req.headers.get("user-agent") || undefined;
+    const deviceHash = generateDeviceHash(userAgent);
 
-    if (!user) {
+    // Validar login usando el nuevo sistema de seguridad
+    const result = await validateLoginAttempt(
+      username,
+      password,
+      ipAddress,
+      userAgent
+    );
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: "Usuario o contraseña no válida", code: "INVALID_CREDENTIALS" },
-        { status: 401 }
-      );
-    }
-
-    // Validar contraseña
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Usuario o contraseña no válida", code: "INVALID_CREDENTIALS" },
-        { status: 401 }
-      );
-    }
-
-    // Validar licencia para usuarios normales
-    if (user.role !== "ADMIN" && user.licenses.length === 0) {
-      return NextResponse.json(
-        { error: "No tienes una licencia activa. Contacta al administrador.", code: "NO_LICENSE" },
-        { status: 403 }
-      );
-    }
-
-    // Verificar session lock
-    const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
-    const timeSinceLastSeen = lock ? Date.now() - new Date(lock.lastSeen).getTime() : Infinity;
-    const isLockActive = lock && timeSinceLastSeen < 120_000; // 2 minutos
-
-    if (isLockActive && user.role !== "ADMIN") {
-      return NextResponse.json(
-        {
-          error: "Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.",
-          code: "DEVICE_ALREADY_ACTIVE"
+        { 
+          error: result.message, 
+          code: result.code 
         },
-        { status: 409 }
+        { 
+          status: result.code === "ACCOUNT_LOCKED" ? 429 : 
+                  result.code === "NO_LICENSE" ? 403 : 
+                  401 
+        }
       );
     }
 
     return NextResponse.json(
-      { success: true, code: "OK", canLogin: true },
+      { 
+        success: true, 
+        code: "OK", 
+        canLogin: true,
+        deviceHash 
+      },
       { status: 200 }
     );
   } catch (error) {

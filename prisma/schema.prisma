@@ -12,17 +12,23 @@ enum Role {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  username     String        @unique
-  passwordHash String
-  email        String?       @unique
-  role         Role          @default(USER)
-  licenses     License[]
-  sessions     Session[]
-  accounts     Account[]
-  sessionLocks SessionLock[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                    String         @id @default(cuid())
+  username              String         @unique
+  passwordHash          String
+  email                 String?        @unique
+  role                  Role           @default(USER)
+  licenses              License[]
+  sessions              Session[]
+  accounts              Account[]
+  sessionLocks          SessionLock[]
+  loginAttempts         LoginAttempt[]
+  loginAudit            LoginAudit[]
+  isLocked              Boolean        @default(false)
+  lockedUntil           DateTime?
+  failedLoginCount      Int            @default(0)
+  lastFailedLoginAt     DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 }
 
 model License {
@@ -43,6 +49,39 @@ model SessionLock {
   sessionId  String
   lastSeen   DateTime @default(now())
   deviceHash String?
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  userId    String?
+  username  String
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  success   Boolean
+  ipAddress String?
+  userAgent String?
+  deviceHash String?
+  failReason String? // INVALID_PASSWORD, USER_NOT_FOUND, ACCOUNT_LOCKED, etc.
+  createdAt DateTime @default(now())
+
+  @@index([username])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model LoginAudit {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action       String   // LOGIN_SUCCESS, LOGOUT, SESSION_EXPIRED, etc.
+  ipAddress    String?
+  userAgent    String?
+  deviceHash   String?
+  sessionId    String?
+  metadata     String? // JSON string con información adicional
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Account {
