@@ -1,6 +1,6 @@
 ﻿"use client";
 import { useState } from 'react';
-import { signIn, signOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -69,8 +69,10 @@ export default function LoginPage() {
       return;
     }
     
-    // Asegurar que se invalida la sesión previa antes de autenticar de nuevo
-    try { await signOut({ redirect: false }); } catch {}
+    // Limpiar sesión previa si existe, llamando al endpoint de logout que elimina session lock
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    } catch {}
     
     const res = await signIn('credentials', { username, password, redirect: false }); 
     setLoading(false); 

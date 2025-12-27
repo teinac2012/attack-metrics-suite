@@ -85,7 +85,7 @@ export default async function DashboardPage() {
                 Panel Admin
               </Link>
             )}
-            <form action="/api/auth/signout" method="post">
+            <form action="/api/auth/logout" method="post">
               <button
                 type="submit"
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
