@@ -26,38 +26,34 @@ export default function LoginPage() {
     setError(''); 
     setShowToast(false);
     
-    // Mostrar mensaje de procesando
-    setError('Verificando credenciales...');
-    setToastType('info');
-    setShowToast(true);
-    
     // Asegurar que se invalida la sesión previa antes de autenticar de nuevo
     try { await signOut({ redirect: false }); } catch {}
+    
     const res = await signIn('credentials', { username, password, redirect: false }); 
     setLoading(false); 
     
-    if (res?.ok) {
-      setError('✓ Inicio de sesión correcto');
+    if (res?.ok && !res?.error) {
+      setError('Inicio de sesión correcto');
       setToastType('success');
       setShowToast(true);
       setTimeout(() => {
         window.location.href = '/dashboard';
-      }, 1000);
+      }, 800);
     } else {
       // Determinar el tipo de error basado en el mensaje de error de NextAuth
       const errorMsg = res?.error || '';
       
       if (errorMsg.includes('licencia')) {
-        setError('⚠️ No tienes una licencia activa. Contacta al administrador.');
+        setError('No tienes una licencia activa. Contacta al administrador.');
         setToastType('warning');
       } else if (errorMsg.includes('dispositivo') || errorMsg.includes('session') || errorMsg.includes('device')) {
-        setError('⚠️ Ya hay un dispositivo activo en esta cuenta');
+        setError('Ya hay un dispositivo activo en esta cuenta');
         setToastType('warning');
       } else if (errorMsg.includes('Credenciales')) {
-        setError('⚠️ Por favor, completa usuario y contraseña');
+        setError('Por favor, completa usuario y contraseña');
         setToastType('warning');
       } else {
-        setError('⚠️ Usuario o contraseña no válida');
+        setError('Usuario o contraseña no válida');
         setToastType('error');
       }
       
