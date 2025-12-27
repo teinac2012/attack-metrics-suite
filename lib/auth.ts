@@ -39,13 +39,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           
           const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
           if (lock && (Date.now() - new Date(lock.lastSeen).getTime() < 60_000)) {
-            // Permitir a ADMIN iniciar sesión aunque exista lock reciente (toma el control)
-            if (user.role !== 'ADMIN') {
-              console.error("[AUTH] User already logged in from another device:", credentials.username);
-              return null;
-            } else {
-              console.warn("[AUTH] ADMIN overriding existing session lock:", credentials.username);
-            }
+            // Nuevo login toma el control: elimina el lock previo para este usuario
+            // Mantiene restricción de un dispositivo porque se reemplaza el lock
+            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
+            console.warn("[AUTH] Overriding existing session lock for user:", credentials.username);
           }
           
           await prisma.sessionLock.upsert({
