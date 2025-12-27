@@ -1,6 +1,6 @@
 ﻿"use client";
-import { useEffect, useState } from 'react';
-import { signIn, useSession } from 'next-auth/react';
+import { useState } from 'react';
+import { signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -9,15 +9,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const sessionState = useSession();
-  const status = sessionState?.status as 'authenticated' | 'unauthenticated' | 'loading' | undefined;
-
-  // Si ya hay sesión activa, redirige al dashboard
-  useEffect(() => {
-    if (status === 'authenticated') {
-      window.location.href = '/dashboard';
-    }
-  }, [status]);
+  // No redirigimos automáticamente si hay sesión; permitimos reautenticación
 
   const onSubmit = async (e: React.FormEvent) => { 
     e.preventDefault(); 
@@ -25,8 +17,10 @@ export default function LoginPage() {
       setError('Por favor, introduce usuario y contraseña.');
       return;
     }
-    setLoading(true); 
+    setLoading(true);
     setError(''); 
+    // Asegurar que se invalida la sesión previa antes de autenticar de nuevo
+    try { await signOut({ redirect: false }); } catch {}
     const res = await signIn('credentials', { username, password, redirect: false }); 
     setLoading(false); 
     if (res?.ok) {
