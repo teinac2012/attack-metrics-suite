@@ -89,3 +89,35 @@ export async function DELETE(req: Request) {
     return new Response(JSON.stringify({ error: "Error al eliminar usuario" }), { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  const session = await auth();
+  if ((session?.user as any)?.role !== "ADMIN") {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { userId, newPassword } = body;
+
+    if (!userId || !newPassword) {
+      return new Response(JSON.stringify({ error: "Faltan campos requeridos" }), { status: 400 });
+    }
+
+    if (newPassword.length < 6) {
+      return new Response(JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }), { status: 400 });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash }
+    });
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return new Response(JSON.stringify({ error: "Error al actualizar contraseña" }), { status: 500 });
+  }
+}

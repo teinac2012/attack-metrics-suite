@@ -4,6 +4,7 @@ import Link from "next/link";
 import AdminCreateUserForm from "./AdminCreateUserForm";
 import LicenseEditor from "./LicenseEditor";
 import SavedPasswordDisplay from "./SavedPasswordDisplay";
+import ResetPasswordButton from "./ResetPasswordButton";
 import DeleteUserButton from "./DeleteUserButton";
 
 export default async function AdminPage() {
@@ -104,7 +105,10 @@ export default async function AdminPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-400">{user.email || "—"}</td>
                       <td className="px-6 py-4">
-                        <SavedPasswordDisplay userId={user.id} />
+                        <div className="flex items-center gap-2">
+                          <SavedPasswordDisplay userId={user.id} />
+                          <ResetPasswordButton userId={user.id} username={user.username} />
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
