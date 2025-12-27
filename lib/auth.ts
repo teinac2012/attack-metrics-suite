@@ -77,6 +77,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             });
           }
           
+          // Limpiar intentos fallidos si login es exitoso
+          if (user.failedLoginCount > 0 || user.isLocked) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                failedLoginCount: 0,
+                isLocked: false,
+                lockedUntil: null,
+                lastFailedLoginAt: null
+              }
+            }).catch(err => {
+              console.warn("[AUTH] Could not reset failed attempts:", err);
+            });
+          }
+          
           // Crear nuevo session lock - siempre crear, no actualizar
           try {
             await prisma.sessionLock.create({

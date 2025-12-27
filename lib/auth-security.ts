@@ -145,7 +145,7 @@ export async function validateLoginAttempt(
       };
     }
 
-    // Verificar dispositivo activo (session lock)
+    // Verificar dispositivo activo (session lock) - solo para validación inicial
     const deviceHash = generateDeviceHash(userAgent);
     const lock = await prisma.sessionLock.findUnique({
       where: { userId: user.id }
@@ -174,37 +174,10 @@ export async function validateLoginAttempt(
       };
     }
 
-    // Limpiar intentos fallidos si login es exitoso
-    if (user.failedLoginCount > 0 || user.isLocked) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginCount: 0,
-          isLocked: false,
-          lockedUntil: null,
-          lastFailedLoginAt: null
-        }
-      });
-    }
+    // NO crear/actualizar session lock aquí - se hace en lib/auth.ts durante signIn
+    // Esto evita conflictos de ejecución doble
 
-    // Crear o actualizar session lock
-    if (isLockActive && user.role === "ADMIN") {
-      // ADMIN sobrescribe
-      await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
-    }
-
-    await prisma.sessionLock.upsert({
-      where: { userId: user.id },
-      update: { lastSeen: new Date(), sessionId: "temp", deviceHash },
-      create: {
-        userId: user.id,
-        sessionId: "temp",
-        lastSeen: new Date(),
-        deviceHash
-      }
-    });
-
-    // Log successful attempt
+    // Log successful attempt (sin session lock)
     await logSuccessfulAttempt(user.id, ipAddress, userAgent, deviceHash);
 
     return {
