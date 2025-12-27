@@ -94,12 +94,6 @@ export default async function DashboardPage() {
           </div>
           <div className="flex gap-3">
             <Link
-              href="/historial"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              📊 Historial
-            </Link>
-            <Link
               href="/perfil"
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
             >
