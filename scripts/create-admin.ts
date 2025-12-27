@@ -24,7 +24,13 @@ async function main() {
   // Check if user exists
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
-    console.log('El usuario ya existe');
+    console.log('El usuario ya existe. Actualizando contraseña...');
+    const passwordHash = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { passwordHash }
+    });
+    console.log(`✓ Contraseña actualizada para ${username}`);
     process.exit(0);
   }
 
