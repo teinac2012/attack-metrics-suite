@@ -6,6 +6,7 @@ import LicenseEditor from "./LicenseEditor";
 import SavedPasswordDisplay from "./SavedPasswordDisplay";
 import ResetPasswordButton from "./ResetPasswordButton";
 import DeleteUserButton from "./DeleteUserButton";
+import UnlockUserButton from "./UnlockUserButton";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -85,6 +86,7 @@ export default async function AdminPage() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Rol</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Licencia</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Estado</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Bloqueo</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wide">Acciones</th>
                 </tr>
               </thead>
@@ -131,7 +133,24 @@ export default async function AdminPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
+                        {user.isLocked ? (
+                          <div className="flex flex-col gap-2">
+                            <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-300">
+                              🔒 Bloqueado
+                            </span>
+                            {user.lockedUntil && (
+                              <span className="text-xs text-red-300/70">
+                                Hasta: {new Date(user.lockedUntil).toLocaleTimeString('es-MX')}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-sm">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
+                          <UnlockUserButton userId={user.id} username={user.username} isLocked={user.isLocked} />
                           <LicenseEditor userId={user.id} initialDaysLeft={daysLeft} />
                           <DeleteUserButton userId={user.id} username={user.username} />
                         </div>
