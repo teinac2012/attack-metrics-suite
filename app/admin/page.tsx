@@ -140,7 +140,3 @@ export default async function AdminPage() {
     </div>
   );
 }
-      </Link>
-    </div>
-  );
-}
