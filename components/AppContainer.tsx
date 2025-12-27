@@ -98,6 +98,9 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
         console.log(`[${appName}]:`, event.data.message);
       } else if (event.data.type === "APP_READY") {
         console.log(`[AppContainer] App ${appId} está lista`);
+      } else if (event.data.type === "DOWNLOAD_FILE") {
+        console.log(`[AppContainer] Procesando descarga: ${event.data.filename}`);
+        handleDownload(event.data);
       }
     };
 
@@ -106,6 +109,43 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
       window.removeEventListener("message", handleMessage);
     };
   }, [appId, appName]);
+
+  const handleDownload = (downloadData: { filename: string; data: string }) => {
+    try {
+      // Convertir base64 a blob
+      const byteCharacters = atob(downloadData.data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray]);
+
+      // Crear URL de descarga
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = downloadData.filename;
+      
+      // Trigger descarga
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Limpiar URL
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      console.log(`[AppContainer] Descarga completada: ${downloadData.filename}`);
+      toast.success(`✅ Descargado: ${downloadData.filename}`, {
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error("Error procesando descarga:", error);
+      toast.error("❌ Error en la descarga", {
+        duration: 2000,
+      });
+    }
+  };
 
   const saveAppData = async (data?: any) => {
     try {
