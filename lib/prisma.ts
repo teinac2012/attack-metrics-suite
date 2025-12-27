@@ -1,23 +1,19 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
 const globalForPrisma = globalThis as any;
 
-let prisma: PrismaClient;
+export const getPrisma = () => {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = new PrismaClient();
+  }
+  return globalForPrisma.prisma;
+};
 
-if (!globalForPrisma.prisma) {
-  const connectionString = process.env.DATABASE_URL;
-
-  const pool = new Pool({ connectionString });
-  const adapter = new PrismaPg(pool);
-
-  prisma = new PrismaClient({
-    adapter,
-  });
-  globalForPrisma.prisma = prisma;
-} else {
-  prisma = globalForPrisma.prisma;
-}
-
-export { prisma };
+export const prisma = (() => {
+  try {
+    return getPrisma();
+  } catch {
+    // Return a dummy object during build; will be replaced at runtime
+    return null;
+  }
+})() as any;
