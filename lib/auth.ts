@@ -41,18 +41,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             throw new Error("Usuario o contraseña no válida");
           }
           
-          // Verificar si hay un dispositivo activo (session lock reciente)
+          // Verificar si hay un dispositivo activo (session lock reciente < 2 minutos)
           const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
-          const isLockActive = lock && (Date.now() - new Date(lock.lastSeen).getTime() < 60_000);
+          const timeSinceLastSeen = lock ? Date.now() - new Date(lock.lastSeen).getTime() : Infinity;
+          const isLockActive = lock && timeSinceLastSeen < 120_000; // 2 minutos
           
           if (isLockActive) {
             // Si es un usuario normal (no ADMIN), rechazar el login
             if (user.role !== 'ADMIN') {
-              console.error("[AUTH] Device already active for user:", credentials.username);
+              console.error("[AUTH] Device already active for user:", credentials.username, "- last seen", Math.floor(timeSinceLastSeen / 1000), "seconds ago");
               throw new Error("Ya hay un dispositivo activo en esta cuenta. Cierra sesión en el otro dispositivo primero.");
             }
             // Si es ADMIN, permitir sobrescribir y eliminar el lock previo
             console.warn("[AUTH] ADMIN override - removing existing session lock for:", credentials.username);
+            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
+          } else if (lock && timeSinceLastSeen >= 120_000) {
+            // Limpiar locks antiguos (más de 2 minutos sin actividad)
+            console.log("[AUTH] Cleaning stale session lock for:", credentials.username);
             await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
           }
           
