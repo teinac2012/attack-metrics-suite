@@ -1,0 +1,3540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <meta name="theme-color" content="#121212">
+    <title>Attack Metrics v3.1 - Red Filtrada</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #121212; --panel: #1e1e1e; --border: #333;
+            --accent: #f39c12; --success: #27ae60; --fail: #c0392b;
+            --dribble: #00cec9; --regate: #f1c40f; --def: #8e44ad;
+            --text: #ecf0f1; --btn-blue: #3498db; --rival: #e74c3c;
+            --header-h: 50px;
+        }
+        
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); color: var(--text); 
+            margin: 0; height: 100dvh; width: 100vw;
+            display: flex; flex-direction: column; overflow: hidden; 
+        }
+
+        /* HEADER */
+        header { 
+            height: var(--header-h); background: #000; border-bottom: 1px solid var(--border); 
+            display: flex; align-items: center; padding: 0 5px; gap: 5px; flex-shrink: 0;
+            overflow-x: auto; overflow-y: hidden; white-space: nowrap; z-index: 100;
+        }
+        header::-webkit-scrollbar { height: 2px; }
+        header::-webkit-scrollbar-thumb { background: #444; }
+
+        /* AJUSTES DE TAMAÑO PARA COMPRIMIR EL ENCABEZADO */
+        .logo { font-weight: 900; font-size: 0.6rem; margin-right: 2px; display:flex; flex-direction:column; line-height:0.9;} 
+        .logo span { color: var(--accent); }
+        
+        .btn-header { 
+            background: #333; border: 1px solid #555; color: #ccc; border-radius: 4px; 
+            padding: 0 4px; /* Reducido */
+            height: 28px; /* Reducido */
+            font-size: 0.6rem; /* Reducido */
+            font-weight: bold; cursor: pointer; flex-shrink: 0;
+        }
+        .btn-save { background: #444; border-color: #666; color:#fff; }
+
+        /* POSESIÓN */
+        .pos-group { display: flex; background: #222; border-radius: 4px; border: 1px solid #444; overflow: hidden; margin-right: 5px; flex-shrink: 0;}
+        .pos-btn { 
+            border: none; padding: 0 4px; /* Reducido */
+            height: 28px; /* Reducido */
+            font-weight: 800; font-size: 0.6rem; 
+            cursor: pointer; color: #888; background: #1a1a1a; border-right: 1px solid #333; transition: 0.2s;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 30px; /* Reducido */
+        }
+        .pos-btn.active-home { background: var(--btn-blue); color: #fff; }
+        .pos-btn.active-away { background: var(--rival); color: #fff; }
+        .pos-btn.active-out { background: #7f8c8d; color: #fff; }
+        .pos-btn.active-stop { background: #f39c12; color: #000; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% {opacity:1;} 50% {opacity:0.6;} 100% {opacity:1;} }
+
+        .timer-wrapper { display:flex; flex-direction:column; align-items:center; margin-right:5px; flex-shrink:0;}
+        .timer-display { font-family: monospace; font-size: 0.9rem; /* Reducido */ font-weight: 900; color: #fff; text-align: center; width: 45px; /* Reducido */ }
+        .pos-bar-mini { height: 3px; display: flex; width: 100%; margin-top: 2px; border-radius: 2px; overflow: hidden;}
+
+        .btn-reset { background: #c0392b; color: white; border: 1px solid #e74c3c; font-size: 0.9rem; /* Reducido */ padding: 0 6px; height: 28px; /* Reducido */ border-radius: 4px; flex-shrink:0;}
+
+        /* FILTROS Y VISTAS */
+        select.header-select { 
+            background: #222; border: 1px solid #555; color: #fff; padding: 0 3px; /* Reducido */
+            border-radius: 4px; font-weight: bold; height: 28px; /* Reducido */
+            font-size: 0.6rem; /* Reducido */
+            max-width: 70px; /* Reducido */
+        }
+        
+        #viewMode { background: #2c3e50; border: 1px solid #3498db; color: #fff; width: 70px; /* Reducido */ }
+
+        .toggle-wrapper { display: flex; align-items: center; gap: 3px; font-size: 0.55rem; font-weight: bold; color: #aaa; flex-shrink: 0; border: 1px solid #333; padding: 0 4px; height: 28px; border-radius: 4px; background: #1a1a1a;}
+        .switch { position: relative; display: inline-block; width: 22px; height: 12px; /* Reducido */ }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 7px; width: 7px; left: 2px; bottom: 2.5px; /* Ajustado */ background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(10px); }
+
+        .btn-tool { 
+            border: none; padding: 0 3px; /* Reducido */
+            height: 28px; /* Reducido */
+            color: #fff; border-radius: 4px; cursor: pointer; 
+            font-weight: bold; font-size: 0.55rem; /* Reducido */
+            flex-shrink: 0;
+            min-width: 45px; /* Ancho mínimo para etiquetas cortas */
+        }
+        /* Ajuste específico para las herramientas con etiquetas más largas */
+        .btn-tool[onclick*="openZScoreModal"],
+        .btn-tool[onclick*="openSankeyModal"],
+        .btn-tool[onclick*="openFlowVizModal"],
+        .btn-tool[onclick*="openAvgPosModal"],
+        .btn-tool[onclick*="openHullModal"] 
+        {
+            min-width: 50px;
+            padding: 0 2px;
+            font-size: 0.5rem;
+        }
+        
+        /* LAYOUT */
+        .layout { display: flex; flex: 1; overflow: hidden; height: calc(100dvh - var(--header-h)); }
+        
+        .field-col { 
+            background: #000; display: flex; flex-direction: column; padding: 2px; position: relative; 
+            flex: 65; justify-content: flex-start; overflow: hidden;
+        }
+
+        /* --- VIDEO PANEL --- */
+        #videoPanel { display: none; flex-direction: column; background: #111; border-bottom: 1px solid #333; padding: 0; flex-shrink: 0; width: 100%; height: 35%; transition: height 0.3s ease; z-index: 20; }
+        .player-container { width: 100%; height: calc(100% - 28px); background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        #myVid { width: 100%; height: 100%; object-fit: contain; }
+        .vid-controls { height: 28px; display: flex; gap: 5px; align-items: center; padding: 2px 5px; background: #222; overflow-x: auto; white-space: nowrap; border-top: 1px solid #333; }
+        .vid-input { font-size: 0.65rem; color: #fff; background: #333; border: 1px solid #555; padding: 2px; border-radius: 4px; flex: 1; }
+        .vid-btn { background: #444; color: #fff; border: 1px solid #555; cursor: pointer; font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; }
+
+        /* --- PITCH --- */
+        .pitch-container { flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; width: 100%; position: relative; background: #000; min-height: 0; }
+        .pitch-wrapper { position: relative; border: 1px solid #444; overflow: hidden; background: #204a2e; cursor: crosshair; touch-action: none; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); aspect-ratio: 1.5 / 1; height: 98%; width: auto; max-width: 98%; margin: auto; }
+        canvas { width: 100%; height: 100%; display:block; object-fit: contain;}
+        
+        .field-stats { display: flex; gap: 5px; justify-content: space-between; background: #111; padding: 4px 5px; border-top: 1px solid #333; flex-shrink: 0; }
+        .fs-box { background: #222; padding: 2px 8px; border-radius: 4px; border-left: 3px solid var(--accent); flex: 1; display: flex; flex-direction: column; align-items: center;}
+        .fs-val { font-size: 0.8rem; font-weight: 800; display: block; } 
+        .fs-lbl { font-size: 0.5rem; color: #aaa; text-transform: uppercase; text-align: center; }
+
+        /* DATA COL */
+        .data-col { background: var(--panel); display: flex; flex-direction: column; overflow-y: auto; border-left: 1px solid var(--border); -webkit-overflow-scrolling: touch; flex: 35; min-width: 280px; }
+        .input-section { padding: 8px; background: #1a1a1a; border-bottom: 1px solid var(--border); flex-shrink: 0;}
+        .input-section.edit-mode { border: 2px solid var(--accent); background: #2a2515; }
+
+        .team-toggle { display: flex; background: #111; border-radius: 6px; margin-bottom: 8px; overflow: hidden; border: 1px solid #444; height: 36px;}
+        .t-opt { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; cursor: pointer; color: #666; transition: 0.2s;}
+        .t-opt.active-home { background: #2c3e50; color: #fff; border-bottom: 3px solid var(--btn-blue); }
+        .t-opt.active-away { background: #3b1e1e; color: #fff; border-bottom: 3px solid var(--rival); }
+        
+        .p-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px; margin-bottom: 10px; max-height: 110px; overflow-y: auto; background: #111; padding: 6px; border-radius: 6px; }
+        .p-btn { background: #2a2a2a; border: 1px solid #444; color: #aaa; border-radius: 6px; padding: 6px 0; text-align: center; cursor: pointer; display:flex; flex-direction:column; align-items:center; transition: 0.1s; min-height: 45px; }
+        .p-btn b { font-size: 1rem; color: #fff; margin-bottom: 1px;} 
+        .p-btn span { font-size: 0.6rem; font-weight: 500;}
+        .p-btn.active { background: var(--accent); color: #000; border-color: var(--accent); } 
+
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+        .a-btn { padding: 10px 2px; border: 1px solid #444; background: #2c3e50; color: #fff; border-radius: 6px; font-weight: bold; font-size: 0.65rem; cursor: pointer; border-left-width: 4px; min-height: 40px; }
+        .a-btn.active { background: #fff; color: #000; border-color: var(--accent); transform: translateY(-1px);}
+
+        .xg-row { display: none; gap: 8px; background: #000; padding: 8px; border-radius: 6px; margin-bottom: 8px; border: 1px dashed #444;}
+        .xg-row input { background: #222; border: 1px solid #555; color: var(--accent); text-align: center; width: 100%; padding: 8px; font-weight: bold; border-radius: 4px; font-size: 1rem;}
+
+        .btn-res { width: 100%; padding: 12px; border: none; font-weight: 900; color: #fff; border-radius: 6px; margin-top: 4px; cursor: pointer; font-size: 0.8rem; min-height: 44px; }
+        
+        .charts-area { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; min-height: 200px; }
+        .chart-head { font-size: 0.7rem; color: var(--accent); font-weight: 800; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 2px;}
+        .bar-row { display: flex; align-items: center; font-size: 0.7rem; margin-bottom: 4px; }
+        .bar-lbl { width: 70px; text-align: right; padding-right: 8px; color: #aaa; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 500;}
+        .bar-track { flex: 1; background: #222; height: 8px; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; background: #ccc; }
+        .bar-val { width: 30px; padding-left: 6px; font-weight: bold; font-size: 0.7rem;}
+        
+        .lanes-viz { display: flex; height: 25px; border-radius: 6px; overflow: hidden; border: 1px solid #333; margin-top: 5px; font-weight: bold;}
+        .lane-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.5); overflow: hidden; white-space: nowrap;}
+        
+        .log-table { height: 150px; background: #111; overflow-y: auto; border-top: 1px solid #333; font-size: 0.7rem; flex-shrink: 0; }
+        table { width: 100%; border-collapse: collapse; } 
+        th { position: sticky; top: 0; background: #222; z-index: 5; color: #aaa; font-size: 0.6rem; text-transform: uppercase; padding: 6px 4px;}
+        td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #222; color: #ccc; }
+        
+        /* MODALS */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; justify-content: center; align-items: center; backdrop-filter: blur(5px);}
+        .modal-box { background: #1e1e1e; width: 95%; max-width: 800px; padding: 20px; border-radius: 16px; border: 1px solid #444; display: flex; flex-direction: column; height: 90vh; }
+        .modal-head { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0;}
+        .close { background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; padding: 0 15px;}
+        .check-list { background: #111; border: 1px solid #333; padding: 10px; border-radius: 6px; overflow-y: auto; flex: 1; min-height: 80px; }
+        .check-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #222; cursor: pointer; }
+        .check-item input { margin-right: 15px; transform: scale(1.4); }
+        #radarChartContainer { flex: 2; min-height: 350px; width: 100%; position: relative; margin-top: 15px; overflow: hidden; }
+        #scatterChartContainer { flex: 1; width: 100%; position: relative; margin-top: 10px; overflow: hidden; background: #111; border-radius:8px; border:1px solid #333; padding: 10px;}
+
+        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 14px 28px; border-radius: 30px; border: 1px solid var(--accent); opacity: 0; transition: 0.3s; pointer-events: none; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 6000; font-size: 1rem;}
+        .toast.show { opacity: 1; bottom: 120px; }
+
+        /* --- ZONAS 5x8 (DISEÑO COMPACTO Y FLECHA LATERAL) --- */
+        .zones-wrapper { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 20px; 
+            height: 100%; 
+            overflow: hidden; 
+            padding: 5px; 
+        }
+        
+        .zone-card { 
+            background: #111; 
+            border: 1px solid #333; 
+            border-radius: 8px; 
+            padding: 4px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            width: 48%; 
+            max-width: 320px; /* Reducido para evitar scroll */
+        }
+        
+        .zone-header { 
+            font-size: 1rem; 
+            font-weight: 900; 
+            margin-bottom: 4px; 
+            text-transform: uppercase; 
+            line-height: 1;
+            /* Flex para alinear nombre y flecha en la misma linea */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        /* Ocultamos la flecha antigua grande */
+        .attack-arrow { display: none; }
+        
+        .arrow-shape { width: 20px; height: 100%; background: linear-gradient(to top, rgba(255,255,255,0.1), rgba(255,255,255,0.8)); clip-path: polygon(40% 0, 40% 80%, 0 80%, 50% 100%, 100% 80%, 60% 80%, 60% 0); }
+        
+        .zone-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(8, 1fr); gap: 1px; background: rgba(255,255,255,0.2); border: 2px solid #fff; width: 100%; aspect-ratio: 5 / 8; position: relative; }
+        .z-cell { display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.6rem; color: #fff; text-shadow: 0 1px 2px #000; font-weight: bold; background: #204a2e; position: relative; cursor: default; z-index: 1; }
+        .z-pct { font-size: 0.8rem; } .z-count { font-size: 0.5rem; opacity: 0.8; }
+        .z-legend { display: flex; gap: 10px; margin-top: 10px; font-size: 0.6rem; color: #aaa; }
+        .zl-box { width: 10px; height: 10px; display: inline-block; margin-right: 3px; border-radius: 2px;}
+
+        .pm-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+        .pm-center-line { position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.5); transform: translateY(-50%); }
+        .pm-center-circle { position: absolute; top: 50%; left: 50%; width: 20%; height: 12.5%; border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%); }
+        .pm-area-box.top { position: absolute; top: 0; left: 20%; width: 60%; height: 16.5%; border: 2px solid rgba(255,255,255,0.7); border-top: none; }
+        .pm-area-small.top { position: absolute; top: 0; left: 36%; width: 28%; height: 6%; border: 2px solid rgba(255,255,255,0.7); border-top: none; }
+        .pm-area-box.btm { position: absolute; bottom: 0; left: 20%; width: 60%; height: 16.5%; border: 2px solid rgba(255,255,255,0.7); border-bottom: none; }
+        .pm-area-small.btm { position: absolute; bottom: 0; left: 36%; width: 28%; height: 6%; border: 2px solid rgba(255,255,255,0.7); border-bottom: none; }
+        .pm-spot { position: absolute; width: 4px; height: 4px; background: #fff; border-radius: 50%; left: 50%; transform: translateX(-50%); }
+        .pm-spot.top { top: 11%; } .pm-spot.btm { bottom: 11%; }
+        .pm-arc { position: absolute; width: 20%; height: 6%; border: 2px solid rgba(255,255,255,0.7); left: 50%; transform: translateX(-50%); }
+        .pm-arc.top { top: 16.5%; border-top: none; border-radius: 0 0 50% 50%; } .pm-arc.btm { bottom: 16.5%; border-bottom: none; border-radius: 50% 50% 0 0; }
+
+        /* FIELD TILT */
+        .ft-container { padding: 15px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
+        .ft-bar-wrapper { width: 100%; max-width: 500px; height: 40px; background: #333; border-radius: 20px; overflow: hidden; display: flex; position: relative; border: 2px solid #555; }
+        .ft-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5); transition: width 0.5s ease; color: white;}
+        .ft-seg.home { background: var(--btn-blue); } .ft-seg.away { background: var(--rival); }
+        .ft-label { display: flex; justify-content: space-between; width: 100%; max-width: 500px; color: #aaa; font-size: 0.8rem; font-weight: bold; margin-bottom: -15px; }
+        
+        .ft-heat-compare { display: flex; gap: 10px; width: 100%; justify-content: center; }
+        .ft-heat-box { background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; width: 48%; display: flex; flex-direction: column; align-items: center; }
+        .ft-heat-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; }
+        .ft-heat-lanes { display: flex; width: 100%; height: 100px; border: 1px solid #444; border-radius: 4px; overflow: hidden; }
+        .ft-lane { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; border-right: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); }
+        .ft-lane:last-child { border-right: none; }
+        .ft-lane-fill { width: 100%; background: #fff; opacity: 0.2; transition: height 0.5s; position: absolute; bottom: 0; }
+        .ft-lane-val { z-index: 2; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #fff; text-shadow: 0 1px 2px #000; }
+        .ft-lane-lbl { font-size: 0.5rem; color: #888; margin-bottom: 2px; z-index: 2;}
+        /* ESTILOS NUEVOS PARA SUB-OPCIONES */
+.sub-opt-container {
+    display: none; /* Oculto por defecto, se muestra con JS */
+    flex-direction: column;
+    gap: 5px;
+    background: #222;
+    padding: 6px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px solid #444;
+    animation: fadeIn 0.3s;
+}
+.sub-opt-row { display: flex; gap: 4px; }
+.sub-lbl { font-size: 0.55rem; color: #aaa; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; }
+.sub-btn {
+    flex: 1;
+    background: #333;
+    border: 1px solid #555;
+    color: #888;
+    padding: 6px 2px;
+    font-size: 0.6rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: 0.2s;
+}
+.sub-btn:hover { background: #444; color: #fff; }
+.sub-btn.active {
+    background: var(--dribble); /* Color Cyan/Azul claro */
+    color: #000;
+    border-color: var(--dribble);
+    box-shadow: 0 0 5px rgba(0, 206, 201, 0.4);
+}
+@keyframes fadeIn { from {opacity:0; transform:translateY(-5px);} to {opacity:1; transform:translateY(0);} }
+
+    </style>
+</head>
+<body>
+
+<div id="toast" class="toast">Notificación</div>
+
+
+
+<div id="modalXgBuild" class="modal">
+    <div class="modal-box" id="boxXgBuild"> 
+        <div class="modal-head">
+            <h3>🏗 xG Buildup & Chain</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadXgBuildImg()">📷 IMG</button>
+                <button class="btn-tool" style="background:#2ecc71;" onclick="downloadXgBuildExcel()">📊 EXCEL</button>
+                <button class="close" onclick="closeModal('modalXgBuild')">✕</button>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;height:100%;">
+            <div style="flex:1;background:#111;padding:5px;overflow-y:auto;border-radius:8px">
+                <h4 style="color:#3498db;text-align:center">LOCAL</h4><div id="xgbListHome"></div>
+            </div>
+            <div style="flex:1;background:#111;padding:5px;overflow-y:auto;border-radius:8px">
+                <h4 style="color:#e74c3c;text-align:center">RIVAL</h4><div id="xgbListAway"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modalSquad" class="modal">
+    <div class="modal-box">
+        <div class="modal-head"><h3>Gestionar Plantilla</h3><button class="close" onclick="closeModal('modalSquad')">✕</button></div>
+        <div class="team-toggle">
+            <div class="t-opt active-home" id="sqHome" onclick="setSquadTeam('HOME')">MI EQUIPO</div>
+            <div class="t-opt" id="sqAway" onclick="setSquadTeam('AWAY')">RIVAL</div>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:15px;">
+            <input type="number" id="newNum" placeholder="#" style="width:70px; text-align:center; padding:12px; border-radius:6px; background:#222; border:1px solid #444; color:#fff; font-weight:bold; font-size:1rem;">
+            <input type="text" id="newNam" placeholder="Nombre Jugador" style="flex:1; padding:12px; border-radius:6px; background:#222; border:1px solid #444; color:#fff; font-size:1rem;">
+            <button class="btn-header" onclick="addPlayer()" style="background:var(--btn-blue); color:white; font-size:1.5rem; width:60px;">+</button>
+        </div>
+        <div class="check-list" id="squadList"></div>
+    </div>
+</div>
+
+<div id="modalRadar" class="modal">
+    <div class="modal-box" id="boxRadar">
+        <div class="modal-head">
+            <h3>Comparador <span id="selCount" style="font-size:0.7rem; color:#888;">(0)</span></h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadRadar()">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalRadar')">✕</button>
+            </div>
+        </div>
+        <div style="background:#111; padding:8px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-around; align-items:center; border:1px solid #333; flex-shrink: 0;">
+            <div style="text-align:center;">
+                <div style="font-size:0.6rem; color:#aaa; font-weight:bold;">LOCAL</div>
+                <div style="font-size:1.1rem; font-weight:900; color:#3498db;" id="radPosHome">0%</div>
+            </div>
+            <div style="font-size:0.55rem; color:#555; font-weight:bold; letter-spacing:1px;">POSESIÓN</div>
+            <div style="text-align:center;">
+                <div style="font-size:0.6rem; color:#aaa; font-weight:bold;">RIVAL</div>
+                <div style="font-size:1.1rem; font-weight:900; color:#e74c3c;" id="radPosAway">0%</div>
+            </div>
+        </div>
+        <div style="display:flex; gap:15px; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px; justify-content:center; flex-shrink: 0;">
+            <label style="color:#3498db; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px; font-size:0.8rem;"><input type="checkbox" id="chkHome" onchange="updateRadar()"> <span id="lblRHome">LOCAL</span></label>
+            <label style="color:#e74c3c; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px; font-size:0.8rem;"><input type="checkbox" id="chkAway" onchange="updateRadar()"> <span id="lblRAway">RIVAL</span></label>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#aaa; margin-bottom:5px; flex-shrink: 0;">
+            <span>Jugadores:</span> <span style="cursor:pointer; text-decoration:underline; color:#fff;" onclick="toggleAll()">Seleccionar Todos</span>
+        </div>
+        <div class="check-list" id="radarList"></div>
+        <div id="radarChartContainer"><canvas id="radarCanvas"></canvas></div>
+    </div>
+</div>
+
+<div id="modalZScore" class="modal">
+    <div class="modal-box" id="boxZScore">
+        <div class="modal-head">
+            <h3>⏱ Z-Score & Scatter</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxZScore', 'ZScore_Analysis')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalZScore')">✕</button>
+            </div>
+        </div>
+        <div style="padding:10px; background:#222; margin-bottom:10px; font-size:0.8rem; color:#aaa;">Introduce minutos reales. El gráfico usa Z-Scores normalizados.</div>
+        <div class="check-list" id="zScoreList" style="flex: 1; max-height: 40%;"></div>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn-res" style="background:#27ae60; flex:1;" onclick="generateZScoreExcel()">📊 EXCEL</button>
+            <button class="btn-res" style="background:#3498db; flex:1;" onclick="openScatterModal()">📈 GRAFICO DISPERSIÓN</button>
+        </div>
+    </div>
+</div>
+
+<div id="modalScatter" class="modal">
+    <div class="modal-box" id="boxScatter">
+        <div class="modal-head">
+            <h3>📈 Rendimiento (Ofensivo vs Defensivo)</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxScatter', 'Scatter_Plot')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalScatter')">✕</button>
+            </div>
+        </div>
+        <div style="font-size:0.7rem; color:#888; text-align:center; padding:5px;">EJE X: Z-Score Defensivo (Recup + Control) | EJE Y: Z-Score Ofensivo (Ataque + xG)</div>
+        <div id="scatterChartContainer"><canvas id="scatterCanvas"></canvas></div>
+    </div>
+</div>
+
+<div id="modalZones" class="modal">
+    <div class="modal-box" style="height:95vh;" id="boxZones">
+        <div class="modal-head">
+            <h3>🌐 Zonas de Efectividad (5x8)</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxZones', 'Zonas_Efectividad')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalZones')">✕</button>
+            </div>
+        </div>
+        <div style="text-align:center; padding:5px; background:#222; font-size:0.7rem; color:#ccc; margin-bottom:5px; border-radius:4px;">
+            Calculado sobre acciones positivas. <br>
+            <span class="zl-box" style="background:#c0392b"></span>&lt;50% 
+            <span class="zl-box" style="background:#d35400"></span>50-75% 
+            <span class="zl-box" style="background:#27ae60"></span>&gt;75%
+        </div>
+        <div class="zones-wrapper">
+            <div class="zone-card">
+                <div class="zone-header" style="color:#3498db" id="zTitleHome">LOCAL</div>
+                <div class="attack-arrow"><div class="arrow-shape" style="background:#3498db"></div><span style="position:absolute; bottom:0; right:0;">ATAQUE ⇧</span></div>
+                <div class="zone-grid" id="gridHome"></div>
+            </div>
+            <div class="zone-card">
+                <div class="zone-header" style="color:#e74c3c" id="zTitleAway">RIVAL</div>
+                <div class="attack-arrow"><div class="arrow-shape" style="background:#e74c3c"></div><span style="position:absolute; bottom:0; right:0;">ATAQUE ⇧</span></div>
+                <div class="zone-grid" id="gridAway"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modalFieldTilt" class="modal">
+    <div class="modal-box" id="boxFieldTilt">
+        <div class="modal-head">
+            <h3>⚖️ Field Tilt (Dominio Territorial)</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxFieldTilt', 'Field_Tilt_Metrics')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalFieldTilt')">✕</button>
+            </div>
+        </div>
+        <div style="text-align:center; padding:10px; color:#aaa; font-size:0.8rem; background:#222; margin-bottom:20px;">
+            Compara acciones en el último tercio de campo.<br>
+            <i>"¿Quién inclinó el campo a su favor?"</i>
+        </div>
+        
+        <div class="ft-container">
+            <div class="ft-label"><span id="lblFtHome">LOCAL</span><span id="lblFtAway">RIVAL</span></div>
+            <div class="ft-bar-wrapper">
+                <div class="ft-seg home" id="ftBarHome" style="width:50%">50%</div>
+                <div class="ft-seg away" id="ftBarAway" style="width:50%">50%</div>
+            </div>
+            <div style="font-size:0.7rem; color:#666; margin-top:-10px;">Acciones en Último Tercio</div>
+
+            <div class="ft-heat-compare">
+                <div class="ft-heat-box">
+                    <div class="ft-heat-title" style="color:#3498db">Ataque Local</div>
+                    <div class="ft-heat-lanes" id="ftLanesHome">
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#3498db"></div><div class="ft-lane-lbl">IZQ</div><div class="ft-lane-val">0</div></div>
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#3498db"></div><div class="ft-lane-lbl">CEN</div><div class="ft-lane-val">0</div></div>
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#3498db"></div><div class="ft-lane-lbl">DER</div><div class="ft-lane-val">0</div></div>
+                    </div>
+                    <div style="margin-top:5px; font-size:0.8rem; font-weight:bold; color:#fff;">Total: <span id="ftTotHome">0</span></div>
+                </div>
+
+                <div class="ft-heat-box">
+                    <div class="ft-heat-title" style="color:#e74c3c">Ataque Rival</div>
+                    <div class="ft-heat-lanes" id="ftLanesAway">
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#e74c3c"></div><div class="ft-lane-lbl">IZQ</div><div class="ft-lane-val">0</div></div>
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#e74c3c"></div><div class="ft-lane-lbl">CEN</div><div class="ft-lane-val">0</div></div>
+                        <div class="ft-lane"><div class="ft-lane-fill" style="height:0%; background:#e74c3c"></div><div class="ft-lane-lbl">DER</div><div class="ft-lane-val">0</div></div>
+                    </div>
+                    <div style="margin-top:5px; font-size:0.8rem; font-weight:bold; color:#fff;">Total: <span id="ftTotAway">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modalViolin" class="modal">
+    <div class="modal-box" id="boxViolin" style="height:90vh; max-width:95%;">
+        <div class="modal-head">
+            <h3>🎻 Campograma Táctico</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadViolinImg()">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalViolin')">✕</button>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+            <span style="font-size:0.7rem; color:#aaa; font-weight:bold;">TIPO:</span>
+            <select id="violinMetric" onchange="updateViolin()" style="background:#333; color:#fff; border:1px solid #555; padding:5px; border-radius:4px;">
+                <option value="X">Campograma (Longitudinal)</option>
+                <option value="Y">Anchura (Lateral)</option>
+            </select>
+            
+            <span style="font-size:0.7rem; color:#aaa; font-weight:bold; margin-left:10px;">EQUIPO:</span>
+            <select id="violinTeam" onchange="updateViolin()" style="background:#333; color:#fff; border:1px solid #555; padding:5px; border-radius:4px;">
+                <option value="HOME">Local</option>
+                <option value="AWAY">Rival</option>
+            </select>
+        </div>
+
+        <div id="violinChartContainer" style="flex:1; width:100%; overflow:hidden; border:1px solid #333; border-radius:8px; background:#111;"></div>
+    </div>
+</div>
+
+<div id="modalAvgPos" class="modal">
+    <div class="modal-box" style="height:90vh; max-width:1000px;">
+        <div class="modal-head">
+            <h3>📍 Red de Pases & Ubicación</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadAvgPosImg()">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalAvgPos')">✕</button>
+            </div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; justify-content: center; align-items:center;">
+            <button class="t-opt active-home" id="btnAvgHome" onclick="setAvgPosTeam('HOME')" style="padding: 5px 15px; border-radius: 4px;">LOCAL</button>
+            <button class="t-opt" id="btnAvgAway" onclick="setAvgPosTeam('AWAY')" style="padding: 5px 15px; border-radius: 4px;">RIVAL</button>
+            <select id="avgPosPhaseFilter" onchange="drawAvgPos()" style="background:#222; color:#f39c12; border:1px solid #555; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:0.65rem; margin-left:8px; height:24px;">
+    <option value="ALL">🌐 TODAS FASES</option>
+    <option value="Salida">🏗️ Salida</option>
+    <option value="Progresion">🚀 Progresión</option>
+    <option value="Finalizacion">🎯 Finalización</option>
+    <option value="Transicion_Of">⚡ Contraataque</option>
+</select>
+            <div style="width:1px; height:20px; background:#444; margin:0 5px;"></div>
+            
+            <label style="color:#fff; font-size:0.7rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                <input type="checkbox" id="chkShowNet" onchange="drawAvgPos()" checked> 🕸️ Red
+            </label>
+            <label style="color:#fff; font-size:0.7rem; display:flex; align-items:center; gap:2px; cursor:pointer; margin-left:5px;">
+                Min. Pases: 
+                <input type="number" id="minPassInput" value="2" min="1" max="50" style="width:35px; text-align:center; border-radius:4px; border:1px solid #555; background:#111; color:#fff; font-weight:bold;" onchange="drawAvgPos()">
+            </label>
+
+            <label style="color:#fff; font-size:0.7rem; display:flex; align-items:center; gap:5px; cursor:pointer; margin-left:10px;">
+                <input type="checkbox" id="chkShowSonar" onchange="drawAvgPos()"> 📡 Sonares
+            </label>
+        </div>
+
+        <div class="pitch-wrapper" style="flex:1; width:100%; border:1px solid #444; background:#204a2e; position:relative;">
+            <canvas id="avgPosCanvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="modalSankey" class="modal">
+    <div class="modal-box" id="boxSankey" style="height:90vh; max-width:1100px;">
+        <div class="modal-head">
+            <h3>🌊 Flujo de Posesión (Sankey)</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxSankey', 'Sankey_Diagram')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalSankey')">✕</button>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; justify-content:center; align-items:center;">
+            <button class="t-opt active-home" id="btnSankeyHome" onclick="updateSankey('HOME')" style="padding:5px 15px;">LOCAL</button>
+            <button class="t-opt" id="btnSankeyAway" onclick="updateSankey('AWAY')" style="padding:5px 15px;">RIVAL</button>
+            <span style="color:#aaa; font-size:0.7rem; margin-left:10px;">Muestra: Zona Inicio Posesión ➔ Zona Fin Posesión</span>
+        </div>
+        <div id="sankeyChartContainer" style="flex:1; width:100%; background:#fff; border-radius:6px; overflow:hidden;"></div>
+    </div>
+</div>
+<div id="modalFlowViz" class="modal">
+    <div class="modal-box" style="height:90vh; max-width:95%;">
+        <div class="modal-head">
+            <h3>🌊 Visor de Posesiones Secuenciales</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadFlowImg()">📷 IMG</button>
+                <button class="btn-tool" style="background:#1abc9c;" onclick="downloadPossessionData()">💾 DATOS POS.</button>
+                <button class="close" onclick="closeModal('modalFlowViz')">✕</button>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; flex-wrap:wrap; justify-content:center; align-items:center;">
+            <button class="t-opt active-home" id="btnFlowHome" onclick="setFlowTeam('HOME')" style="padding: 5px 15px; border-radius: 4px;">LOCAL</button>
+            <button class="t-opt" id="btnFlowAway" onclick="setFlowTeam('AWAY')" style="padding: 5px 15px; border-radius: 4px;">RIVAL</button>
+            
+            <div style="width:1px; height:20px; background:#444; margin:0 5px;"></div>
+            
+            <button class="btn-tool" style="background:#e67e22; font-size:0.8rem;" onclick="navigatePossession(-1)">◀ ANTERIOR</button>
+            <span id="possessionDisplay" style="font-weight:bold; color:#fff; min-width:150px; text-align:center;">Cargando...</span>
+            <button class="btn-tool" style="background:#e67e22; font-size:0.8rem;" onclick="navigatePossession(1)">SIGUIENTE ▶</button>
+        </div>
+
+        <div style="display:flex; flex:1; overflow:hidden; gap:10px;">
+            <div class="pitch-wrapper" style="flex:2; border:1px solid #444; background:#204a2e; position:relative;">
+                <canvas id="flowVizCanvas"></canvas>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; max-width: 300px;">
+                <div style="font-size:0.7rem; color:#aaa; font-weight:bold; margin-bottom:5px;">ACCIONES DE LA POSESIÓN:</div>
+                <div class="log-table" style="flex:1; min-height:100px; background:#111; border:1px solid #333;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Min</th>
+                                <th>Jug / Fase</th>
+                                <th>Acc</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flowLogBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="modalHulls" class="modal">
+    <div class="modal-box" style="height:95vh; max-width:1100px;">
+        <div class="modal-head">
+            <h3>🌐 Zonas de Influencia (Convex Hulls)</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadHullImg()">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalHulls')">✕</button>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; height:100%; overflow:hidden;">
+            <div style="width:250px; display:flex; flex-direction:column; gap:10px; flex-shrink:0;">
+                <div class="team-toggle">
+                    <div class="t-opt active-home" id="hullHome" onclick="setHullTeam('HOME')">LOCAL</div>
+                    <div class="t-opt" id="hullAway" onclick="setHullTeam('AWAY')">RIVAL</div>
+                </div>
+                
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-res" style="font-size:0.7rem; padding:5px;" onclick="toggleHullAll(true)">Marcar Todos</button>
+                    <button class="btn-res" style="font-size:0.7rem; padding:5px; background:#444;" onclick="toggleHullAll(false)">Desmarcar</button>
+                </div>
+
+                <div class="check-list" id="hullPlayerList" style="flex:1;"></div>
+            </div>
+
+            <div class="pitch-wrapper" style="flex:1; border:1px solid #444; background:#204a2e; position:relative;">
+                <canvas id="hullCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="modalFootprint" class="modal">
+    <div class="modal-box" id="boxFootprint" style="height:95vh; max-width:1200px;">
+        <div class="modal-head">
+            <h3>👣 Huella Táctica Colectiva</h3>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-tool" style="background:#27ae60;" onclick="downloadElementImage('boxFootprint', 'Huella_Tacticia')">📷 IMG</button>
+                <button class="close" onclick="closeModal('modalFootprint')">✕</button>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:15px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
+    <span style="color:#aaa; font-size:0.7rem; font-weight:bold;">FILTRO: Excluye Bandas y 1ª acción posterior</span>
+    
+    <div class="team-toggle" style="margin:0; width: 250px; flex-shrink: 0;">
+        <div class="t-opt active-home" id="btnFpHome" onclick="updateFootprint('HOME')">LOCAL</div>
+        <div class="t-opt" id="btnFpAway" onclick="updateFootprint('AWAY')">RIVAL</div>
+    </div>
+</div>
+
+        <div id="footprintChartContainer" style="flex:1; width:100%; background:#1e1e1e; border:1px solid #333; border-radius:8px; overflow:hidden; position:relative;">
+            <div id="footprintChart" style="width:100%; height:100%;"></div>
+        </div>
+    </div>
+</div>
+<header>
+    <div class="logo">ATTACK<span>METRICS</span></div>
+    <button class="btn-header btn-save" onclick="downloadBackup()">💾</button>
+    <button class="btn-header btn-save" onclick="document.getElementById('restoreFile').click()">📂</button>
+    <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="restoreBackup(this)">
+    
+    <button class="btn-header" onclick="toggleVideoPanel()" style="color:#f1c40f">🎥</button>
+    <button class="btn-header" onclick="editTeamNames()" style="color:#fff">✎</button>
+    <button class="btn-header" onclick="openSquad()" style="color:#f39c12">👥</button>
+
+    <div class="pos-group">
+        <button class="pos-btn" id="btnP_Home" onclick="setMatchState('HOME')">L</button>
+        <button class="pos-btn" id="btnP_Away" onclick="setMatchState('AWAY')">V</button>
+        <button class="pos-btn" id="btnP_Out" onclick="setMatchState('OUT')">OUT</button>
+        <button class="pos-btn" id="btnP_Stop" onclick="setMatchState('STOP')">⏹</button>
+    </div>
+    
+    <div class="timer-wrapper">
+        <div class="timer-display" id="timer">00:00</div>
+        <div class="pos-bar-mini"><div id="pb-h" style="width:50%;background:#3498db"></div><div id="pb-a" style="width:50%;background:#e74c3c"></div></div>
+    </div>
+    
+    <button class="btn-header" id="btnHalf" onclick="toggleHalf()">1T</button>
+    <button class="btn-reset" onclick="hardReset()">🗑</button>
+    
+    <select class="header-select" id="playerFilter" onchange="onPlayerSelect()"><option value="ALL">Jug</option></select>
+    <select class="header-select" id="actionTypeFilter" onchange="updateDash()" style="width:85px;">
+        <option value="ALL">Todo</option>
+        <option value="Pase">Pases</option>
+        <option value="Clave">P. Clave</option>
+        <option value="Asist">Asist</option>
+        <option value="Disparo">Tiros</option>
+        <option value="Conducción">Conduc</option>
+        <option value="Regate">Regates</option>
+        <option value="Duelo Aéreo">D. Aéreo</option>
+        <option value="Duelo Suelo">D. Suelo</option>
+        <option value="Recup">Recup</option>
+        <option value="Intercep">Intercep</option>
+        <option value="Perdida">Pérdidas</option>
+        <option value="Falta">Faltas</option>
+        <option value="Corner">Corner</option>
+        <option value="Banda">Banda</option>
+    </select>
+    
+    <select class="header-select" id="viewMode" onchange="drawPitch()" style="background:#2c3e50;color:#fff;width:75px">
+        <option value="LIVE">🎥 VIVO</option>
+        <option value="ALL">🏹 TAC</option>
+        <option value="HEAT">🔥 MAP</option>
+        <option value="XBUILD">🏗 xBUILD</option>
+    </select>
+    
+    <select class="header-select" id="teamView" onchange="onTeamSelect()"><option value="HOME">L</option><option value="AWAY">V</option><option value="ALL">T</option></select>
+    
+    <div class="toggle-wrapper"><span>Z</span><label class="switch"><input type="checkbox" id="gridToggle" onchange="drawPitch()"><span class="slider"></span></label></div>
+
+    <div style="width:1px;height:20px;background:#444;margin:0 2px"></div>
+    
+    <button class="btn-tool" style="background:#576574" onclick="openXgBuildModal()">🏗 xG</button>
+    
+    <button class="btn-tool" style="background:#8e44ad" onclick="openRadar()">VS</button>
+    <button class="btn-tool" style="background:#e67e22" onclick="openZScoreModal()">Z</button>
+    <button class="btn-tool" style="background:#e74c3c" onclick="openFieldTilt()">FT</button>
+    <button class="btn-tool" style="background:#8e44ad" onclick="openZonesModal()">Zn</button>
+    <button class="btn-tool" style="background:#16a085" onclick="openHullModal()">⬠</button>
+    <button class="btn-tool" style="background:#f39c12" onclick="openAvgPosModal()">📍</button>
+    <button class="btn-tool" style="background:#9b59b6" onclick="openViolinModal()">🎻</button>
+    <button class="btn-tool" style="background:#d35400" onclick="openFootprintModal()">👣</button>
+    <button class="btn-tool" style="background:#34495e" onclick="openSankeyModal()">🌊</button>
+    <button class="btn-tool" style="background:#2980b9" onclick="openFlowVizModal()">Seq</button>
+    
+    <div style="width:1px;height:20px;background:#444;margin:0 2px"></div>
+    
+    <button class="btn-tool" style="background:#3498db" onclick="downloadPitchImg()">📷</button>
+    <button class="btn-tool" style="background:#2ecc71" onclick="downloadExcel()">📊</button>
+</header>
+
+<div class="layout">
+    <div class="field-col">
+        <div id="videoPanel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                <span style="font-size:0.6rem; color:#888; font-weight:bold;">VIDEO LOCAL</span>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="resizeVideo(20)" class="vid-btn" style="background:#444;">Pequeño (20%)</button>
+                    <button onclick="resizeVideo(35)" class="vid-btn" style="background:#444;">Medio (35%)</button>
+                    <button onclick="resizeVideo(50)" class="vid-btn" style="background:#444;">Grande (50%)</button>
+                    <button onclick="closeVideoMode()" style="background:#c0392b; border:none; color:#fff; font-size:0.7rem; cursor:pointer; padding:2px 8px; border-radius:4px; font-weight:bold;">CERRAR</button>
+                </div>
+            </div>
+            <div class="player-container">
+                <video id="myVid" controls playsinline webkit-playsinline style="width:100%; height:100%; display:none; background:#000; object-fit:contain;"></video>
+            </div>
+            <div class="vid-controls">
+                <span style="font-size:0.65rem; color:#aaa; margin-right:5px;">ARCHIVO:</span>
+                <input type="file" id="vidFile" accept="video/*" class="vid-input" onchange="loadLocalVideo(this)">
+                <span style="color:#666; margin:0 5px;">|</span>
+                <span style="font-size:0.65rem; color:#aaa;">Offset:</span>
+                <button class="vid-btn" onclick="adjustOffset(-1)">-1s</button>
+                <button class="vid-btn" onclick="adjustOffset(-0.5)">-0.5</button>
+                <span id="offsetVal" style="font-size:0.7rem; color:#fff; font-weight:bold; min-width:30px; text-align:center;">0.0</span>
+                <button class="vid-btn" onclick="adjustOffset(0.5)">+0.5</button>
+                <button class="vid-btn" onclick="adjustOffset(1)">+1s</button>
+            </div>
+        </div>
+
+        <div class="pitch-container">
+            <div class="pitch-wrapper" id="pitch"><canvas id="pitchCanvas"></canvas></div>
+        </div>
+
+        <div class="field-stats">
+            <div class="fs-box"><span class="fs-val" id="kpiAct">0</span><span class="fs-lbl">Acciones</span></div>
+            <div class="fs-box" style="border-left-color:#27ae60"><span class="fs-val" id="kpiEff">0%</span><span class="fs-lbl">Efectividad</span></div>
+            <div class="fs-box" style="border-left-color:#8e44ad"><span class="fs-val" id="kpiPpda" style="line-height:1">0</span><span class="fs-lbl" id="lblPpda">RIVAL PPDA</span></div>
+        </div>
+    </div>
+
+   <div class="data-col">
+        <div class="input-section" id="inputPanel">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <button class="btn-header" onclick="cancelEdit()" style="visibility:hidden; background:#c0392b; border:none; color:white;" id="btnCancel">CANCELAR</button>
+                <button class="btn-header" onclick="undo()">DESHACER</button>
+            </div>
+            
+            <div class="team-toggle">
+                <div class="t-opt active-home" id="btnTHome" onclick="setTeam('HOME')">MI EQUIPO</div>
+                <div class="t-opt" id="btnTAway" onclick="setTeam('AWAY')">RIVAL</div>
+            </div>
+
+            <div style="margin-bottom:6px; display:flex; align-items:center; gap:4px; background:#1a1a1a; padding:2px 4px; border-radius:4px; border:1px solid #333;">
+                <span style="font-size:0.55rem; font-weight:bold; color:#f39c12; text-transform:uppercase;">Fase:</span>
+                <select id="gamePhase" style="flex:1; background:#222; color:#fff; border:none; font-weight:bold; font-size:0.65rem; padding:4px 0; outline:none; cursor:pointer;">
+                    <option value="Salida">🏗️ Salida de Balón</option>
+                    <option value="Progresion">🚀 Progresión / Creación</option>
+                    <option value="Finalizacion">🎯 Finalización (3/4)</option>
+                    <option value="Transicion_Of">⚡ Transición Ofensiva</option>
+                    <option value="Transicion_Def">🛡️ Transición Defensiva</option>
+                    <option value="Presion_Alta">🐕 Presión Alta</option>
+                    <option value="Bloque_Medio">🧱 Bloque Medio/Bajo</option>
+                    <option value="ABP">⚽ Balón Parado</option>
+                </select>
+            </div>
+
+            <label style="font-size:0.65rem; font-weight:bold; color:#888; margin-bottom:4px; display:block;">SELECCIONAR JUGADOR:</label>
+            <div class="p-grid" id="playerGrid"></div>
+            <input type="hidden" id="selPlayer" value="UNK">
+            
+            <div class="action-grid">
+                <button class="a-btn active" onclick="setType('Pase', this)" style="border-color:#3498db">PASE</button>
+                <button class="a-btn" onclick="setType('Conducción', this)" style="border-color:#00cec9">CONDUCCIÓN</button>
+                <button class="a-btn" onclick="setType('Regate', this)" style="border-color:#f1c40f">REGATE</button>
+                <button class="a-btn" onclick="setType('Clave', this)" style="border-color:#9b59b6">P. CLAVE</button>
+                <button class="a-btn" onclick="setType('Asist', this)" style="border-color:#f39c12">ASIST</button>
+                <button class="a-btn" onclick="setType('Disparo', this)" style="border-color:#e74c3c">DISPARO</button>
+                <button class="a-btn" onclick="setType('Banda', this)" style="border-color:#95a5a6">BANDA</button>
+                <button class="a-btn" onclick="setType('Corner', this)" style="border-color:#fd79a8">CORNER</button>
+                <button class="a-btn" onclick="setType('Falta', this)" style="border-color:#e17055">FALTA</button>
+                <button class="a-btn" onclick="setType('Duelo Aéreo', this)" style="border-color:#d35400">D. AÉREO</button>
+                <button class="a-btn" onclick="setType('Duelo Suelo', this)" style="border-color:#d35400">D. SUELO</button>
+                <button class="a-btn" onclick="setType('Recup', this)" style="border-color:#1abc9c">RECUP.</button>
+                <button class="a-btn" onclick="setType('Perdida', this)" style="border-color:#e67e22">PÉRDIDA</button>
+                <button class="a-btn" onclick="setType('Intercep', this)" style="border-color:#34495e">INTERCEP</button>
+            </div>
+
+            <div id="subOptionsPanel" class="sub-opt-container">
+                <div>
+                    <div class="sub-lbl">Parte del Cuerpo</div>
+                    <div class="sub-opt-row">
+                        <button class="sub-btn" onclick="setSubOption('body', 'Pie', this)">🦶 PIE</button>
+                        <button class="sub-btn" onclick="setSubOption('body', 'Cabeza', this)">👱 CABEZA</button>
+                        <button class="sub-btn" onclick="setSubOption('body', 'Otro', this)">🦾 OTRO</button>
+                    </div>
+                </div>
+                <div style="margin-top:4px;">
+                    <div class="sub-lbl">Altura / Trayectoria</div>
+                    <div class="sub-opt-row">
+                        <button class="sub-btn" onclick="setSubOption('height', 'Bajo', this)">⬇ BAJO</button>
+                        <button class="sub-btn" onclick="setSubOption('height', 'Medio', this)">➡ MEDIO</button>
+                        <button class="sub-btn" onclick="setSubOption('height', 'Alto', this)">⬆ ALTO</button>
+                    </div>
+                </div>
+                <div id="rowShotDetails" style="display:none; margin-top:6px; border-top:1px solid #444; padding-top:6px;">
+                    <div class="sub-lbl" style="color:#e74c3c;">Resultado del Tiro</div>
+                    <div class="sub-opt-row">
+                        <button class="sub-btn" onclick="setSubOption('shot', 'Gol', this)" style="border-color:#2ecc71; color:#2ecc71; font-weight:900;">⚽ GOL</button>
+                        <button class="sub-btn" onclick="setSubOption('shot', 'Fuera', this)">❌ FUERA</button>
+                        <button class="sub-btn" onclick="setSubOption('shot', 'Parada', this)">🧤 PARADA</button>
+                        <button class="sub-btn" onclick="setSubOption('shot', 'Bloqueado', this)">🛡 BLOQ</button>
+                        <button class="sub-btn" onclick="setSubOption('shot', 'Rechace', this)">🔁 RECHACE</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="xg-row" id="xgRow">
+                <input type="number" id="ixG" placeholder="xG (0.000)" step="0.001">
+                <input type="number" id="ixGOT" placeholder="xGOT (0.000)" step="0.001">
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button class="btn-res" style="background:var(--success)" id="btnOk" onclick="save('Completado')">✓ OK</button>
+                <button class="btn-res" style="background:var(--fail)" id="btnKo" onclick="save('Fallado')">✕ FALLO</button>
+            </div>
+            
+            <button class="btn-res" id="btnPpda" style="background:var(--def); margin-top:8px; font-size:0.8rem;" onclick="savePpda()">🛡️ RIVAL: ACCIÓN DEFENSIVA (+1)</button>
+        </div>
+
+        <div class="charts-area">
+            <div>
+                <div class="chart-head">TIPOLOGÍA DE ACCIONES</div>
+                <div id="chartTypes"></div>
+            </div>
+            <div>
+                <div class="chart-head">CARRILES DE ATAQUE</div>
+                <div class="lanes-viz">
+                    <div class="lane-seg" id="lnL" style="background:#3498db; width:33%">I:0</div>
+                    <div class="lane-seg" id="lnC" style="background:#2ecc71; width:34%">C:0</div>
+                    <div class="lane-seg" id="lnR" style="background:#e74c3c; width:33%">D:0</div>
+                </div>
+            </div>
+            <div>
+                <div class="chart-head">ZONAS DE JUEGO</div>
+                <div id="chartZones"></div>
+            </div>
+        </div>
+
+        <div class="log-table">
+            <table>
+                <thead>
+                    <tr><th>Min</th><th>Eq</th><th>Jug</th><th>Acc</th><th>Res</th><th>xT</th><th>xG</th><th>xGOT</th><th></th></tr>
+                </thead>
+                <tbody id="logBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// MATRICES MATEMÁTICAS
+const XBUILD_GRID = [
+    [0.01, 0.01, 0.01, 0.01, 0.01], [0.02, 0.03, 0.04, 0.03, 0.02],
+    [0.04, 0.06, 0.08, 0.06, 0.04], [0.05, 0.08, 0.12, 0.08, 0.05],
+    [0.06, 0.10, 0.15, 0.10, 0.06], [0.03, 0.05, 0.05, 0.05, 0.03],
+    [0.01, 0.02, 0.02, 0.02, 0.01], [0.00, 0.00, 0.00, 0.00, 0.00] 
+];
+const XT_GRID = [
+    [0.00,0.00,0.00,0.00,0.00], [0.01,0.01,0.01,0.01,0.01], 
+    [0.01,0.02,0.02,0.02,0.01], [0.02,0.03,0.04,0.03,0.02],
+    [0.03,0.04,0.06,0.04,0.03], [0.05,0.08,0.12,0.08,0.05], 
+    [0.08,0.15,0.25,0.15,0.08], [0.10,0.30,0.80,0.30,0.10]
+];
+const ACTION_COLORS = { 'Pase': '#3498db', 'Conducción': '#00cec9', 'Regate': '#f1c40f', 'Clave': '#9b59b6', 'Asist': '#f39c12', 'Disparo': '#e74c3c', 'Banda': '#95a5a6', 'Corner': '#fd79a8', 'Falta': '#e17055', 'Duelo Aéreo': '#d35400', 'Duelo Suelo': '#d35400', 'Recup': '#1abc9c', 'Perdida': '#e67e22', 'Intercep': '#34495e', 'Defensiva': '#8e44ad' };
+
+// FUNCIONES DE CÁLCULO
+function getMatrixValue(grid, x, y) {
+    if (x===undefined || y===undefined || x<0) return 0;
+    const r = Math.min(7, Math.floor(x/12.5)); 
+    const c = Math.min(4, Math.floor(y/20));
+    return grid[r][c] || 0;
+}
+
+function calculateXBuild(sx, sy, ex, ey, type, res) {
+    if (sx > 75) return 0; // Si es muy arriba no es construcción
+    if (res === 'Fallado' || type === 'Perdida') {
+        if (sx < 30) return -0.20; // Error grave en salida
+        if (sx < 60) return -0.08; // Error en medio
+        return -0.03;
+    }
+    if (!ex) return 0; 
+    let val = getMatrixValue(XBUILD_GRID, ex, ey) - getMatrixValue(XBUILD_GRID, sx, sy);
+    if (sx < 50 && ex >= 50) val += 0.10; // Bonus por romper líneas
+    if (val < 0 && res === 'Completado') return 0.01; // Pase de seguridad
+    return val;
+}
+let DB = {
+    actions: [],
+    rosters: { HOME: [], AWAY: [] },
+    config: { homeName: "LOCAL", awayName: "RIVAL" },
+    possession: { home: 0, away: 0, out: 0 }, 
+    lastClick: {x:50, y:50}
+};
+
+// 1. Modifica STATE para incluir los campos nuevos
+let STATE = {
+    team: 'HOME',
+    type: 'Pase',
+    editId: null,
+    timer: null,
+    sec: 0,
+    matchState: 'STOP',
+    videoOffset: 0,
+    videoMode: 'NONE', 
+    lastVideoTime: 0,
+    isSecondHalf: false, // false = 1er tiempo, true = 2do tiempo
+    
+    // VARIABLES DE SUB-OPCIONES
+    subBody: null,
+    subHeight: null,
+    subShot: null    // <--- AQUÍ ESTÁ EL NUEVO CAMPO AÑADIDO
+};
+
+
+// 2. Pega esta función nueva en cualquier parte del script (ej: debajo de setType)
+function setSubOption(category, val, btn) {
+    if (category === 'body') {
+        STATE.subBody = val;
+        // Quitar clase active de los botones de cuerpo
+        const parent = btn.parentElement;
+        parent.querySelectorAll('.sub-btn').forEach(b => b.classList.remove('active'));
+    } else if (category === 'height') {
+        STATE.subHeight = val;
+        // Quitar clase active de los botones de altura
+        const parent = btn.parentElement;
+        parent.querySelectorAll('.sub-btn').forEach(b => b.classList.remove('active'));
+    }
+    btn.classList.add('active');
+}
+
+function resetSubOptions() {
+    STATE.subBody = null;
+    STATE.subHeight = null;
+    document.querySelectorAll('#subOptionsPanel .sub-btn').forEach(b => b.classList.remove('active'));
+}
+
+window.addEventListener("dragover", function(e){e=e||event;e.preventDefault();},false);
+window.addEventListener("drop", function(e){e=e||event;e.preventDefault();},false);
+
+window.onload = () => {
+    if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
+    STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
+    setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
+};
+
+function saveDB() { localStorage.setItem('am_v22_6', JSON.stringify(DB)); }
+
+
+function downloadBackup() {
+    // 1. Detener procesos para evitar conflictos
+    if (typeof stopTimer === "function") stopTimer();
+    setMatchState('STOP');
+
+    // Notificación de inicio
+    if (typeof showToast === "function") showToast("💾 Generando archivo de seguridad...");
+
+    try {
+        // --- FASE 1: LIMPIEZA DE DATOS (Sanitización Profesional) ---
+        var cleanActions = [];
+        if (DB.actions && Array.isArray(DB.actions)) {
+            cleanActions = DB.actions.map(function(a) {
+                return {
+                    id: a.id || Date.now(),
+                    min: a.min || "00:00",
+                    period: a.period || '1T',
+                    team: a.team || 'UNK',
+                    player: a.player || 'UNK',
+                    type: a.type || 'Action',
+                    res: a.res || 'Neutro',
+                    phase: a.phase || '',
+                    x: Number(a.x) || -1,
+                    y: Number(a.y) || -1,
+                    endX: a.endX ? Number(a.endX) : null,
+                    endY: a.endY ? Number(a.endY) : null,
+                    lane: a.lane || '',
+                    zone: a.zone || '',
+                    xg: Number(a.xg) || 0,
+                    xgot: Number(a.xgot) || 0,
+                    body: a.body || '',
+                    height: a.height || '',
+                    shotDetail: a.shotDetail || '',
+                    xt: Number(a.xt) || 0,
+                    xbuild: Number(a.xbuild) || 0
+                };
+            });
+        }
+
+        var cleanDB = {
+            actions: cleanActions,
+            rosters: DB.rosters || { HOME: [], AWAY: [] },
+            config: DB.config || { homeName: "LOCAL", awayName: "RIVAL" },
+            possession: DB.possession || { home: 0, away: 0, out: 0 },
+            version: "3.1",
+            savedAt: new Date().toISOString()
+        };
+
+        // --- FASE 2: CONVERSIÓN SEGURA ---
+        var dataStr = JSON.stringify(cleanDB, null, 2);
+        var blob = new Blob([dataStr], { type: "application/octet-stream" });
+        var url = URL.createObjectURL(blob);
+
+        // Generar nombre de archivo limpio
+        var hName = (cleanDB.config.homeName || "L").replace(/[^a-z0-9]/gi, '');
+        var aName = (cleanDB.config.awayName || "V").replace(/[^a-z0-9]/gi, '');
+        var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        var fileName = "AttackMetrics_" + hName + "_vs_" + aName + "_" + dateStr + ".json";
+
+        // --- FASE 3: DESCARGA (en el mismo gesto del usuario) ---
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+
+        // Limpieza (después del clic)
+        setTimeout(function() {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            if (typeof showToast === "function") showToast("✅ Archivo guardado correctamente");
+        }, 0);
+
+    } catch (err) {
+        console.error(err);
+        alert("Error al exportar: " + err.message);
+    }
+}
+
+function restoreBackup(input) {
+    // 1. Verificamos si hay archivo
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                // Intentamos leer el JSON
+                const loadedDB = JSON.parse(e.target.result);
+
+                // 2. Validación más flexible (Solo exigimos que haya acciones o rosters)
+                if (loadedDB && (loadedDB.actions || loadedDB.rosters)) {
+                    
+                    // 3. FUSIÓN DE DATOS (Importante para compatibilidad con versiones viejas)
+                    // Si el archivo no tiene posesión o config, usamos los valores por defecto
+                    DB.actions = loadedDB.actions || [];
+                    DB.rosters = loadedDB.rosters || { HOME: [], AWAY: [] };
+                    DB.config = loadedDB.config || { homeName: "LOCAL", awayName: "RIVAL" };
+                    DB.possession = loadedDB.possession || { home: 0, away: 0, out: 0 };
+
+                    // Recalculamos el tiempo total asegurando que sean números
+                    const h = parseInt(DB.possession.home) || 0;
+                    const a = parseInt(DB.possession.away) || 0;
+                    const o = parseInt(DB.possession.out) || 0;
+                    STATE.sec = h + a + o;
+                    
+                    // Guardamos en LocalStorage inmediatamente
+                    saveDB();
+                    
+                    // 4. Actualizamos la interfaz con un pequeño retardo para evitar bloqueos
+                    setTimeout(() => {
+                        try {
+                            setMatchState('STOP'); // Detener crono al cargar
+                            updateTeamLabels();
+                            renderUI();
+                            refreshPlayersFilter();
+                            updateDash();
+                            updateTimerDisplay();
+                            drawPitch();
+                            showToast("✅ Archivo cargado correctamente");
+                        } catch (uiError) {
+                            console.error(uiError);
+                            alert("El archivo cargó, pero hubo un error visualizando los datos.");
+                        }
+                    }, 50);
+
+                } else {
+                    alert("⚠️ El archivo no parece una copia de seguridad válida de AttackMetrics.");
+                }
+            } catch (err) {
+                console.error("Error de lectura:", err);
+                alert("❌ Error: El archivo está corrupto o no es JSON.");
+            }
+        };
+
+        reader.onerror = function() {
+            alert("Error del navegador al leer el archivo.");
+        };
+
+        reader.readAsText(file);
+    }
+
+    // 5. IMPORTANTE: Limpiar el input para permitir cargar el mismo archivo si hubo error antes
+    input.value = ""; 
+}
+
+function toggleVideoPanel() {
+    const p = document.getElementById('videoPanel');
+    if(p.style.display === 'flex') {
+        closeVideoMode();
+    } else {
+        p.style.display = 'flex';
+        resizeVideo(35); // Default size
+    }
+    setTimeout(drawPitch, 100); 
+}
+
+function resizeVideo(percent) {
+    const p = document.getElementById('videoPanel');
+    p.style.height = percent + '%';
+    setTimeout(drawPitch, 100);
+}
+
+function closeVideoMode() {
+    document.getElementById('videoPanel').style.display = 'none';
+    const vid = document.getElementById('myVid');
+    vid.pause();
+    vid.style.display = 'none';
+    vid.src = "";
+    document.getElementById('vidFile').value = ""; 
+
+    STATE.videoMode = 'NONE';
+    STATE.matchState = 'STOP'; 
+    setMatchState('STOP'); 
+    
+    showToast("Modo Video Cerrado. Cronómetro manual activo.");
+    setTimeout(drawPitch, 100);
+}
+// --- FUNCIÓN BOTÓN 1T/2T ---
+function toggleHalf() {
+    STATE.isSecondHalf = !STATE.isSecondHalf;
+    const btn = document.getElementById('btnHalf');
+    
+    if(STATE.isSecondHalf) {
+        btn.innerText = "2T";
+        btn.style.background = "#e67e22"; // Naranja
+        btn.style.color = "#000";
+        showToast("🔄 2º Tiempo: Campo Invertido");
+    } else {
+        btn.innerText = "1T";
+        btn.style.background = "#222"; // Negro
+        btn.style.color = "#fff";
+        showToast("1º Tiempo: Campo Normal");
+    }
+    drawPitch(); 
+}
+
+function getPos(e) {
+    const r = cv.getBoundingClientRect();
+    // Devolvemos la posición EXACTA del ratón en pantalla (0-100).
+    // No invertimos aquí para que el dibujo "Live" siga al dedo/cursor perfectamente.
+    return { x: (e.clientX - r.left)/cv.width*100, y: (e.clientY - r.top)/cv.height*100 };
+}
+
+function loadLocalVideo(input) {
+    if(input.files && input.files[0]) {
+        STATE.videoMode = 'LOCAL';
+        STATE.lastVideoTime = 0; 
+        const url = URL.createObjectURL(input.files[0]);
+        const vid = document.getElementById('myVid');
+        vid.src = url;
+        vid.style.display = 'block';
+        
+        vid.ontimeupdate = () => syncVideoTime(vid.currentTime);
+        showToast("Video Local Cargado");
+        drawPitch(); 
+    }
+}
+
+function adjustOffset(val) {
+    STATE.videoOffset += val;
+    document.getElementById('offsetVal').innerText = STATE.videoOffset.toFixed(1);
+    syncVideoTime(document.getElementById('myVid').currentTime);
+}
+
+function syncVideoTime(currTime) {
+    const gameTime = currTime + STATE.videoOffset;
+    if(gameTime < 0) return;
+    
+    if(currTime > STATE.lastVideoTime) {
+        const delta = currTime - STATE.lastVideoTime;
+        if(delta < 2) {
+            if(STATE.matchState === 'HOME') DB.possession.home += delta;
+            if(STATE.matchState === 'AWAY') DB.possession.away += delta;
+            if(STATE.matchState === 'OUT') DB.possession.out += delta;
+        }
+    }
+    STATE.lastVideoTime = currTime;
+    
+    STATE.sec = Math.floor(gameTime);
+    updateTimerDisplay();
+    if(Math.floor(currTime) % 5 === 0) saveDB();
+}
+
+function setMatchState(newState) {
+    STATE.matchState = newState;
+    document.querySelectorAll('.pos-btn').forEach(b => b.className = 'pos-btn');
+    
+    const id = newState === 'HOME' ? 'btnP_Home' : (newState === 'AWAY' ? 'btnP_Away' : (newState === 'OUT' ? 'btnP_Out' : 'btnP_Stop'));
+    const activeClass = newState === 'HOME' ? 'active-home' : (newState === 'AWAY' ? 'active-away' : (newState === 'OUT' ? 'active-out' : 'active-stop'));
+    
+    document.getElementById(id).classList.add(activeClass);
+
+    if(STATE.videoMode === 'NONE') {
+        if(newState !== 'STOP') {
+            startTimer();
+        } else {
+            stopTimer();
+        }
+    }
+    
+    if(newState === 'HOME') setTeam('HOME');
+    if(newState === 'AWAY') setTeam('AWAY');
+}
+
+function startTimer() {
+    if(!STATE.timer) {
+        STATE.timer = setInterval(() => {
+            STATE.sec++;
+            if(STATE.matchState === 'HOME') DB.possession.home++;
+            if(STATE.matchState === 'AWAY') DB.possession.away++;
+            if(STATE.matchState === 'OUT') DB.possession.out++;
+            updateTimerDisplay();
+            if(document.getElementById('modalRadar').style.display === 'flex') updateRadarPossession();
+            if(STATE.sec % 5 === 0) saveDB(); 
+        }, 1000);
+    }
+}
+
+function stopTimer() {
+    if(STATE.timer) { clearInterval(STATE.timer); STATE.timer = null; }
+    saveDB();
+}
+
+function updateTimerDisplay() {
+    // CÁLCULO MANUAL PARA PERMITIR MINUTOS > 60
+    // Math.floor asegura que sean números enteros
+    const minutes = Math.floor(STATE.sec / 60);
+    const seconds = Math.floor(STATE.sec % 60);
+
+    // Agregamos un "0" delante si es menor a 10 (ej: 9 -> "09")
+    const mStr = minutes < 10 ? "0" + minutes : minutes;
+    const sStr = seconds < 10 ? "0" + seconds : seconds;
+
+    // Actualizamos el texto del cronómetro
+    document.getElementById('timer').innerText = `${mStr}:${sStr}`;
+
+    // --- Lógica de la barra de posesión (se mantiene igual) ---
+    const totalPlay = DB.possession.home + DB.possession.away;
+    if(totalPlay > 0) {
+        const hPct = (DB.possession.home / totalPlay) * 100;
+        const aPct = 100 - hPct;
+        document.getElementById('pb-h').style.width = hPct + '%';
+        document.getElementById('pb-a').style.width = aPct + '%';
+    }
+}
+
+function hardReset() {
+    if(confirm("⚠ ¿BORRADO GENERAL?\n\nSe eliminarán TODAS las acciones y se reiniciará el cronómetro a 00:00.\n(Las plantillas de jugadores NO se borrarán).")) {
+        DB.actions = [];
+        DB.possession = { home: 0, away: 0, out: 0 };
+        STATE.sec = 0;
+        setMatchState('STOP');
+        updateTimerDisplay();
+        updateDash();
+        drawPitch();
+        saveDB();
+        showToast("Partido Reiniciado");
+    }
+}
+
+const cv = document.getElementById('pitchCanvas');
+const ctx = cv.getContext('2d');
+let isDrag = false, startP = null;
+
+function setupCanvas() {
+    window.addEventListener('resize', drawPitch);
+    cv.addEventListener('mousedown', e => { isDrag=true; startP=getPos(e); });
+    cv.addEventListener('mousemove', e => { if(isDrag) { DB.lastClick = getPos(e); drawPitch(startP, DB.lastClick); } });
+    cv.addEventListener('mouseup', e => finishDrag(e));
+    cv.addEventListener('touchstart', e => { e.preventDefault(); isDrag=true; startP=getPos(e.touches[0]); });
+    cv.addEventListener('touchmove', e => { e.preventDefault(); if(isDrag) { DB.lastClick = getPos(e.touches[0]); drawPitch(startP, DB.lastClick); } });
+    cv.addEventListener('touchend', e => { e.preventDefault(); finishDrag(e.changedTouches[0]); });
+    drawPitch();
+}
+
+function getPos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left)/cv.width*100, y: (e.clientY - r.top)/cv.height*100 };
+}
+
+function finishDrag(e) {
+    if(!isDrag) return; isDrag=false;
+    const endP = getPos(e);
+    const dist = Math.hypot(endP.x-startP.x, endP.y-startP.y);
+    DB.lastClick = startP;
+    DB.lastEnd = dist > 2 ? endP : null;
+    if(DB.lastEnd) { drawPitch(DB.lastClick, DB.lastEnd); } else { drawPitch(); }
+}
+
+function drawPitch(dragS, dragE) {
+    // 1. OBTENER CONFIGURACIÓN ACTUAL
+    const viewMode = document.getElementById('viewMode').value;
+    const tView = document.getElementById('teamView').value;
+    const pFilter = document.getElementById('playerFilter').value;
+    const aFilter = document.getElementById('actionTypeFilter').value;
+
+    // 2. PREPARAR CANVAS
+    cv.width = cv.parentElement.clientWidth; 
+    cv.height = cv.parentElement.clientHeight; 
+    const w = cv.width, h = cv.height;
+
+    // 3. PINTAR FONDO Y LÍNEAS
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
+    
+    // Contorno y Medio
+    ctx.strokeRect(w*0.05, h*0.05, w*0.9, h*0.9);
+    ctx.beginPath(); ctx.moveTo(w/2, h*0.05); ctx.lineTo(w/2, h*0.95); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w/2, h/2, h*0.1, 0, 7); ctx.stroke();
+    
+    // Áreas
+    ctx.strokeRect(w*0.05, h*0.22, w*0.15, h*0.56); 
+    ctx.strokeRect(w*0.05, h*0.36, w*0.05, h*0.28);
+    ctx.strokeRect(w*0.8, h*0.22, w*0.15, h*0.56); 
+    ctx.strokeRect(w*0.9, h*0.36, w*0.05, h*0.28);
+    
+    // Puntos de penalti y arcos
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.beginPath(); ctx.arc(w*0.16, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.16, h*0.5, h*0.1, -0.92, 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w*0.84, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.84, h*0.5, h*0.1, Math.PI - 0.92, Math.PI + 0.92); ctx.stroke();
+
+    // Grid Opcional
+    if(document.getElementById('gridToggle').checked) { 
+        ctx.save(); ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); 
+        for(let i=1; i<6; i++) { ctx.beginPath(); ctx.moveTo(w*0.05 + (w*0.9/6)*i, h*0.05); ctx.lineTo(w*0.05 + (w*0.9/6)*i, h*0.95); ctx.stroke(); } 
+        ctx.beginPath(); ctx.moveTo(w*0.05, h*0.33); ctx.lineTo(w*0.95, h*0.33); ctx.stroke(); 
+        ctx.beginPath(); ctx.moveTo(w*0.05, h*0.66); ctx.lineTo(w*0.95, h*0.66); ctx.stroke(); 
+        ctx.restore(); 
+    }
+
+    // Etiquetas de Dirección (1T / 2T) - ¡IMPORTANTE MANTENERLAS!
+    ctx.save(); ctx.font = "bold 12px sans-serif"; ctx.lineWidth = 4;
+    if (!STATE.isSecondHalf) {
+        ctx.fillStyle = "rgba(52, 152, 219, 0.4)"; ctx.strokeStyle = "rgba(52, 152, 219, 0.4)"; 
+        arrow(ctx, w*0.1, h*0.03, w*0.25, h*0.03); ctx.textAlign = "left"; ctx.fillText(DB.config.homeName + " ►", w*0.1, h*0.07);
+        ctx.fillStyle = "rgba(231, 76, 60, 0.4)"; ctx.strokeStyle = "rgba(231, 76, 60, 0.4)"; 
+        arrow(ctx, w*0.9, h*0.97, w*0.75, h*0.97); ctx.textAlign = "right"; ctx.fillText("◄ " + DB.config.awayName, w*0.9, h*0.93);
+    } else {
+        ctx.fillStyle = "rgba(52, 152, 219, 0.4)"; ctx.strokeStyle = "rgba(52, 152, 219, 0.4)"; 
+        arrow(ctx, w*0.9, h*0.03, w*0.75, h*0.03); ctx.textAlign = "right"; ctx.fillText("◄ " + DB.config.homeName, w*0.9, h*0.07);
+        ctx.fillStyle = "rgba(231, 76, 60, 0.4)"; ctx.strokeStyle = "rgba(231, 76, 60, 0.4)"; 
+        arrow(ctx, w*0.1, h*0.97, w*0.25, h*0.97); ctx.textAlign = "left"; ctx.fillText(DB.config.awayName + " ►", w*0.1, h*0.93);
+    }
+    ctx.restore();
+
+   // 4. FILTRAR ACCIONES (LÓGICA EXACTA)
+    let filtered = DB.actions.filter(a => {
+        // Filtros básicos (Coordenadas, Equipo, Jugador)
+        if(a.x < 0) return false;
+        if(tView !== 'ALL' && a.team !== tView) return false;
+        if(pFilter !== 'ALL' && a.player !== pFilter) return false;
+        
+        // FILTRO DE ACCIÓN (DIRECTO)
+        // Aquí está la magia: Compara el nombre exacto.
+        // Si eliges "Corner", solo verás "Corner".
+        if(aFilter !== 'ALL' && a.type !== aFilter) return false;
+
+        return true;
+    });
+
+    // 5. SELECCIONAR QUÉ PINTAR
+    let actionsToDraw = filtered;
+    if(viewMode === 'LIVE') actionsToDraw = filtered.slice(-2); // Solo las últimas 2
+    else if(viewMode === 'HEAT') actionsToDraw = []; // El Heatmap va aparte
+
+    // PINTAR HEATMAP (Si está activo)
+    if(viewMode === 'HEAT') {
+        filtered.forEach(a => {
+            let ax = a.x, ay = a.y; 
+            if (STATE.isSecondHalf) { ax = 100 - ax; ay = 100 - ay; }
+            const x = (ax/100)*w, y = (ay/100)*h;
+            const grd = ctx.createRadialGradient(x, y, 2, x, y, 40);
+            grd.addColorStop(0, "rgba(231, 76, 60, 0.6)"); grd.addColorStop(1, "rgba(231, 76, 60, 0)");
+            ctx.fillStyle = grd; ctx.globalCompositeOperation = 'screen'; 
+            ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // 6. PINTAR FLECHAS (CON SEMÁFORO xBUILD)
+    actionsToDraw.forEach(a => {
+        let color = ACTION_COLORS[a.type] || '#fff';
+        let alpha = 1.0;
+
+        // --- LÓGICA VISUAL xBUILD ---
+       // --- LÓGICA VISUAL xBUILD MEJORADA (Opción A) ---
+if(viewMode === 'XBUILD') {
+    const val = a.xbuild || 0;
+    const absVal = Math.abs(val);
+
+    // Umbral mínimo: Si es menor a 0.02, ni se pinta (elimina el ruido total)
+    if (absVal < 0.02) return; 
+
+    // Opacidad dinámica: Cuanto mayor el valor, más visible
+    // Multiplicamos por 5 para que un valor de 0.2 ya se vea totalmente sólido
+    alpha = Math.min(absVal * 5, 1.0); 
+
+    if (val > 0) { 
+        color = '#00ff00'; // Verde
+        ctx.lineWidth = 1 + (absVal * 5); // También hacemos la línea más gruesa si es importante
+    } else { 
+        color = '#ff0000'; // Rojo
+        alpha = alpha * 0.7; // Hacemos el rojo un poco más suave para que no moleste tanto
+        ctx.lineWidth = 1;
+    }
+}
+
+        if(a.res === 'Fallado') alpha = Math.min(alpha, 0.5);
+        if(STATE.editId && a.id !== STATE.editId) alpha = 0.1;
+
+        let dX = a.x, dY = a.y, dEX = a.endX, dEY = a.endY;
+        if (STATE.isSecondHalf) { 
+            dX = 100 - dX; dY = 100 - dY; 
+            if (dEX!=null) { dEX = 100 - dEX; dEY = 100 - dEY; } 
+        }
+        const sx = (dX/100)*w, sy = (dY/100)*h;
+        
+        ctx.globalAlpha = alpha; 
+        ctx.lineWidth = 1.5; 
+        ctx.strokeStyle = ctx.fillStyle = color; 
+        ctx.setLineDash(a.res === 'Fallado' ? [5, 5] : []);
+        
+        if(dEX!=null) { 
+            arrow(ctx, sx, sy, (dEX/100)*w, (dEY/100)*h); 
+            ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fill(); 
+        } else { 
+            ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill(); ctx.stroke(); 
+        }
+        
+        if(STATE.editId === a.id) { 
+            ctx.shadowBlur=0; ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.setLineDash([]); 
+            ctx.beginPath(); ctx.arc(sx, sy, 15, 0, 7); ctx.stroke(); 
+        }
+    });
+    ctx.globalAlpha = 1; ctx.setLineDash([]);
+
+    // 7. PINTAR ARRASTRE ACTUAL
+    if(dragS && dragE) { 
+        ctx.strokeStyle="white"; ctx.fillStyle="white"; ctx.lineWidth=3; 
+        arrow(ctx, (dragS.x/100)*w, (dragS.y/100)*h, (dragE.x/100)*w, (dragE.y/100)*h); 
+    }
+}
+
+function arrow(ctx, x1, y1, x2, y2) {
+    // CAMBIO: head reducido a 10 (antes 15) y ángulo cambiado a PI/7 (antes PI/6) para que sea más fina
+    const head = 10, ang = Math.atan2(y2-y1, x2-x1);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, y2);
+    // Usamos PI/7 para una punta más cerrada/aguda
+    ctx.lineTo(x2-head*Math.cos(ang-Math.PI/7), y2-head*Math.sin(ang-Math.PI/7));
+    ctx.lineTo(x2-head*Math.cos(ang+Math.PI/7), y2-head*Math.sin(ang+Math.PI/7));
+    ctx.lineTo(x2, y2); ctx.fill();
+}
+
+function editTeamNames() {
+    let h = prompt("Nombre LOCAL:", DB.config.homeName); if(h) DB.config.homeName = h;
+    let a = prompt("Nombre RIVAL:", DB.config.awayName); if(a) DB.config.awayName = a;
+    saveDB(); updateTeamLabels(); updateDash(); 
+    drawPitch(); 
+}
+
+function updateTeamLabels() {
+    document.getElementById('btnTHome').innerText = document.getElementById('btnP_Home').innerText = DB.config.homeName.substr(0,7);
+    document.getElementById('btnTAway').innerText = document.getElementById('btnP_Away').innerText = DB.config.awayName.substr(0,7);
+    document.getElementById('sqHome').innerText = DB.config.homeName;
+    document.getElementById('sqAway').innerText = DB.config.awayName;
+    document.getElementById('lblRHome').innerText = DB.config.homeName;
+    document.getElementById('lblRAway').innerText = DB.config.awayName;
+    document.getElementById('lblFtHome').innerText = DB.config.homeName;
+    document.getElementById('lblFtAway').innerText = DB.config.awayName;
+    const s = document.getElementById('teamView');
+    s.options[0].text = "VER: " + DB.config.homeName;
+    s.options[1].text = "VER: " + DB.config.awayName;
+    updatePpdaBtn();
+}
+
+function setTeam(t) {
+    STATE.team = t;
+    document.getElementById('btnTHome').className = t==='HOME'?'t-opt active-home':'t-opt';
+    document.getElementById('btnTAway').className = t==='AWAY'?'t-opt active-away':'t-opt';
+    document.getElementById('selPlayer').value = 'UNK';
+    document.getElementById('teamView').value = t;
+    renderUI(); updatePpdaBtn(); updateDash(); drawPitch();
+}
+
+function setType(t, btn) {
+    STATE.type = t;
+    
+    // 1. Gestión visual de botones (quita active a los demás)
+    document.querySelectorAll('.a-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // 2. Fila de xG (solo si es Disparo)
+    const xgRow = document.getElementById('xgRow');
+    if(xgRow) xgRow.style.display = (t === 'Disparo') ? 'flex' : 'none';
+
+    // 3. Lógica del Panel de Sub-Opciones
+    const accionesConDetalle = [
+        'Pase', 'Asist', 'Clave', 'Disparo', 'Banda', 'Falta', 'Corner', 
+        'Recup', 'Intercep', 'Duelo Aéreo', 'Duelo Suelo'
+    ];
+
+    const showSubs = accionesConDetalle.includes(t);
+    const panel = document.getElementById('subOptionsPanel');
+    
+    if(panel) {
+        // Muestra/Oculta la caja azul general
+        panel.style.display = showSubs ? 'flex' : 'none';
+
+        // --- TU BLOQUE NUEVO ---
+        // Muestra/Oculta la fila específica de "Resultado Tiro"
+        const shotRow = document.getElementById('rowShotDetails');
+        if(shotRow) {
+            shotRow.style.display = (t === 'Disparo') ? 'block' : 'none';
+        }
+    }
+}
+
+function getLaneZone(x, y) {
+    let lane = "CENTRAL"; if (y < 33) lane = "IZQUIERDO"; else if (y > 66) lane = "DERECHO";
+    let zone = "Z" + (Math.floor(x / 16.6) + 1); if(zone === "Z7") zone = "Z6";
+    return { lane, zone };
+}
+
+function save(res) {
+    const pName = document.getElementById('selPlayer').value;
+    const xg = parseFloat(document.getElementById('ixG').value) || 0;
+    const xgot = parseFloat(document.getElementById('ixGOT').value) || 0;
+    
+    // 1. CAPTURAR LA FASE DEL SELECTOR (NUEVO)
+    const currentPhase = document.getElementById('gamePhase').value; // <--- ¡AÑADIR ESTA LÍNEA!
+
+    // 1. Obtener coordenadas del clic
+    let rawX = DB.lastClick.x, rawY = DB.lastClick.y;
+    let rawEndX = DB.lastEnd?.x, rawEndY = DB.lastEnd?.y;
+
+    // 2. Si es 2ª Parte, INVERTIRLOS para guardarlos normalizados
+    if (STATE.isSecondHalf) {
+        rawX = 100 - rawX; rawY = 100 - rawY;
+        if (rawEndX != null) { rawEndX = 100 - rawEndX; rawEndY = 100 - rawEndY; }
+    }
+
+    let lane = "CENTRAL"; if (rawY < 33) lane = "IZQUIERDO"; else if (rawY > 66) lane = "DERECHO";
+    let zone = "Z" + (Math.floor(rawX / 16.6) + 1); if(zone === "Z7") zone = "Z6";
+
+    // 3. CÁLCULOS AUTOMÁTICOS (xT y xBuild)
+    let xtVal = 0, xBuildVal = 0;
+    const actionsWithMetric = ['Pase', 'Conducción', 'Regate', 'Clave', 'Asist', 'Banda', 'Corner', 'Perdida'];
+
+    if (actionsWithMetric.includes(STATE.type)) {
+        // Calcular xT (Amenaza) solo si se completa y avanza
+        if (res === 'Completado' && rawEndX != null && STATE.type !== 'Perdida') {
+            xtVal = getMatrixValue(XT_GRID, rawEndX, rawEndY) - getMatrixValue(XT_GRID, rawX, rawY);
+        }
+        // Calcular xBuild (Construcción) siempre
+        xBuildVal = calculateXBuild(rawX, rawY, rawEndX, rawEndY, STATE.type, res);
+    }
+
+    // --- LÓGICA BOTÓN GOL (NUEVO) ---
+    // Si el usuario marcó el botón "GOL", forzamos que el resultado sea 'Gol'
+    if (STATE.type === 'Disparo' && STATE.subShot === 'Gol') {
+        res = 'Gol'; 
+    }
+
+    // 4. CREAR LA ACCIÓN NUEVA
+    const newAction = {
+        id: STATE.editId || Date.now(),
+        min: document.getElementById('timer').innerText,
+        period: STATE.isSecondHalf ? '2T' : '1T', // <--- NUEVA LÍNEA AÑADIDA
+        team: STATE.team, 
+        player: pName, 
+        type: STATE.type, 
+        res: res,
+        phase: currentPhase, // <--- ¡AÑADIR ESTA LÍNEA TAMBIÉN!
+        x: rawX, 
+        y: rawY, 
+        endX: rawEndX, 
+        endY: rawEndY, 
+        lane: lane, 
+        zone: zone, 
+        xg: xg, 
+        xgot: xgot,
+        body: STATE.subBody||'', 
+        height: STATE.subHeight||'', 
+        shotDetail: STATE.subShot||'', // Importante para la métrica de porteros
+        xt: xtVal, 
+        xbuild: xBuildVal
+    };
+
+    // 5. GUARDAR O ACTUALIZAR
+    if(STATE.editId) {
+        const idx = DB.actions.findIndex(a => a.id === STATE.editId);
+        if(idx >= 0) DB.actions[idx] = newAction;
+        cancelEdit();
+    } else {
+        DB.actions.push(newAction);
+    }
+    
+    // Limpieza final
+    resetSubOptions(); DB.lastEnd = null; 
+    saveDB(); 
+    refreshPlayersFilter(); 
+    updateDash(); 
+    drawPitch(); 
+    showToast("Guardado");
+    document.getElementById('ixG').value = ''; 
+    document.getElementById('ixGOT').value = '';
+}
+
+function savePpda() {
+    const targetDefTeam = STATE.team === 'HOME' ? 'AWAY' : 'HOME';
+    DB.actions.push({ id: Date.now(), min: document.getElementById('timer').innerText, team: targetDefTeam, player: 'EQUIPO', type: 'Defensiva', res: 'Neutro', x:-10, y:-10 });
+    saveDB(); updateDash(); showToast("Defensa +1");
+}
+
+function updatePpdaBtn() {
+    const tName = STATE.team === 'HOME' ? DB.config.awayName : DB.config.homeName;
+    document.getElementById('btnPpda').innerText = `🛡️ ${tName}: ACCIÓN DEFENSIVA (+1)`;
+}
+
+function edit(id) {
+    const a = DB.actions.find(x => x.id === id); if(!a) return;
+    STATE.editId = id; STATE.team = a.team; STATE.type = a.type;
+    setTeam(a.team);
+    const btns = document.querySelectorAll('.a-btn');
+    btns.forEach(b => { if(b.innerText === a.type.toUpperCase()) setType(a.type, b); });
+    document.getElementById('selPlayer').value = a.player;
+    document.getElementById('ixG').value = a.xg || ''; document.getElementById('ixGOT').value = a.xgot || '';
+    renderUI();
+    document.getElementById('inputPanel').classList.add('edit-mode');
+    document.getElementById('btnOk').innerText = "ACTUALIZAR OK"; document.getElementById('btnKo').innerText = "ACTUALIZAR FALLO";
+    document.getElementById('btnCancel').style.visibility = 'visible'; drawPitch();
+}
+
+function cancelEdit() {
+    STATE.editId = null;
+    document.getElementById('inputPanel').classList.remove('edit-mode');
+    document.getElementById('btnOk').innerText = "✓ OK"; document.getElementById('btnKo').innerText = "✕ FALLO";
+    document.getElementById('btnCancel').style.visibility = 'hidden'; document.getElementById('ixG').value = ''; drawPitch();
+}
+
+// --- PEGA LA FUNCIÓN AQUÍ DEBAJO ---
+function getXtValue(x, y) {
+    if (x === undefined || y === undefined || x < 0) return 0;
+    const row = Math.min(7, Math.floor(x / 12.5)); 
+    const col = Math.min(4, Math.floor(y / 20));
+    return XT_GRID[row][col];
+}
+
+function undo() { DB.actions.pop(); saveDB(); updateDash(); drawPitch(); }
+function del(id) { if(confirm('¿Borrar?')) { DB.actions = DB.actions.filter(a=>a.id!==id); saveDB(); updateDash(); drawPitch(); } }
+
+function updateDash() {
+    const tView = document.getElementById('teamView').value;
+    const pFilter = document.getElementById('playerFilter').value;
+    const aFilter = document.getElementById('actionTypeFilter').value;
+
+    // --- 1. FILTRO EXACTO (NUEVO) ---
+    const filtered = DB.actions.filter(a => {
+        // Filtros básicos
+        if(a.x < 0) return false;
+        if(tView !== 'ALL' && a.team !== tView) return false;
+        if(pFilter !== 'ALL' && a.player !== pFilter) return false;
+        
+        // FILTRO DE ACCIÓN: Ahora es directo
+        // Si eliges "Corner", solo ves "Corner".
+        if(aFilter !== 'ALL' && a.type !== aFilter) return false;
+        
+        return true;
+    });
+    
+    // --- 2. GENERAR TABLA CON xBUILD ---
+    document.getElementById('logBody').innerHTML = filtered.slice().reverse().map(a => {
+        return `<tr style="border-left: 3px solid ${ACTION_COLORS[a.type] || '#fff'}">
+            <td>${a.min}</td>
+            <td style="color:${a.team==='HOME'?'#3498db':'#e74c3c'}">${a.team==='HOME'?'L':'V'}</td>
+            <td>${a.player}</td>
+            <td style="color:${ACTION_COLORS[a.type]}"><b>${a.type}</b></td>
+            <td style="color:${a.res==='Completado'?'var(--success)':'var(--fail)'}">${a.res[0]}</td>
+            
+            <td style="font-weight:bold; color:#00cec9">${a.xt ? a.xt.toFixed(2) : '-'}</td>
+            <td style="font-weight:bold; color:#00ff00">${a.xbuild ? a.xbuild.toFixed(2) : '-'}</td>
+            <td style="font-weight:bold; color:#e74c3c">${a.xg || '-'}</td>
+            
+            <td>
+                <span onclick="edit(${a.id})" style="cursor:pointer; font-size:1.1rem; margin-right:5px;">✎</span> 
+                <span onclick="del(${a.id})" style="cursor:pointer;color:red; font-size:1.1rem;">✕</span>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // --- 3. ACTUALIZAR CONTADORES (KPIs) ---
+    const valid = filtered.filter(a => a.type !== 'Defensiva');
+    document.getElementById('kpiAct').innerText = valid.length;
+    document.getElementById('kpiEff').innerText = valid.length ? Math.round((valid.filter(a=>a.res==='Completado').length/valid.length)*100)+'%' : '0%';
+    
+    // --- CÁLCULO MEJORADO DE PPDA (RIVAL PPDA) ---
+    // RIVAL PPDA responde a: "¿Cuánto nos está presionando el rival?"
+    // Fórmula: Nuestros Pases en Construcción / Sus Acciones Defensivas en esa zona
+    
+    const focusTeam = (tView === 'ALL' || tView === 'HOME') ? 'HOME' : 'AWAY';
+    const defenseTeam = focusTeam === 'HOME' ? 'AWAY' : 'HOME'; // El que presiona
+    
+    let offCount = 0;
+    let defCount = 0;
+
+    if (focusTeam === 'HOME') {
+        // LOCAL ATACA (Izq -> Der): Construcción en 0-60. RIVAL defiende en 0-60.
+        offCount = DB.actions.filter(a => a.team === 'HOME' && ['Pase','Clave','Conducción'].includes(a.type) && a.x <= 60).length;
+        defCount = DB.actions.filter(a => a.team === 'AWAY' && ['Recup','Intercep','Falta','Duelo Suelo','Duelo Aéreo','Defensiva'].includes(a.type) && a.x <= 60).length;
+    } else {
+        // RIVAL ATACA (Der -> Izq): Construcción en 40-100. LOCAL defiende en 40-100.
+        // Nota: Asumimos que x=100 es la portería del Local (Derecha del canvas)
+        offCount = DB.actions.filter(a => a.team === 'AWAY' && ['Pase','Clave','Conducción'].includes(a.type) && a.x >= 40).length;
+        defCount = DB.actions.filter(a => a.team === 'HOME' && ['Recup','Intercep','Falta','Duelo Suelo','Duelo Aéreo','Defensiva'].includes(a.type) && a.x >= 40).length;
+    }
+
+    const ppdaVal = defCount > 0 ? (offCount / defCount).toFixed(1) : offCount;
+    
+    // Actualizar Valor Grande
+    document.getElementById('kpiPpda').innerText = ppdaVal;
+    
+    // Actualizar Etiqueta pequeña con el desglose
+    // Ejemplo: RIVAL PPDA (120 Pas / 12 Def)
+    document.getElementById('lblPpda').innerHTML = `RIVAL PPDA <br><span style="color:#fff; font-size:0.55rem">(${offCount} Const. / ${defCount} Def)</span>`;
+
+    updateCharts(valid);
+    drawPitch();
+    
+}
+
+let sqTeam = 'HOME'; 
+function openSquad() { sqTeam = 'HOME'; document.getElementById('modalSquad').style.display = 'flex'; renderSquad(); }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function setSquadTeam(t) { sqTeam = t; renderSquad(); }
+
+function renderSquad() {
+    const list = document.getElementById('squadList');
+    document.getElementById('sqHome').className = sqTeam==='HOME'?'t-opt active-home':'t-opt';
+    document.getElementById('sqAway').className = sqTeam==='AWAY'?'t-opt active-away':'t-opt';
+    const teamRoster = DB.rosters[sqTeam] || [];
+    list.innerHTML = teamRoster.map((p, i) => `<div class="check-item"><span style="font-weight:bold; width:30px">${p.num}</span><span style="flex:1">${p.name}</span><button onclick="delPlayer(${i})" style="background:none; border:none; color:red; font-weight:bold; font-size:1.2rem;">✕</button></div>`).join('');
+}
+
+function addPlayer() {
+    const num = document.getElementById('newNum').value;
+    const nam = document.getElementById('newNam').value.trim().toUpperCase();
+    if(num && nam) {
+        if(!DB.rosters[sqTeam]) DB.rosters[sqTeam] = [];
+        DB.rosters[sqTeam].push({num, name:nam}); DB.rosters[sqTeam].sort((a,b)=>a.num-b.num);
+        saveDB(); renderSquad(); renderUI(); refreshPlayersFilter();
+        document.getElementById('newNum').value = ''; document.getElementById('newNam').value = ''; document.getElementById('newNum').focus();
+    }
+}
+
+function delPlayer(i) { DB.rosters[sqTeam].splice(i,1); saveDB(); renderSquad(); renderUI(); refreshPlayersFilter(); }
+
+function renderUI() {
+    const grid = document.getElementById('playerGrid');
+    const list = DB.rosters[STATE.team] || [];
+    const active = document.getElementById('selPlayer').value;
+    grid.innerHTML = list.map(p => `<div class="p-btn ${p.name===active?'active':''}" onclick="pickPlayer('${p.name}')"><b>${p.num}</b><span>${p.name.substr(0,6)}</span></div>`).join('');
+    if(list.length > 0 && active === 'UNK') pickPlayer(list[0].name);
+}
+
+function pickPlayer(name) { 
+    document.getElementById('selPlayer').value = name; 
+    renderUI(); 
+    if(document.getElementById('modalViolin').style.display === 'flex') updateViolin();
+}
+
+function refreshPlayersFilter() {
+    const sel = document.getElementById('playerFilter'); const cur = sel.value;
+    sel.innerHTML = '<option value="ALL">Jugador</option>';
+    const all = new Set(); [...DB.rosters.HOME, ...DB.rosters.AWAY].forEach(p => all.add(p.name)); DB.actions.forEach(a => { if(a.x>=0) all.add(a.player); });
+    Array.from(all).sort().forEach(p => { const o = document.createElement('option'); o.value=p; o.innerText=p; sel.appendChild(o); });
+    sel.value = cur;
+}
+
+function downloadRadar() {
+    const canvas = document.getElementById('radarCanvas');
+    if (!canvas) { alert("No hay gráfico para descargar."); return; }
+    
+    // Crear un fondo temporal para la imagen
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const ctx = tempCanvas.getContext("2d");
+    
+    ctx.fillStyle = "#1e1e1e"; // Color de fondo del modal
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    ctx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement('a');
+    link.download = `Radar_${DB.config.homeName}_vs_${DB.config.awayName}_${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+    showToast("Imagen Radar Guardada");
+}
+
+function downloadElementImage(elementId, filename) {
+    const element = document.getElementById(elementId);
+    if(!element) return;
+    
+    html2canvas(element, { backgroundColor: "#1e1e1e" }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `${filename}_${Date.now()}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        showToast("Imagen Guardada");
+    }).catch(err => {
+        console.error("Error capturando imagen:", err);
+        alert("Error al generar la imagen.");
+    });
+}
+
+function openRadar() {
+    document.getElementById('modalRadar').style.display = 'flex';
+    const all = new Set(); [...DB.rosters.HOME, ...DB.rosters.AWAY].forEach(p => all.add(p.name)); DB.actions.forEach(a => { if(a.x>=0) all.add(a.player); });
+    document.getElementById('radarList').innerHTML = Array.from(all).sort().map(p => `<label class="check-item"><input type="checkbox" class="chk-p" value="${p}" onchange="updateRadar()"><span>${p}</span></label>`).join('');
+    updateRadar();
+    updateRadarPossession();
+}
+
+function updateRadarPossession() {
+    const total = DB.possession.home + DB.possession.away;
+    let h = 0, a = 0;
+    if (total > 0) {
+        h = Math.round((DB.possession.home / total) * 100);
+        a = 100 - h;
+    }
+    document.getElementById('radPosHome').innerText = h + "%";
+    document.getElementById('radPosAway').innerText = a + "%";
+}
+
+function toggleAll() { const b = document.querySelectorAll('.chk-p'); const s = !b[0].checked; b.forEach(x => x.checked = s); updateRadar(); }
+
+function getStats(name, isTeam=false) {
+    const acts = DB.actions.filter(a => isTeam ? a.team === name : a.player === name);
+    // Nota: Ahora devolvemos 8 ceros en 'data' por si no hay datos
+    if(acts.length === 0) return { data: [0,0,0,0,0,0,0,0], raw: {} }; 
+    
+    const okActs = acts.filter(a => a.res === 'Completado' || a.res === 'Gol');
+    const offAttempts = acts.filter(a => ['Pase','Conducción','Regate','Disparo'].includes(a.type));
+    const offOk = offAttempts.filter(a => a.res === 'Completado' || a.res === 'Gol').length;
+    const eff = offAttempts.length ? (offOk/offAttempts.length)*100 : 0;
+    
+    const vol = Math.min(acts.length * (isTeam ? 0.16 : 1.25), 100);
+    const creat = okActs.filter(a => ['Pase','Clave','Asist'].includes(a.type)).length * (isTeam ? 0.28 : 2.8);
+    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 1.25 : 10.0);
+    const def = okActs.filter(a => ['Recup','Intercep','Duelo Aéreo', 'Duelo Suelo', 'Falta'].includes(a.type)).length * (isTeam ? 0.5 : 10.0);
+    
+    // --- NUEVO CÁLCULO: TIROS A PUERTA (SoT) ---
+    const shots = acts.filter(a => a.type === 'Disparo');
+    const shotsOnTarget = shots.filter(a => {
+        // 1. Excluir explícitamente lo que va fuera
+        if (a.shotDetail === 'Fuera' || a.shotDetail === 'Bloqueado') return false;
+        
+        // 2. Incluir Goles, Paradas y Rechaces
+        if (a.res === 'Gol') return true;
+        if (a.shotDetail === 'Parada' || a.shotDetail === 'Rechace') return true;
+        
+        // 3. Por defecto (si no hay detalle marcado), si no fue 'Fuera'/'Bloqueado', cuenta como a puerta
+        return true; 
+    }).length;
+    
+    // Puntuación (Escala: 10 tiros a puerta del equipo = 100%)
+    const sotScore = Math.min(shotsOnTarget * (isTeam ? 10 : 33), 100); 
+    // --------------------------------------
+
+    let xg = 0, xgot = 0; 
+    acts.forEach(a => { xg += (a.xg||0); xgot += (a.xgot||0); });
+    const xgScore = Math.min(xg * (isTeam ? 33 : 100), 100);
+    const xgotScore = Math.min(xgot * (isTeam ? 33 : 100), 100);
+
+    return { 
+        // AQUI ESTÁ EL CAMBIO PRINCIPAL: AÑADIDO 'sotScore' (Total 8 valores)
+        data: [eff, vol, Math.min(creat,100), Math.min(att,100), sotScore, Math.min(def,100), xgScore, xgotScore], 
+        raw: { xg: xg.toFixed(2), xgot: xgot.toFixed(2) } 
+    };
+}
+
+let radarChart = null;
+function updateRadar() {
+    const ctxR = document.getElementById('radarCanvas').getContext('2d');
+    if(radarChart) radarChart.destroy();
+    
+    const datasets = [];
+    
+    // Generar datasets (esto no cambia, pero usa el getStats nuevo internamente)
+    if(document.getElementById('chkHome').checked) datasets.push({ label: DB.config.homeName, data: getStats('HOME', true).data, backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db', borderWidth: 3, raw: getStats('HOME', true).raw });
+    if(document.getElementById('chkAway').checked) datasets.push({ label: DB.config.awayName, data: getStats('AWAY', true).data, backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c', borderWidth: 3, raw: getStats('AWAY', true).raw });
+    
+    const cols = ['#f1c40f', '#9b59b6', '#2ecc71', '#e67e22', '#1abc9c'];
+    document.querySelectorAll('.chk-p:checked').forEach((chk, i) => datasets.push({ label: chk.value, data: getStats(chk.value).data, borderColor: cols[i%5], backgroundColor: 'transparent', borderWidth: 2, raw: getStats(chk.value).raw }));
+    
+    document.getElementById('selCount').innerText = `(${datasets.length})`;
+    
+    // --- CAMBIO IMPORTANTE AQUÍ: AÑADIDO 'Tiros P.' ---
+    const labels = ['Efectividad', 'Volumen', 'Creación', 'Ataque', 'Tiros P.', 'Defensa', 'xG', 'xGOT'];
+
+    radarChart = new Chart(ctxR, { 
+        type: 'radar', 
+        data: { labels: labels, datasets: datasets }, 
+        plugins: [{id:'bg', beforeDraw: c => {const x=c.ctx; x.fillStyle='#1e1e1e'; x.fillRect(0,0,c.width,c.height)}}], 
+        options: { 
+            maintainAspectRatio: false, 
+            scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: '#444' }, angleLines: { color: '#444' }, pointLabels: { color: '#ccc', font: {size: 10} } } }, 
+            layout: { padding: 10 },
+            plugins: { 
+                legend: { labels: { color: '#fff' } },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => {
+                            const r = c.dataset.raw || {};
+                            // --- INDICES ACTUALIZADOS ---
+                            // Como hemos metido una columna nueva en medio, xG pasa al 6 y xGOT al 7
+                            if(c.dataIndex === 6) return `xG Total: ${r.xg}`;
+                            if(c.dataIndex === 7) return `xGOT Total: ${r.xgot}`;
+                            return `${c.dataset.label}: ${c.raw.toFixed(0)}`;
+                        }
+                    }
+                }
+            } 
+        } 
+    });
+}
+
+function updateCharts(actions) {
+    const types = {}; actions.forEach(a => types[a.type] = (types[a.type]||0) + 1);
+    const sorted = Object.keys(types).sort((a,b)=>types[b]-types[a]);
+    const max = Math.max(...Object.values(types), 1);
+    document.getElementById('chartTypes').innerHTML = sorted.map(t => `<div class="bar-row"><div class="bar-lbl">${t}</div><div class="bar-track"><div class="bar-fill" style="width:${(types[t]/max)*100}%; background:${ACTION_COLORS[t]||'#ccc'}"></div></div><div class="bar-val">${types[t]}</div></div>`).join('') || '<div style="font-size:0.6rem; color:#666">Sin datos</div>';
+
+    const l = {IZQUIERDO:0, CENTRAL:0, DERECHO:0}; actions.forEach(a => { if(a.lane) l[a.lane]++ });
+    const tot = actions.length || 1;
+    document.getElementById('lnL').style.width = `${(l.IZQUIERDO/tot)*100}%`; document.getElementById('lnL').innerText = `IZQ:${l.IZQUIERDO}`; document.getElementById('lnL').style.background = '#3498db';
+    document.getElementById('lnC').style.width = `${(l.CENTRAL/tot)*100}%`; document.getElementById('lnC').innerText = `CEN:${l.CENTRAL}`; document.getElementById('lnC').style.background = '#2ecc71';
+    document.getElementById('lnR').style.width = `${(l.DERECHO/tot)*100}%`; document.getElementById('lnR').innerText = `DER:${l.DERECHO}`; document.getElementById('lnR').style.background = '#e74c3c';
+
+    const z = {Z1:0, Z2:0, Z3:0, Z4:0, Z5:0, Z6:0}; actions.forEach(a => { if(a.zone) z[a.zone]++ });
+    const maxZ = Math.max(...Object.values(z), 1);
+    document.getElementById('chartZones').innerHTML = Object.keys(z).map(k => `<div class="bar-row"><div class="bar-lbl" style="width:20px">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${(z[k]/maxZ)*100}%; background:#7f8c8d"></div></div><div class="bar-val">${z[k]}</div></div>`).join('');
+}
+
+ function downloadExcel() {
+    // 1. Calcular Totales de xBuild y xThreat por equipo
+    let xBuildHome = 0, xBuildAway = 0;
+    let xThreatHome = 0, xThreatAway = 0;
+
+    DB.actions.forEach(a => {
+        if (a.team === 'HOME') {
+            xBuildHome += (a.xbuild || 0);
+            xThreatHome += (a.xt || 0);
+        } else {
+            xBuildAway += (a.xbuild || 0);
+            xThreatAway += (a.xt || 0);
+        }
+    });
+
+    const homeStats = getStats('HOME', true);
+    const awayStats = getStats('AWAY', true);
+    
+    // Función auxiliar para PPDA
+    const getPpdaCounts = (attTeam, defTeam) => {
+        let offActs = 0, defActs = 0;
+        if (attTeam === 'HOME') {
+             offActs = DB.actions.filter(a => a.team === attTeam && ['Pase','Clave'].includes(a.type) && a.x <= 60).length;
+             defActs = DB.actions.filter(a => a.team === defTeam && ['Recup','Intercep','Falta','Defensiva'].includes(a.type) && a.x <= 60).length;
+        } else {
+             offActs = DB.actions.filter(a => a.team === attTeam && ['Pase','Clave'].includes(a.type) && a.x >= 40).length;
+             defActs = DB.actions.filter(a => a.team === defTeam && ['Recup','Intercep','Falta','Defensiva'].includes(a.type) && a.x >= 40).length;
+        }
+        return defActs ? (offActs/defActs).toFixed(1) : 0;
+    };
+
+    const ppdaHome = getPpdaCounts('AWAY', 'HOME'); 
+    const ppdaAway = getPpdaCounts('HOME', 'AWAY');
+
+    // Carriles
+    const getLanes = (team) => {
+        const l = {IZQUIERDO:0, CENTRAL:0, DERECHO:0}; 
+        const teamActs = DB.actions.filter(a => a.team === team);
+        teamActs.forEach(a => { if(a.lane) l[a.lane]++ });
+        const total = teamActs.length || 1;
+        return {
+            L: Math.round((l.IZQUIERDO/total)*100)+'%',
+            C: Math.round((l.CENTRAL/total)*100)+'%',
+            R: Math.round((l.DERECHO/total)*100)+'%'
+        };
+    };
+    
+    const lanesHome = getLanes('HOME');
+    const lanesAway = getLanes('AWAY');
+    const totalPos = DB.possession.home + DB.possession.away || 1;
+
+    // Altura Defensiva
+    const getDefHeight = (team) => {
+        const defTypes = ['Recup', 'Intercep', 'Falta', 'Duelo Aéreo', 'Duelo Suelo', 'Defensiva'];
+        const acts = DB.actions.filter(a => a.team === team && defTypes.includes(a.type) && a.x >= 0);
+        if (acts.length === 0) return 0;
+        let totalHeight = 0;
+        acts.forEach(a => {
+            const height = (team === 'HOME') ? a.x : (100 - a.x);
+            totalHeight += height;
+        });
+        return (totalHeight / acts.length).toFixed(1);
+    };
+
+    // Goles Evitados (Porteros)
+    const getGolesEvitados = (gkTeam) => {
+        const rivalTeam = (gkTeam === 'HOME') ? 'AWAY' : 'HOME';
+        const shots = DB.actions.filter(a => a.team === rivalTeam && a.type === 'Disparo');
+        let xGOT_faced = 0;
+        let goals_conceded = 0;
+        shots.forEach(s => {
+            const isOffTarget = (s.shotDetail === 'Fuera' || s.shotDetail === 'Bloqueado');
+            if (!isOffTarget) xGOT_faced += (s.xgot || 0);
+            const isSaved = (s.shotDetail === 'Parada' || s.shotDetail === 'Rechace' || s.shotDetail === 'Bloqueado' || s.shotDetail === 'Fuera');
+            if ((s.res === 'Gol' || s.res === 'Completado') && !isSaved) goals_conceded++;
+        });
+        return (xGOT_faced - goals_conceded).toFixed(2);
+    };
+
+    const xGpHome = getGolesEvitados('HOME');
+    const xGpAway = getGolesEvitados('AWAY');
+    const defHeightHome = getDefHeight('HOME');
+    const defHeightAway = getDefHeight('AWAY');
+
+    // --- HOJA 1: RESUMEN ---
+    const statsData = [
+        ["METRICA", DB.config.homeName, DB.config.awayName],
+        ["Posesion", Math.round((DB.possession.home/totalPos)*100)+"%", Math.round((DB.possession.away/totalPos)*100)+"%"],
+        ["Altura Media Defensiva (m)", defHeightHome, defHeightAway],
+        ["Goles Evitados (Portero)", xGpHome, xGpAway],
+        ["xBuild Total (Construcción)", xBuildHome.toFixed(2), xBuildAway.toFixed(2)],
+        ["xThreat Total (Amenaza)", xThreatHome.toFixed(2), xThreatAway.toFixed(2)],
+        ["PPDA (Presion)", ppdaHome, ppdaAway],
+        ["Ataque Izquierdo", lanesHome.L, lanesAway.L],
+        ["Ataque Central", lanesHome.C, lanesAway.C],
+        ["Ataque Derecho", lanesHome.R, lanesAway.R],
+        ["xG Total", homeStats.raw.xg, awayStats.raw.xg],
+        ["xGOT Total", homeStats.raw.xgot, awayStats.raw.xgot]
+    ];
+
+    // --- HOJA 2: LOGS (AQUÍ ESTÁ LA CORRECCIÓN) ---
+    const logData = [["Min", "Equipo", "Jugador", "Accion", "Fase", "Resultado", "Carril", "Zona", "xG", "xGOT", "xThreat", "xBuild", "X", "Y", "Parte", "Altura"]];
+    
+    DB.actions.forEach(a => {
+        logData.push([
+        a.min, a.team, a.player, a.type, 
+        a.phase || '-', // <--- AHORA SÍ SE INCLUYE LA FASE
+        a.res, a.lane||'', a.zone||'', 
+        a.xg||'', a.xgot||'', 
+        (a.xt || 0).toFixed(3),
+        (a.xbuild || 0).toFixed(3),
+        a.x.toFixed(1), a.y.toFixed(1),
+        a.body || '-', a.height || '-'
+    ]);
+    });
+
+    // --- HOJA 3: JUGADORES ---
+    const playerHeaders = ["Equipo", "#", "Jugador", "Acciones", "Pases OK", "xG", "xBuild", "xThreat"];
+    const playerData = [playerHeaders];
+
+    const allPlayers = [];
+    if(DB.rosters.HOME) DB.rosters.HOME.forEach(p => allPlayers.push({team: DB.config.homeName, ...p}));
+    if(DB.rosters.AWAY) DB.rosters.AWAY.forEach(p => allPlayers.push({team: DB.config.awayName, ...p}));
+
+    allPlayers.forEach(p => {
+        const acts = DB.actions.filter(a => a.player === p.name);
+        if(acts.length === 0) return;
+        const passes = acts.filter(a => ['Pase','Clave','Asist'].includes(a.type));
+        const passOk = passes.filter(a => a.res === 'Completado').length;
+        let xg = 0, xb = 0, xt = 0;
+        acts.forEach(a => { xg += (a.xg||0); xb += (a.xbuild||0); xt += (a.xt||0); });
+        playerData.push([p.team, p.num, p.name, acts.length, `${passOk}/${passes.length}`, xg.toFixed(2), xb.toFixed(2), xt.toFixed(2)]);
+    });
+
+    // --- HOJA 4: METRICAS LIVERPOOL ---
+    const livStats = calculateLiverpoolMetrics();
+    livStats.sort((a, b) => b.progPasses - a.progPasses);
+    const livHeaders = ["Equipo", "Jugador", "Pases Progresivos (>10m)", "Pases a Zona Peligro (Deep)", "Pre-Asistencias", "xT Generado"];
+    const livData = [livHeaders];
+    livStats.forEach(p => {
+        if (p.progPasses > 0 || p.deepCompletions > 0 || p.xT_Generated > 0.01) {
+            const tName = p.team === 'HOME' ? DB.config.homeName : DB.config.awayName;
+            livData.push([tName, p.name, p.progPasses, p.deepCompletions, p.preAssists, p.xT_Generated.toFixed(3)]);
+        }
+    });
+
+    // --- GENERAR LIBRO EXCEL ---
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(statsData), "Resumen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logData), "Logs");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(playerData), "Jugadores");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(livData), "Metricas_Liverpool");
+    
+    XLSX.writeFile(wb, "Reporte_Partido_Pro.xlsx");
+}
+function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
+function downloadPitchImg() { const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; const tCtx = tmp.getContext('2d'); tCtx.fillStyle = "#204a2e"; tCtx.fillRect(0,0,tmp.width, tmp.height); tCtx.drawImage(cv, 0, 0); const link = document.createElement('a'); link.download = `Pitch_${Date.now()}.png`; link.href = tmp.toDataURL(); link.click(); }
+
+function onPlayerSelect() {
+    const sel = document.getElementById('playerFilter').value;
+    if (sel !== 'ALL') {
+        document.getElementById('viewMode').value = 'ALL';
+    }
+    updateDash(); 
+    drawPitch();
+}
+
+/* Z-SCORE & SCATTER PLOT LOGIC */
+function openZScoreModal() {
+    const list = document.getElementById('zScoreList'); list.innerHTML = "";
+    const players = new Set();
+    if(DB.rosters.HOME) DB.rosters.HOME.forEach(p => players.add(p.name));
+    if(DB.rosters.AWAY) DB.rosters.AWAY.forEach(p => players.add(p.name));
+    DB.actions.forEach(a => { if(a.player !== 'UNK' && a.player !== 'EQUIPO') players.add(a.player); });
+
+    if(players.size === 0) { alert("No hay jugadores."); return; }
+
+    Array.from(players).sort().forEach(p => {
+        const row = document.createElement('div');
+        row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #333;";
+        const hasActs = DB.actions.some(a => a.player === p);
+        const defMins = hasActs ? 90 : 0; 
+        row.innerHTML = `<span style="font-weight:bold; color:#fff;">${p}</span><input type="number" id="min_${p}" value="${defMins}" placeholder="Min" style="width:60px; padding:5px; text-align:center; background:#111; border:1px solid #444; color:var(--accent); font-weight:bold; border-radius:4px;">`;
+        list.appendChild(row);
+    });
+    document.getElementById('modalZScore').style.display = 'flex';
+}
+
+function calculateZMetrics() {
+    const playerMins = {};
+    const inputs = document.querySelectorAll('[id^="min_"]');
+    inputs.forEach(inp => playerMins[inp.id.replace('min_', '')] = parseFloat(inp.value) || 0);
+
+    const rawStats = {};
+    const metrics = ['NetPases', 'Tiros', 'NetRegates', 'Recup', 'Seguridad', 'xG'];
+    
+    Object.keys(playerMins).forEach(p => {
+        rawStats[p] = { Name: p, Mins: playerMins[p] };
+        metrics.forEach(m => rawStats[p][m] = 0);
+    });
+
+    DB.actions.forEach(a => {
+        if(!rawStats[a.player]) return; 
+        if(['Pase','Clave','Asist'].includes(a.type)) {
+            if(a.res === 'Completado') rawStats[a.player]['NetPases'] += 1;
+            else if(a.res === 'Fallado') rawStats[a.player]['NetPases'] -= 1; 
+        }
+        if(a.type === 'Disparo') rawStats[a.player]['Tiros']++; 
+        if(['Conducción','Regate'].includes(a.type)) {
+            if(a.res === 'Completado') rawStats[a.player]['NetRegates'] += 1;
+            else if(a.res === 'Fallado') rawStats[a.player]['NetRegates'] -= 1;
+        }
+        if(['Recup','Intercep'].includes(a.type)) rawStats[a.player]['Recup']++;
+        if(['Duelo Aéreo', 'Duelo Suelo'].includes(a.type) && a.res === 'Completado') rawStats[a.player]['Recup']++;
+        const esPerdida = (a.type === 'Perdida');
+        const esFalloTecnico = (['Pase','Clave','Asist','Conducción','Regate'].includes(a.type) && a.res === 'Fallado');
+        const esDueloPerdido = (['Duelo Aéreo', 'Duelo Suelo'].includes(a.type) && a.res === 'Fallado');
+        if(esPerdida || esFalloTecnico || esDueloPerdido) rawStats[a.player]['Seguridad']++;
+        if(a.xg) rawStats[a.player]['xG'] += a.xg;
+    });
+
+    const p90Stats = []; const groupStats = {}; metrics.forEach(m => groupStats[m] = []);
+    Object.values(rawStats).forEach(p => {
+        if(p.Mins < 10) return; 
+        const factor = 90 / p.Mins; const pRow = { Name: p.Name, Mins: p.Mins };
+        metrics.forEach(m => { const val = p[m] * factor; pRow[m] = val; groupStats[m].push(val); });
+        p90Stats.push(pRow);
+    });
+
+    const statsCalc = {};
+    metrics.forEach(m => {
+        const values = groupStats[m];
+        if(values.length === 0) { statsCalc[m] = { mean: 0, std: 1 }; return; }
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const sqDiff = values.map(v => Math.pow(v - mean, 2));
+        const std = Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / values.length);
+        statsCalc[m] = { mean: mean, std: std === 0 ? 1 : std };
+    });
+
+    const results = [];
+    p90Stats.forEach(p => {
+        const res = { Name: p.Name, Mins: p.Mins, Z: {} };
+        let sumZ = 0;
+        metrics.forEach(m => {
+            let z = (p[m] - statsCalc[m].mean) / statsCalc[m].std;
+            if(m === 'Seguridad') z = z * -1; 
+            res.Z[m] = z; sumZ += z;
+        });
+        res.Score = (sumZ / metrics.length);
+        res.OffZ = (res.Z['NetPases'] + res.Z['Tiros'] + res.Z['NetRegates'] + res.Z['xG']) / 4;
+        res.DefZ = (res.Z['Recup'] + res.Z['Seguridad']) / 2;
+        results.push(res);
+    });
+    return results;
+}
+
+function generateZScoreExcel() {
+    const data = calculateZMetrics();
+    const headers = [["Jugador", "Min", "Z-NetPases", "Z-Tiros", "Z-NetRegates", "Z-Recup", "Z-Seguridad(Inv)", "Z-xG", "NOTA MEDIA"]];
+    data.forEach(p => {
+        headers.push([p.Name, p.Mins, p.Z.NetPases.toFixed(2), p.Z.Tiros.toFixed(2), p.Z.NetRegates.toFixed(2), p.Z.Recup.toFixed(2), p.Z.Seguridad.toFixed(2), p.Z.xG.toFixed(2), p.Score.toFixed(2)]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    XLSX.utils.book_append_sheet(wb, ws, "Z-SCORES");
+    XLSX.writeFile(wb, `ZScore_Analysis_${DB.config.homeName}.xlsx`);
+    showToast("📊 Excel Generado");
+}
+
+let scatterChart = null;
+function openScatterModal() {
+    const data = calculateZMetrics();
+    if(data.length === 0) { alert("No hay datos suficientes (Minutos < 10)"); return; }
+    document.getElementById('modalScatter').style.display = 'flex';
+    renderScatter(data);
+}
+
+function renderScatter(data) {
+    const ctxS = document.getElementById('scatterCanvas').getContext('2d');
+    if(scatterChart) scatterChart.destroy();
+    const points = data.map(p => ({ x: p.DefZ, y: p.OffZ, player: p.Name }));
+    scatterChart = new Chart(ctxS, {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Jugadores', data: points, backgroundColor: 'rgba(52, 152, 219, 0.6)', borderColor: '#3498db', pointRadius: 6, pointHoverRadius: 8 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { x: { title: { display: true, text: 'Z-Score Defensivo (Seguridad + Recup)', color:'#aaa' }, grid: { color: '#333' }, ticks: { color: '#888' } }, y: { title: { display: true, text: 'Z-Score Ofensivo (Neto + xG)', color:'#aaa' }, grid: { color: '#333' }, ticks: { color: '#888' } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return context.raw.player + ` (Def: ${context.raw.x.toFixed(2)}, Off: ${context.raw.y.toFixed(2)})`; } } } }
+        },
+        plugins: [{
+            id: 'customLabels',
+            afterDatasetsDraw(chart, args, options) {
+                const { ctx } = chart; ctx.save(); ctx.font = '10px sans-serif'; ctx.fillStyle = '#fff';
+                chart.data.datasets[0].data.forEach((dp, i) => { const meta = chart.getDatasetMeta(0); const x = meta.data[i].x; const y = meta.data[i].y; ctx.fillText(dp.player, x + 8, y + 3); });
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+function openZonesModal() {
+    document.getElementById('modalZones').style.display = 'flex';
+    
+    // CAMBIO: Añadimos flecha ⇧ junto al nombre
+    document.getElementById('zTitleHome').innerHTML = `${DB.config.homeName} <span style="font-size:0.9em;">⇧</span>`;
+    document.getElementById('zTitleAway').innerHTML = `${DB.config.awayName} <span style="font-size:0.9em;">⇧</span>`;
+    
+    renderZoneGrid('HOME', 'gridHome');
+    renderZoneGrid('AWAY', 'gridAway');
+}
+
+function renderZoneGrid(team, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const rows = 8; const cols = 5;
+    const gridData = Array(rows).fill().map(() => Array(cols).fill().map(() => ({ total: 0, ok: 0 })));
+    const acts = DB.actions.filter(a => a.team === team && ['Pase', 'Disparo', 'Regate', 'Conducción', 'Clave', 'Asist', 'Banda', 'Corner'].includes(a.type) && a.x >= 0);
+    acts.forEach(a => {
+        let x = a.x; let y = a.y; let rowIdx, colIdx;
+        if (team === 'HOME') { rowIdx = 7 - Math.floor(x / (100/rows)); colIdx = Math.floor(y / (100/cols)); } 
+        else { rowIdx = Math.floor(x / (100/rows)); colIdx = 4 - Math.floor(y / (100/cols)); }
+        if(rowIdx < 0) rowIdx = 0; if(rowIdx >= rows) rowIdx = rows - 1;
+        if(colIdx < 0) colIdx = 0; if(colIdx >= cols) colIdx = cols - 1;
+        gridData[rowIdx][colIdx].total++;
+        if (a.res === 'Completado' || a.res === 'Gol') gridData[rowIdx][colIdx].ok++;
+    });
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const d = gridData[r][c];
+            const cell = document.createElement('div'); cell.className = 'z-cell';
+            let bgColor = '#204a2e'; 
+            if (d.total > 0) {
+                const pct = Math.round((d.ok / d.total) * 100);
+                if (pct < 50) bgColor = '#c0392b'; else if (pct < 75) bgColor = '#d35400'; else bgColor = '#27ae60';
+                cell.style.background = bgColor; cell.innerHTML = `<span class="z-pct">${pct}%</span><span class="z-count">${d.ok}/${d.total}</span>`;
+            } else { cell.style.background = '#204a2e'; cell.innerHTML = `<span style="color:rgba(255,255,255,0.2)">-</span>`; }
+            container.appendChild(cell);
+        }
+    }
+    const markings = document.createElement('div'); markings.className = 'pm-layer';
+    markings.innerHTML = `<div class="pm-center-line"></div><div class="pm-center-circle"></div><div class="pm-area-box top"></div><div class="pm-area-small top"></div><div class="pm-area-box btm"></div><div class="pm-area-small btm"></div><div class="pm-spot top"></div><div class="pm-arc top"></div><div class="pm-spot btm"></div><div class="pm-arc btm"></div>`;
+    container.appendChild(markings);
+}
+
+function openFieldTilt() {
+    document.getElementById('modalFieldTilt').style.display = 'flex';
+    const homeFinal3rd = DB.actions.filter(a => a.team === 'HOME' && a.x > 66 && ['Pase','Conducción','Regate','Disparo','Clave'].includes(a.type));
+    const awayFinal3rd = DB.actions.filter(a => a.team === 'AWAY' && a.x < 33 && ['Pase','Conducción','Regate','Disparo','Clave'].includes(a.type));
+    const hCount = homeFinal3rd.length; const aCount = awayFinal3rd.length; const total = hCount + aCount;
+    let hPct = 50, aPct = 50;
+    if (total > 0) { hPct = Math.round((hCount / total) * 100); aPct = 100 - hPct; }
+    document.getElementById('ftBarHome').style.width = hPct + '%'; document.getElementById('ftBarHome').innerText = hPct + '%';
+    document.getElementById('ftBarAway').style.width = aPct + '%'; document.getElementById('ftBarAway').innerText = aPct + '%';
+    document.getElementById('ftTotHome').innerText = hCount; document.getElementById('ftTotAway').innerText = aCount;
+    updateLaneChart(homeFinal3rd, 'ftLanesHome', 'HOME'); updateLaneChart(awayFinal3rd, 'ftLanesAway', 'AWAY');
+}
+
+function updateLaneChart(actions, elId, team) {
+    let l = 0, c = 0, r = 0;
+    actions.forEach(a => { if (a.y < 33) l++; else if (a.y > 66) r++; else c++; });
+    const max = Math.max(l, c, r, 1);
+    const container = document.getElementById(elId);
+    const bars = container.querySelectorAll('.ft-lane-fill'); const vals = container.querySelectorAll('.ft-lane-val');
+    bars[0].style.height = (l/max)*100 + '%'; vals[0].innerText = l;
+    bars[1].style.height = (c/max)*100 + '%'; vals[1].innerText = c;
+    bars[2].style.height = (r/max)*100 + '%'; vals[2].innerText = r;
+}
+
+function openViolinModal() { document.getElementById('modalViolin').style.display = 'flex'; setTimeout(updateViolin, 200); }
+
+function updateViolin() {
+    const metric = document.getElementById('violinMetric').value;
+    const viewTeam = document.getElementById('violinTeam').value;
+    const container = document.getElementById('violinChartContainer');
+    
+    container.innerHTML = "";
+    
+    // Mapeo de dorsales
+    let playerNumMap = {};
+    if(DB.rosters[viewTeam]) DB.rosters[viewTeam].forEach(p => playerNumMap[p.name] = p.num);
+    
+    let roster = [];
+    if(DB.rosters[viewTeam]) roster = DB.rosters[viewTeam].map(p => p.name);
+    
+    const teamActions = DB.actions.filter(a => a.team === viewTeam && a.player !== 'UNK' && a.player !== 'EQUIPO');
+    teamActions.forEach(a => { if(!roster.includes(a.player)) roster.push(a.player); });
+
+    if(roster.length === 0) { 
+        container.innerHTML = '<div style="color:#666; display:flex; height:100%; justify-content:center; align-items:center;">Sin datos.</div>'; 
+        return; 
+    }
+
+    // --- LÓGICA DEFINITIVA (SIN MIRAR MINUTOS) ---
+    // Confiamos en que el botón 2T ya guardó el dato correctamente (invertido) en la DB.
+    const getTacticalX = (action) => {
+        let x = action.x;
+
+        if (viewTeam === 'HOME') {
+            // LOCAL: El dato ya está guardado tal cual queremos mostrarlo.
+            // (0 = Portería Propia, 100 = Portería Rival)
+            return x;
+        } else {
+            // VISITANTE: Históricamente se guarda como coordenadas absolutas (0=Izq, 100=Der).
+            // Como el rival "defiende" visualmente en el 100 (Derecha), 
+            // invertimos SIEMPRE para que en el gráfico el 0 sea "Defensa".
+            return 100 - x;
+        }
+    };
+
+    // Ordenar jugadores
+    let playersSorted = roster.map(player => {
+        const pActs = teamActions.filter(a => a.player === player && a.x >= 0);
+        if(pActs.length === 0) return { name: player, num: playerNumMap[player] || '?', avgX: 50 }; 
+        
+        let sumX = 0; 
+        pActs.forEach(a => { 
+            let val = a.x; 
+            if(metric === 'X') {
+                val = getTacticalX(a); 
+            }
+            sumX += val; 
+        });
+        return { name: player, num: playerNumMap[player] || '?', avgX: sumX / pActs.length };
+    });
+    
+    playersSorted.sort((a, b) => a.avgX - b.avgX);
+
+    let traces = [];
+    const defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+    
+    playersSorted.forEach((p, i) => {
+        const pActions = teamActions.filter(a => a.player === p.name);
+        let values = [];
+        
+        pActions.forEach(a => {
+            if(metric === 'X') { 
+                if(a.x >= 0) values.push(getTacticalX(a)); 
+            } else { 
+                // Para Y (Anchura)
+                if(a.y >= 0) values.push(a.y);
+            }
+        });
+        
+        if(values.length > 0) {
+            let fillColor = defaultColors[i % defaultColors.length]; 
+            
+            traces.push({
+                type: 'violin', 
+                name: p.name, 
+                x: Array(values.length).fill(p.name), 
+                text: "Dorsal: " + p.num, 
+                y: values, 
+                box: { visible: true, width: 0.1 }, 
+                points: 'all', 
+                jitter: 0.05, 
+                pointpos: 0, 
+                line: { color: '#fff', width: 1 },
+                fillcolor: fillColor, 
+                marker: { size: 3, color: 'rgba(0,0,0,0.6)' }, 
+                meanline: { visible: true }, 
+                opacity: 0.8, 
+                hoverinfo: 'y+text'
+            });
+        }
+    });
+    
+    const layout = {
+        title: { text: `Campograma - ${viewTeam === 'HOME' ? DB.config.homeName : DB.config.awayName}`, font: { color: '#fff', size: 16 } },
+        paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e',
+        xaxis: { title: '', tickfont: { color: '#ccc', size: 11, family: 'Arial' }, gridcolor: '#333', type: 'category', categoryorder: 'array', categoryarray: playersSorted.map(p => p.name), tickangle: -45, automargin: true },
+        yaxis: { title: { text: metric === 'X' ? 'Posición (0=Propia | 100=Rival)' : 'Anchura (0-100)', font: { color: '#888' } }, tickfont: { color: '#ccc' }, gridcolor: '#333', range: [0, 100], zeroline: false },
+        showlegend: false, 
+        margin: { l: 50, r: 20, t: 50, b: 120 },
+        shapes: [
+            { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 25, y1: 25, line: { color: 'rgba(52, 152, 219, 0.5)', width: 1, dash: 'dash' } },
+            { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 50, y1: 50, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1, dash: 'dot' } },
+            { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 75, y1: 75, line: { color: 'rgba(231, 76, 60, 0.5)', width: 1, dash: 'dash' } }
+        ]
+    };
+    
+    Plotly.newPlot('violinChartContainer', traces, layout, { responsive: true, displayModeBar: false });
+}
+
+// ==========================================
+// AVG POS + RED DE PASES + SONARES
+// ==========================================
+let currentAvgTeam = 'HOME';
+let passMatrix = {};
+
+function openAvgPosModal() {
+    document.getElementById('modalAvgPos').style.display = 'flex';
+    document.getElementById('btnAvgHome').innerText = DB.config.homeName;
+    document.getElementById('btnAvgAway').innerText = DB.config.awayName;
+    setTimeout(() => { setAvgPosTeam('HOME'); }, 100);
+}
+
+function setAvgPosTeam(team) {
+    currentAvgTeam = team;
+    document.getElementById('').className = team === 'HOME' ? 't-opt active-home' : 't-opt';
+    document.getElementById('btnAvgAway').className = team === 'AWAY' ? 't-opt active-away' : 't-opt';
+    const bHome = document.getElementById('btnAvgHome'); const bAway = document.getElementById('btnAvgAway');
+    if(team === 'HOME') { bHome.style.background = '#2c3e50'; bHome.style.borderBottom = '3px solid #3498db'; bAway.style.background = '#111'; bAway.style.borderBottom = 'none'; } 
+    else { bAway.style.background = '#3b1e1e'; bAway.style.borderBottom = '3px solid #e74c3c'; bHome.style.background = '#111'; bHome.style.borderBottom = 'none'; }
+    drawAvgPos();
+}
+
+function drawAvgPos() {
+    const cv = document.getElementById('avgPosCanvas');
+    const ctx = cv.getContext('2d');
+    const showNet = document.getElementById('chkShowNet').checked;
+    const showSonar = document.getElementById('chkShowSonar').checked;
+    
+    // 1. LEER NUEVOS FILTROS (Fase y Pases Mínimos)
+    const phaseFilter = document.getElementById('avgPosPhaseFilter').value;
+    const minPasses = parseInt(document.getElementById('minPassInput').value) || 2;
+
+    // 2. AJUSTE ANTI-DISTORSIÓN
+    cv.width = cv.parentElement.clientWidth; 
+    cv.height = cv.parentElement.clientHeight;
+    const w = cv.width, h = cv.height;
+
+    // --- FONDO CAMPO ---
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+    ctx.strokeRect(w*0.05, h*0.05, w*0.9, h*0.9);
+    ctx.beginPath(); ctx.moveTo(w/2, h*0.05); ctx.lineTo(w/2, h*0.95); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w/2, h/2, h*0.1, 0, 7); ctx.stroke();
+    ctx.strokeRect(w*0.05, h*0.22, w*0.15, h*0.56); 
+    ctx.strokeRect(w*0.8, h*0.22, w*0.15, h*0.56);
+    ctx.fillStyle = "rgba(255,255,255,0.5)"; 
+    ctx.beginPath(); ctx.arc(w*0.16, h*0.5, 3, 0, 7); ctx.fill(); 
+    ctx.beginPath(); ctx.arc(w*0.84, h*0.5, 3, 0, 7); ctx.fill();
+
+    // --- PROCESAMIENTO DE DATOS ---
+    const players = {}; 
+    const passes = []; 
+    const teamColor = currentAvgTeam === 'HOME' ? '#3498db' : '#e74c3c';
+    const numMap = {};
+    if(DB.rosters[currentAvgTeam]) DB.rosters[currentAvgTeam].forEach(p => numMap[p.name] = p.num);
+
+    // 3. FILTRADO CON LÓGICA DE FASES (NUEVO)
+    const teamActs = DB.actions.filter(a => {
+        if (a.team !== currentAvgTeam) return false;
+        if (a.x < 0 || a.player === 'UNK' || a.player === 'EQUIPO') return false;
+        // El filtro mágico:
+        if (phaseFilter !== 'ALL' && a.phase !== phaseFilter) return false;
+        return true;
+    });
+    
+    // Calcular posiciones medias
+    teamActs.forEach(a => {
+        if(!players[a.player]) players[a.player] = { x: 0, y: 0, count: 0, totalPasses: 0, name: a.player };
+        players[a.player].x += a.x; 
+        players[a.player].y += a.y; 
+        players[a.player].count++;
+        if(['Pase', 'Clave', 'Asist'].includes(a.type) && a.res === 'Completado') {
+            players[a.player].totalPasses++;
+        }
+    });
+    
+    // Calcular radio variable
+    let maxPasses = 1;
+    Object.keys(players).forEach(pName => {
+        if (players[pName].totalPasses > maxPasses) maxPasses = players[pName].totalPasses;
+    });
+    const minRadius = 8, maxRadius = 20;
+
+    // Calcular matriz de pases
+    passMatrix = {}; 
+    for(let i=0; i < teamActs.length - 1; i++) {
+        const curr = teamActs[i]; const next = teamActs[i+1];
+        if(['Pase', 'Clave', 'Asist'].includes(curr.type) && curr.res === 'Completado') {
+            if(curr.endX) {
+                const ang = Math.atan2(curr.endY - curr.y, curr.endX - curr.x);
+                if(!passes[curr.player]) passes[curr.player] = [];
+                passes[curr.player].push(ang);
+            }
+            if(next.team === currentAvgTeam && next.player !== curr.player) {
+                const key = curr.player + "_" + next.player;
+                if(!passMatrix[key]) passMatrix[key] = 0;
+                passMatrix[key]++;
+            }
+        }
+    }
+
+    // --- CÁLCULO DE LÍNEAS TÁCTICAS (MANTENIDO) ---
+    let playerPositions = [];
+    Object.keys(players).forEach(pName => {
+        const p = players[pName];
+        if (p.count > 0) {
+             playerPositions.push({ name: pName, x: p.x / p.count, y: p.y / p.count });
+        }
+    });
+    playerPositions.sort((a, b) => a.x - b.x);
+
+    let defLineX = 0, attLineX = 0;
+    if (playerPositions.length > 2) {
+        if (currentAvgTeam === 'HOME') {
+            defLineX = playerPositions[1].x; 
+            attLineX = playerPositions[playerPositions.length - 1].x; 
+        } else {
+            defLineX = playerPositions[playerPositions.length - 2].x; 
+            attLineX = playerPositions[0].x; 
+        }
+    }
+
+    // --- INDICADOR DE DIRECCIÓN DE ATAQUE (MANTENIDO) ---
+    ctx.save();
+    ctx.fillStyle = teamColor; ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 3; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+    if (currentAvgTeam === 'HOME') {
+        arrow(ctx, w*0.4, h*0.03, w*0.6, h*0.03); ctx.fillText("ATAQUE ►", w*0.5, h*0.07);
+    } else {
+        arrow(ctx, w*0.6, h*0.03, w*0.4, h*0.03); ctx.fillText("◄ ATAQUE", w*0.5, h*0.07);
+    }
+    ctx.restore();
+
+    // --- DIBUJAR BLOQUE SOMBREADO (MANTENIDO) ---
+    if (Math.abs(attLineX - defLineX) > 0) {
+        const screenDefX = (defLineX / 100) * w;
+        const screenAttX = (attLineX / 100) * w;
+        const xStart = Math.min(screenDefX, screenAttX);
+        const widthBlock = Math.abs(screenAttX - screenDefX);
+
+        ctx.save();
+        ctx.fillStyle = currentAvgTeam === 'HOME' ? "rgba(52, 152, 219, 0.15)" : "rgba(231, 76, 60, 0.15)";
+        ctx.fillRect(xStart, h*0.05, widthBlock, h*0.9);
+        
+        ctx.strokeStyle = currentAvgTeam === 'HOME' ? "rgba(52, 152, 219, 0.4)" : "rgba(231, 76, 60, 0.4)";
+        ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.moveTo(screenDefX, h*0.05); ctx.lineTo(screenDefX, h*0.95); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(screenAttX, h*0.05); ctx.lineTo(screenAttX, h*0.95); ctx.stroke();
+        
+        const meters = Math.abs((attLineX - defLineX) * 1.05).toFixed(1); 
+        ctx.fillStyle = "#fff"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+        const midBlockX = (screenDefX + screenAttX) / 2;
+        ctx.fillText(`↔ ${meters}m`, midBlockX, h * 0.92); 
+        ctx.restore();
+    }
+
+    // --- DIBUJAR RED DE PASES ---
+    if(showNet) {
+        ctx.lineCap = "round";
+        Object.keys(passMatrix).forEach(key => {
+            const [p1, p2] = key.split("_"); const count = passMatrix[key];
+            if(count < minPasses) return; 
+            const from = players[p1]; const to = players[p2];
+            if(from && to) {
+                const fx = (from.x / from.count / 100) * w; const fy = (from.y / from.count / 100) * h;
+                const tx = (to.x / to.count / 100) * w; const ty = (to.y / to.count / 100) * h;
+                const thickness = Math.min(Math.max(count * 0.5, 1), 8); 
+                const alpha = Math.min(0.2 + (count * 0.05), 0.8);
+                ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = thickness; ctx.stroke();
+            }
+        });
+    }
+
+    // --- DIBUJAR JUGADORES ---
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    let teamTotalX = 0; let playerCount = 0;
+
+    Object.keys(players).forEach(pName => {
+        const p = players[pName];
+        if (p.count === 0) return; 
+
+        const avgX = (p.x / p.count); const avgY = (p.y / p.count);
+        teamTotalX += avgX; playerCount++;
+        
+        const screenX = (avgX / 100) * w; const screenY = (avgY / 100) * h;
+        const dorsal = numMap[pName] || "?";
+        const normalizedPasses = (p.totalPasses - 0) / (maxPasses - 0);
+        const radius = minRadius + normalizedPasses * (maxRadius - minRadius);
+
+        // SONARES
+        if(showSonar && passes[pName] && passes[pName].length > 0) {
+            const bins = 12; const sectorCounts = new Array(bins).fill(0); const step = (Math.PI * 2) / bins; let maxBin = 0;
+            passes[pName].forEach(ang => {
+                let normAng = ang; if(normAng < 0) normAng += Math.PI*2;
+                const binIdx = Math.floor(normAng / step) % bins;
+                sectorCounts[binIdx]++; if(sectorCounts[binIdx] > maxBin) maxBin = sectorCounts[binIdx];
+            });
+            const sonarRadius = 25; ctx.fillStyle = teamColor; ctx.globalAlpha = 0.6;
+            for(let i=0; i<bins; i++) {
+                if(sectorCounts[i] === 0) continue;
+                const len = (sectorCounts[i] / maxBin) * sonarRadius;
+                ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.arc(screenX, screenY, len + 5, i*step, (i+1)*step); ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        // CÍRCULO JUGADOR
+        ctx.shadowColor = "rgba(0,0,0,0.7)"; ctx.shadowBlur = 10; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+        ctx.fillStyle = teamColor; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(screenX, screenY, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+        ctx.font = "900 16px sans-serif"; ctx.fillStyle = "#fff"; ctx.lineWidth = 3; ctx.strokeStyle = "#000"; 
+        const textY = screenY + radius + 6;
+        ctx.strokeText(dorsal, screenX, textY); 
+        ctx.fillText(dorsal, screenX, textY);
+    });
+    
+    // --- LÍNEA DE ALTURA MEDIA (MANTENIDO) ---
+    if (playerCount > 0) {
+        const teamAvgX = teamTotalX / playerCount; 
+        const lineX = (teamAvgX / 100) * w;
+        let displayHeight = teamAvgX; 
+        if (currentAvgTeam === 'AWAY') displayHeight = 100 - teamAvgX;
+
+        ctx.save(); 
+        ctx.beginPath(); ctx.moveTo(lineX, h * 0.05); ctx.lineTo(lineX, h * 0.95); 
+        ctx.strokeStyle = "rgba(255, 255, 0, 1)"; ctx.lineWidth = 3; ctx.setLineDash([5, 5]); ctx.stroke();
+        ctx.fillStyle = "rgba(255, 255, 0, 1)"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("ALTURA MEDIA", lineX, h * 0.02);
+        
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; 
+        const txt = Math.round(displayHeight) + "m"; 
+        const txtW = ctx.measureText(txt).width;
+        ctx.fillRect(lineX - txtW/2 - 6, h * 0.96 - 4, txtW + 12, 16); 
+        ctx.fillStyle = "#ffff00"; ctx.fillText(txt, lineX, h * 0.96); 
+        ctx.restore();
+    }
+
+    // --- ETIQUETA VISUAL DE FASE (NUEVO) ---
+    if(phaseFilter !== 'ALL') {
+        ctx.fillStyle = "rgba(255,255,255,0.9)"; 
+        ctx.font = "bold 14px monospace"; 
+        ctx.textAlign = "left";
+        ctx.fillText("FASE: " + phaseFilter.toUpperCase(), 10, h - 15);
+    }
+}
+
+function downloadAvgPosImg() {
+    const cv = document.getElementById('avgPosCanvas'); const link = document.createElement('a');
+    link.download = `PosicionesMedias_${DB.config.homeName}_vs_${DB.config.awayName}.png`; link.href = cv.toDataURL(); link.click(); showToast("Imagen Posiciones Guardada");
+}
+
+// ==========================================
+// SANKEY DIAGRAM
+// ==========================================
+let currentSankeyTeam = 'HOME';
+function openSankeyModal() { document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
+function updateSankey(team) {
+    currentSankeyTeam = team;
+    document.getElementById('btnSankeyHome').className = team==='HOME'?'t-opt active-home':'t-opt';
+    document.getElementById('btnSankeyAway').className = team==='AWAY'?'t-opt active-away':'t-opt';
+
+    const possessions = []; let currentPossession = null;
+    const sortedActions = [...DB.actions].sort((a,b) => a.id - b.id);
+    sortedActions.forEach(a => {
+        if(a.x < 0) return;
+        let zoneSimple = "";
+        if(a.team === 'HOME') { if(a.x < 33) zoneSimple = "Inicio (Def)"; else if(a.x < 66) zoneSimple = "Creación (Med)"; else zoneSimple = "Finalización (Atq)"; } 
+        else { if(a.x > 66) zoneSimple = "Inicio (Def)"; else if(a.x > 33) zoneSimple = "Creación (Med)"; else zoneSimple = "Finalización (Atq)"; }
+
+        if(a.team === team) {
+            if(!currentPossession) currentPossession = { start: zoneSimple, end: zoneSimple, count: 0 };
+            currentPossession.end = zoneSimple; currentPossession.count++;
+        } else { if(currentPossession) { possessions.push(currentPossession); currentPossession = null; } }
+    });
+    if(currentPossession) possessions.push(currentPossession);
+
+    const nodes = ["Recup: Defensa", "Recup: Medio", "Recup: Ataque", "Fin: Defensa", "Fin: Medio", "Fin: Ataque"];
+    const nodeMap = { "Inicio (Def)": 0, "Creación (Med)": 1, "Finalización (Atq)": 2, "Fin: Inicio (Def)": 3, "Fin: Creación (Med)": 4, "Fin: Finalización (Atq)": 5 };
+    const linksDict = {};
+    possessions.forEach(p => {
+        const srcIdx = nodeMap[p.start]; const tgtStr = "Fin: " + p.end; const tgtIdx = nodeMap[tgtStr];
+        const key = srcIdx + "-" + tgtIdx; if(!linksDict[key]) linksDict[key] = 0; linksDict[key]++;
+    });
+
+    const sources = []; const targets = []; const values = [];
+    Object.keys(linksDict).forEach(k => { const [s, t] = k.split("-").map(Number); sources.push(s); targets.push(t); values.push(linksDict[k]); });
+    const color = team === 'HOME' ? "rgba(52, 152, 219, 0.8)" : "rgba(231, 76, 60, 0.8)";
+    const nodeColors = ["#7f8c8d", "#7f8c8d", "#7f8c8d", color, color, color];
+
+    const data = {
+        type: "sankey", orientation: "h",
+        node: { pad: 15, thickness: 20, line: { color: "black", width: 0.5 }, label: nodes, color: nodeColors },
+        link: { source: sources, target: targets, value: values, color: team === 'HOME' ? "rgba(52, 152, 219, 0.3)" : "rgba(231, 76, 60, 0.3)" }
+    };
+    const layout = { font: { size: 12, color: "black" }, paper_bgcolor: "#fff", plot_bgcolor: "#fff", margin: { t: 30, l: 10, r: 10, b: 10 } };
+    Plotly.newPlot('sankeyChartContainer', [data], layout, {responsive: true, displayModeBar: false});
+}
+
+// ==========================================
+// CONVEX HULLS
+// ==========================================
+let hullTeam = 'HOME';
+const HULL_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3'];
+function openHullModal() { document.getElementById('modalHulls').style.display = 'flex'; document.getElementById('hullHome').innerText = DB.config.homeName; document.getElementById('hullAway').innerText = DB.config.awayName; setHullTeam('HOME'); }
+function setHullTeam(t) { hullTeam = t; document.getElementById('hullHome').className = t==='HOME'?'t-opt active-home':'t-opt'; document.getElementById('hullAway').className = t==='AWAY'?'t-opt active-away':'t-opt'; renderHullList(); drawHulls(); }
+function renderHullList() {
+    const list = document.getElementById('hullPlayerList'); list.innerHTML = '';
+    const players = new Set();
+    if(DB.rosters[hullTeam]) DB.rosters[hullTeam].forEach(p => players.add(p.name));
+    DB.actions.forEach(a => { if(a.team === hullTeam && a.player !== 'UNK' && a.player !== 'EQUIPO') players.add(a.player); });
+    Array.from(players).sort().forEach((p, i) => {
+        const color = HULL_COLORS[i % HULL_COLORS.length];
+        const item = document.createElement('label'); item.className = 'check-item'; item.style.borderLeft = `4px solid ${color}`;
+        item.innerHTML = `<input type="checkbox" class="chk-hull" value="${p}" onchange="drawHulls()"> <span style="font-size:0.8rem; font-weight:bold;">${p}</span>`;
+        list.appendChild(item);
+    });
+}
+function toggleHullAll(state) { document.querySelectorAll('.chk-hull').forEach(c => c.checked = state); drawHulls(); }
+function convexHull(points) {
+    if (points.length < 3) return points;
+    points.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+    const cross = (a, b, o) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower = []; for (let p of points) { while (lower.length >= 2 && cross(lower[lower.length - 1], p, lower[lower.length - 2]) <= 0) { lower.pop(); } lower.push(p); }
+    const upper = []; for (let i = points.length - 1; i >= 0; i--) { const p = points[i]; while (upper.length >= 2 && cross(upper[upper.length - 1], p, upper[upper.length - 2]) <= 0) { upper.pop(); } upper.push(p); }
+    upper.pop(); lower.pop(); return lower.concat(upper);
+}
+function drawHulls() {
+    const cv = document.getElementById('hullCanvas'); const ctx = cv.getContext('2d');
+    cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight; const w = cv.width, h = cv.height;
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h); ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
+    ctx.strokeRect(w*0.05, h*0.05, w*0.9, h*0.9); ctx.beginPath(); ctx.moveTo(w/2, h*0.05); ctx.lineTo(w/2, h*0.95); ctx.stroke();
+    ctx.strokeRect(w*0.05, h*0.22, w*0.15, h*0.56); ctx.strokeRect(w*0.8, h*0.22, w*0.15, h*0.56);
+    
+    /* CAMBIO: DIBUJAR FLECHA DE ATAQUE */
+    ctx.save();
+    const teamColor = (hullTeam === 'HOME' ? '#3498db' : '#e74c3c');
+    ctx.fillStyle = teamColor; 
+    ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 3;
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+    
+    if (hullTeam === 'HOME') {
+        arrow(ctx, w*0.4, h*0.03, w*0.6, h*0.03); 
+        ctx.fillText("ATAQUE ►", w*0.5, h*0.07);
+    } else {
+        arrow(ctx, w*0.6, h*0.03, w*0.4, h*0.03);
+        ctx.fillText("◄ ATAQUE", w*0.5, h*0.07);
+    }
+    ctx.restore();
+    /* FIN CAMBIO */
+
+    const selected = Array.from(document.querySelectorAll('.chk-hull:checked')).map(c => c.value);
+    selected.forEach((pName, idx) => {
+        const rawPoints = DB.actions.filter(a => a.team === hullTeam && a.player === pName && a.x >= 0).map(a => ({x: a.x, y: a.y}));
+        if(rawPoints.length < 3) return;
+        const allChecks = Array.from(document.querySelectorAll('.chk-hull')); const originalIndex = allChecks.findIndex(c => c.value === pName); const color = HULL_COLORS[originalIndex % HULL_COLORS.length];
+        const hullPoints = convexHull(rawPoints);
+        ctx.fillStyle = color; ctx.strokeStyle = color; ctx.globalAlpha = 0.3;
+        ctx.beginPath(); hullPoints.forEach((p, i) => { const px = (p.x / 100) * w; const py = (p.y / 100) * h; if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+        ctx.closePath(); ctx.fill(); ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.stroke();
+        let cx = 0, cy = 0; hullPoints.forEach(p => { cx += p.x; cy += p.y; }); cx /= hullPoints.length; cy /= hullPoints.length;
+        ctx.globalAlpha = 1.0; ctx.fillStyle = "#fff"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.shadowColor = "black"; ctx.shadowBlur = 4;
+        ctx.fillText(pName, (cx/100)*w, (cy/100)*h); ctx.shadowBlur = 0;
+    });
+}
+function downloadHullImg() { const cv = document.getElementById('hullCanvas'); const link = document.createElement('a'); link.download = `ZonasInfluencia_${DB.config.homeName}_vs_${DB.config.awayName}.png`; link.href = cv.toDataURL(); link.click(); showToast("Imagen Zonas Guardada"); }
+
+function downloadViolinImg() {
+    downloadElementImage('boxViolin', 'Campograma_Tactico');
+}
+// ==========================================
+// VISOR DE POSESIONES (FLOW VIZ)
+// ==========================================
+let flowVizDB = { team: 'HOME', allPossessions: [], currentIndex: 0 };
+
+function openFlowVizModal() {
+    document.getElementById('modalFlowViz').style.display = 'flex';
+    setTimeout(() => { setFlowTeam('HOME'); }, 100);
+}
+
+function setFlowTeam(team) {
+    flowVizDB.team = team;
+    document.getElementById('btnFlowHome').className = team === 'HOME' ? 't-opt active-home' : 't-opt';
+    document.getElementById('btnFlowAway').className = team === 'AWAY' ? 't-opt active-away' : 't-opt';
+    
+    // Estilos botones
+    const bHome = document.getElementById('btnFlowHome');
+    const bAway = document.getElementById('btnFlowAway');
+    if(team === 'HOME') {
+        bHome.style.background = '#2c3e50'; bHome.style.borderBottom = '3px solid #3498db';
+        bAway.style.background = '#111'; bAway.style.borderBottom = 'none';
+    } else {
+        bAway.style.background = '#3b1e1e'; bAway.style.borderBottom = '3px solid #e74c3c';
+        bHome.style.background = '#111'; bHome.style.borderBottom = 'none';
+    }
+
+    calculatePossessions();
+    
+    flowVizDB.currentIndex = 0;
+    if (flowVizDB.allPossessions.length > 0) {
+        drawFlowViz(flowVizDB.currentIndex);
+    } else {
+        clearFlowCanvas();
+    }
+}
+
+function calculatePossessions() {
+    flowVizDB.allPossessions = [];
+    let currentPossession = [];
+    // Ordenar por ID para asegurar cronologia
+    const sortedActions = [...DB.actions].sort((a, b) => a.id - b.id);
+    
+    sortedActions.forEach(a => {
+        if (a.x < 0) return; // Ignorar acciones sin coordenadas
+
+        if (a.team === flowVizDB.team) {
+            // Acción de MI equipo: añadir a la posesión actual
+            currentPossession.push(a);
+        } else {
+            // Acción del RIVAL: Corta la posesión anterior si existe
+            if (currentPossession.length > 0) {
+                flowVizDB.allPossessions.push(currentPossession);
+            }
+            currentPossession = [];
+        }
+    });
+    // Añadir la última si quedó pendiente
+    if (currentPossession.length > 0) flowVizDB.allPossessions.push(currentPossession);
+}
+
+function navigatePossession(delta) {
+    const total = flowVizDB.allPossessions.length;
+    if (total === 0) return;
+
+    let newIndex = flowVizDB.currentIndex + delta;
+    if (newIndex < 0) newIndex = total - 1; 
+    if (newIndex >= total) newIndex = 0; 
+
+    flowVizDB.currentIndex = newIndex;
+    drawFlowViz(newIndex);
+}
+
+function clearFlowCanvas() {
+    const cv = document.getElementById('flowVizCanvas');
+    const ctx = cv.getContext('2d');
+    cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,cv.width,cv.height);
+    document.getElementById('possessionDisplay').innerText = "Sin posesiones";
+    document.getElementById('flowLogBody').innerHTML = "";
+}
+
+// Función de ayuda para clasificar una acción en una zona de campo simple
+function getSimpleZone(action, team) {
+    if (action.x < 0) return 'DEFENSIVA (FUERA DE CAMPO)';
+    
+    const x = action.x;
+    if (team === 'HOME') {
+        if (x < 33) return "Defensa (0-33%)";
+        if (x < 66) return "Medio (33-66%)";
+        return "Ataque (66-100%)";
+    } else { // Team AWAY (Ataca de derecha a izquierda)
+        if (x > 66) return "Defensa (66-100%)";
+        if (x > 33) return "Medio (33-66%)";
+        return "Ataque (0-33%)";
+    }
+}
+
+function drawFlowViz(index) {
+    const cv = document.getElementById('flowVizCanvas');
+    const ctx = cv.getContext('2d');
+    
+    // ASEGURAR SIN DISTORSIÓN
+    cv.width = cv.parentElement.clientWidth; 
+    cv.height = cv.parentElement.clientHeight;
+    const w = cv.width, h = cv.height;
+
+    // FONDO (Idéntico a la antigua)
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+    ctx.strokeRect(w*0.05, h*0.05, w*0.9, h*0.9);
+    ctx.beginPath(); ctx.moveTo(w/2, h*0.05); ctx.lineTo(w/2, h*0.95); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w/2, h/2, h*0.1, 0, 7); ctx.stroke();
+    ctx.strokeRect(w*0.05, h*0.22, w*0.15, h*0.56); ctx.strokeRect(w*0.8, h*0.22, w*0.15, h*0.56);
+
+    const possession = flowVizDB.allPossessions[index] || [];
+    
+    // --- NUEVO: LÓGICA DE ETIQUETA DE FASE ---
+    let phaseLabel = "";
+    let phaseColor = "transparent";
+    
+    if(possession.length > 0) {
+        const p = possession[0].phase; 
+        if(p === 'Salida') { phaseLabel = "SALIDA"; phaseColor = "#f39c12"; }
+        else if(p === 'Progresion') { phaseLabel = "PROGRESIÓN"; phaseColor = "#3498db"; }
+        else if(p === 'Finalizacion') { phaseLabel = "FINALIZACIÓN"; phaseColor = "#e74c3c"; }
+        else if(p === 'Transicion_Of') { phaseLabel = "CONTRA"; phaseColor = "#f1c40f"; }
+        else if(p === 'Transicion_Def') { phaseLabel = "TRANS. DEF"; phaseColor = "#8e44ad"; }
+        else if(p === 'ABP') { phaseLabel = "ABP"; phaseColor = "#2ecc71"; }
+        else if(p === 'Presion_Alta') { phaseLabel = "PRESIÓN"; phaseColor = "#d35400"; }
+        else if(p === 'Bloque_Medio') { phaseLabel = "BLOQUE"; phaseColor = "#7f8c8d"; }
+    }
+
+    const displayTitle = `Pos #${index + 1} (${possession.length} acciones)`;
+    // Si hay fase, creamos la etiqueta visual
+    let badgeHtml = phaseLabel ? `<span style="font-size:0.6rem; font-weight:900; color:#000; background:${phaseColor}; padding:1px 5px; border-radius:3px; margin-top:2px; box-shadow:0 0 5px ${phaseColor}">${phaseLabel}</span>` : '';
+
+    // ACTUALIZAR TÍTULO (Mejorado con la etiqueta)
+    document.getElementById('possessionDisplay').innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; line-height:1.1;">
+            <span style="font-size:0.8rem; color:#fff;">${displayTitle}</span>
+            ${badgeHtml}
+        </div>
+    `;
+
+    // ACTUALIZAR TABLA LATERAL (Mejorado con iconos de fase)
+    const logBody = document.getElementById('flowLogBody');
+    logBody.innerHTML = possession.map((a, i) => {
+        let pIcon = "";
+        if(a.phase === 'Salida') pIcon = "🏗️";
+        if(a.phase === 'Finalizacion') pIcon = "🎯";
+        if(a.phase === 'Transicion_Of') pIcon = "⚡";
+        
+        return `<tr>
+            <td style="color:#aaa; font-size:0.7rem;">${i + 1}</td>
+            <td>${a.min}</td>
+            <td>
+                <div style="font-weight:bold;">${a.player.substr(0,10)}</div>
+                <div style="font-size:0.55rem; color:#888;">${pIcon} ${a.phase || ''}</div>
+            </td>
+            <td style="color:${ACTION_COLORS[a.type] || '#fff'}; font-weight:bold; font-size:0.7rem;">${a.type}</td>
+        </tr>`;
+    }).join('');
+
+    // DIBUJAR ACCIONES (Mantiene lógica antigua)
+    const teamColor = flowVizDB.team === 'HOME' ? '#3498db' : '#e74c3c';
+    ctx.lineCap = "round";
+    
+    // Indicador Ataque (Mantenido)
+    ctx.save(); ctx.fillStyle = teamColor; ctx.strokeStyle = teamColor; ctx.lineWidth = 3; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+    if (flowVizDB.team === 'HOME') { arrow(ctx, w*0.4, h*0.03, w*0.6, h*0.03); ctx.fillText("ATAQUE ►", w*0.5, h*0.07); } 
+    else { arrow(ctx, w*0.6, h*0.03, w*0.4, h*0.03); ctx.fillText("◄ ATAQUE", w*0.5, h*0.07); }
+    ctx.restore();
+
+    possession.forEach((a, i) => {
+        const sx = (a.x/100)*w, sy = (a.y/100)*h;
+        let color = ACTION_COLORS[a.type] || teamColor;
+        let alpha = 0.3 + ((i+1) / possession.length) * 0.7; // Efecto fade mantenido
+        
+        ctx.globalAlpha = alpha; ctx.strokeStyle = ctx.fillStyle = color;
+        ctx.lineWidth = 1.5; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 2;
+
+        if (a.endX) { 
+            arrow(ctx, sx, sy, (a.endX/100)*w, (a.endY/100)*h); 
+            ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fill(); 
+        } else { 
+            ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill(); ctx.stroke(); 
+        }
+        
+        // Números (Mantenido)
+        ctx.globalAlpha = 1.0; ctx.fillStyle = "#fff"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.shadowBlur = 0;
+        ctx.fillText(i+1, sx, sy - 7);
+    });
+    ctx.globalAlpha = 1;
+}
+
+function downloadFlowImg() { downloadElementImage('modalFlowViz', 'Flujo_Posesiones'); }
+
+// ==========================================
+// NUEVA LÓGICA DE EXPORTACIÓN DE POSESIONES
+// ==========================================
+function getPossessionDataForExport() {
+    calculatePossessions(); 
+    
+    if (flowVizDB.allPossessions.length === 0) {
+        showToast(`No hay posesiones registradas.`);
+        return [];
+    }
+
+    const exportData = [];
+    
+    flowVizDB.allPossessions.forEach((possessionActions, posId) => {
+        const team = possessionActions[0].team;
+        
+        possessionActions.forEach((action, seqIndex) => {
+            const startZone = getSimpleZone(action, team);
+            let endZone = action.endX ? getSimpleZone({ x: action.endX, y: action.endY }, team) : startZone;
+
+            // Lógica de seguridad para acciones antiguas
+            let periodStr = action.period;
+            if (!periodStr) {
+                periodStr = parseInt(action.min) > 55 ? '2T' : '1T';
+            }
+
+            exportData.push([
+                posId + 1, 
+                seqIndex + 1, 
+                periodStr,
+                team, 
+                action.min,
+                action.player,
+                // 👇 AQUÍ ESTABA EL PROBLEMA. AHORA SÍ INCLUIMOS LA FASE 👇
+                action.phase || '-', 
+                // 👆 Esto rellena la columna "Fase". Antes esto no estaba y "type" ocupaba su lugar.
+                action.type,
+                action.res,
+                startZone,
+                endZone,
+                action.lane || '',
+                action.x.toFixed(1),
+                action.y.toFixed(1),
+                action.endX ? action.endX.toFixed(1) : '',
+                action.endY ? action.endY.toFixed(1) : '',
+                action.xg || '',
+                action.xgot || ''
+            ]);
+        });
+    });
+
+    return exportData;
+}
+
+function downloadPossessionData() {
+    const data = getPossessionDataForExport();
+    
+    if (data.length === 0) return;
+
+    const headers = [
+        "Posesion ID",
+        "Seq Index",
+        "Periodo",
+        "Equipo",
+        "Minuto",
+        "Jugador",
+        "Fase", // <--- AHORA SÍ ESTÁ INCLUIDO
+        "Accion",
+        "Resultado",
+        "Zona Inicio (33%)",
+        "Zona Fin (33%)",
+        "Carril",
+        "X",
+        "Y",
+        "X Fin",
+        "Y Fin",
+        "xG",
+        "xGOT"
+    ];
+    
+    const dataWithHeaders = [headers, ...data];
+    
+    const teamName = flowVizDB.team === 'HOME' ? DB.config.homeName : DB.config.awayName;
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(dataWithHeaders);
+    XLSX.utils.book_append_sheet(wb, ws, `Posesiones_${teamName}`);
+    XLSX.writeFile(wb, `Posesiones_${teamName}_${Date.now()}.xlsx`);
+    
+    showToast(`Posesiones de ${teamName} exportadas a Excel.`);
+}
+// ==========================================
+// HUELLA TÁCTICA (FILTRO INTELIGENTE & VIZ)
+// ==========================================
+let currentFpTeam = 'HOME';
+
+function openFootprintModal() {
+    document.getElementById('modalFootprint').style.display = 'flex';
+    document.getElementById('btnFpHome').innerText = DB.config.homeName;
+    document.getElementById('btnFpAway').innerText = DB.config.awayName;
+    setTimeout(() => updateFootprint('HOME'), 200);
+}
+
+function getCleanFootprintData(team) {
+    const allActions = [...DB.actions].sort((a,b) => a.id - b.id);
+    const ignoreIds = new Set();
+    
+    allActions.forEach((a, index) => {
+        if (a.type === 'Banda') {
+            ignoreIds.add(a.id); 
+            if (index + 1 < allActions.length) {
+                ignoreIds.add(allActions[index + 1].id);
+            }
+        }
+    });
+
+    return allActions.filter(a => 
+        a.team === team && 
+        a.x >= 0 && a.y >= 0 && 
+        !ignoreIds.has(a.id)
+    );
+}
+
+function updateFootprint(team) {
+    currentFpTeam = team;
+    document.getElementById('btnFpHome').className = team==='HOME'?'t-opt active-home':'t-opt';
+    document.getElementById('btnFpAway').className = team==='AWAY'?'t-opt active-away':'t-opt';
+
+    const data = getCleanFootprintData(team);
+    const container = document.getElementById('footprintChart');
+
+    if(data.length < 5) {
+        container.innerHTML = '<div style="display:flex;height:100%;justify-content:center;align-items:center;color:#666;font-family:sans-serif;">Datos insuficientes (Min. 5 acciones)</div>';
+        return;
+    } else {
+        container.innerHTML = '';
+    }
+
+    const xVals = data.map(d => d.x);
+    const yVals = data.map(d => d.y);
+    const colorMain = team === 'HOME' ? '#3498db' : '#e74c3c';
+
+    const hullPoints = convexHull(data.map(d => ({x: d.x, y: d.y})));
+    if(hullPoints.length > 0) hullPoints.push(hullPoints[0]); 
+    const hX = hullPoints.map(p => p.x);
+    const hY = hullPoints.map(p => p.y);
+
+    const traceHull = {
+        x: hX, y: hY, 
+        fill: 'toself', fillcolor: team === 'HOME' ? 'rgba(52, 152, 219, 0.15)' : 'rgba(231, 76, 60, 0.15)',
+        line: {color: colorMain, width: 2, dash:'dot'},
+        name: 'Zona Influencia', hoverinfo: 'skip',
+        type: 'scatter', mode: 'lines'
+    };
+
+    const tracePoints = {
+        x: xVals, y: yVals,
+        mode: 'markers',
+        marker: { size: 4, color: colorMain, opacity: 0.7 },
+        name: 'Acción',
+        text: data.map(d => d.type + (d.player ? ` (${d.player})` : '')),
+        type: 'scatter'
+    };
+
+    const traceViolinX = {
+        x: xVals,
+        type: 'violin', orientation: 'h', side: 'positive',
+        fillcolor: colorMain, line: {color: '#fff', width:0.5}, opacity:0.6,
+        xaxis: 'x', yaxis: 'y2', showlegend: false, hoverinfo: 'x'
+    };
+
+    const traceViolinY = {
+        y: yVals,
+        type: 'violin', orientation: 'v', side: 'positive',
+        fillcolor: colorMain, line: {color: '#fff', width:0.5}, opacity:0.6,
+        xaxis: 'x2', yaxis: 'y', showlegend: false, hoverinfo: 'y'
+    };
+
+    const pitchShapes = [
+        {type:'rect', x0:0, y0:0, x1:100, y1:100, line:{color:'rgba(255,255,255,0.2)'}}, 
+        {type:'line', x0:50, y0:0, x1:50, y1:100, line:{color:'rgba(255,255,255,0.2)'}}, 
+        {type:'circle', x0:40, y0:40, x1:60, y1:60, line:{color:'rgba(255,255,255,0.2)'}}, 
+        {type:'rect', x0:0, y0:22, x1:16, y1:78, line:{color:'rgba(255,255,255,0.2)'}}, 
+        {type:'rect', x0:84, y0:22, x1:100, y1:78, line:{color:'rgba(255,255,255,0.2)'}} 
+    ];
+
+    const layout = {
+        grid: { rows: 2, columns: 2, pattern: 'independent' },
+        xaxis:  { domain: [0, 0.85], range: [-2, 102], showgrid: false, zeroline: false, visible: false }, 
+        yaxis:  { domain: [0, 0.85], range: [102, -2], showgrid: false, zeroline: false, visible: false, scaleanchor: "x", scaleratio: 0.68 }, 
+        yaxis2: { domain: [0.86, 1], showgrid: false, visible: false }, 
+        xaxis2: { domain: [0.86, 1], showgrid: false, visible: false },
+        paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e',
+        shapes: pitchShapes, showlegend: false, margin: {t: 20, b: 20, l: 20, r: 20},
+        annotations: [{ x: 50, y: 50, xref: 'x', yref: 'y', text: team === 'HOME' ? 'ATAQUE ►' : '◄ ATAQUE', font: {size: 30, color: 'rgba(255,255,255,0.05)', weight:'900'}, showarrow: false }]
+    };
+
+    Plotly.newPlot('footprintChart', [traceHull, tracePoints, traceViolinX, traceViolinY], layout, {responsive: true, displayModeBar: false});
+}
+// PEGAR AL FINAL DEL SCRIPT
+function onViewModeChange() {
+    drawPitch(); 
+}
+
+function onTeamSelect() {
+    updateDash(); 
+    drawPitch();
+}
+// ==========================================
+// LÓGICA xG BUILDUP & CHAIN (NUEVO)
+// ==========================================
+function openXgBuildModal() {
+    document.getElementById('modalXgBuild').style.display = 'flex';
+    renderXgBuild();
+}
+
+function renderXgBuild() {
+    const stats = {}; 
+    
+    // Helper para iniciar jugador
+    const initP = (n, t) => { 
+        if(!stats[n]) stats[n] = { name: n, team: t, xGChain: 0, xGBuildup: 0 }; 
+    };
+
+    // 1. Agrupar acciones en posesiones
+    let curPos = [], allPos = [];
+    // Ordenar cronológicamente
+    const sortedActs = [...DB.actions].sort((a,b) => a.id - b.id);
+    
+    sortedActs.forEach(a => { 
+        if(a.x < 0) return; // Ignorar fuera de campo
+        // Si cambia el equipo, se corta la posesión
+        if(curPos.length > 0 && curPos[0].team !== a.team) { 
+            allPos.push(curPos); 
+            curPos = []; 
+        } 
+        curPos.push(a); 
+    });
+    if(curPos.length > 0) allPos.push(curPos);
+
+    // 2. Calcular xG Chain y Buildup por posesión
+    allPos.forEach(pos => {
+        let chainXG = 0;
+        let shooters = new Set();
+        let assisters = new Set();
+        let participants = new Set();
+
+        // Buscar si hubo tiro en esta posesión
+        pos.forEach((a, i) => { 
+            participants.add(a.player); 
+            if(a.type === 'Disparo' && a.xg > 0) { 
+                chainXG += a.xg; 
+                shooters.add(a.player); 
+                // El asistente es el anterior (si es pase/clave/asist)
+                if(i > 0 && ['Pase','Clave','Asist'].includes(pos[i-1].type)) {
+                    assisters.add(pos[i-1].player); 
+                }
+            } 
+        });
+
+        // Si la posesión no acabó en xG > 0, no suma nada
+        if(chainXG === 0) return;
+
+        // Repartir puntos
+        participants.forEach(p => { 
+            initP(p, pos[0].team); 
+            // xG Chain: Todos reciben el valor
+            stats[p].xGChain += chainXG; 
+            // xG Buildup: Todos MENOS el tirador y el asistente
+            if(!shooters.has(p) && !assisters.has(p)) {
+                stats[p].xGBuildup += chainXG; 
+            }
+        });
+    });
+
+    // 3. Renderizar las listas HTML
+    const renderList = (code, divId, col) => {
+        // Filtrar por equipo, ordenar por Buildup y coger Top 10
+        const d = Object.values(stats)
+            .filter(p => p.team === code && p.xGChain > 0)
+            .sort((a,b) => b.xGBuildup - a.xGBuildup)
+            .slice(0, 15);
+
+        const container = document.getElementById(divId);
+        if(d.length === 0) {
+            container.innerHTML = '<div style="color:#666; font-size:0.7rem; text-align:center; padding:10px;">Sin datos de construcción</div>';
+            return;
+        }
+
+        // Calcular máximo para las barras
+        const max = Math.max(...d.map(x => x.xGChain), 0.1);
+
+        container.innerHTML = d.map((p, i) => `
+            <div style="margin-bottom:6px; border-bottom:1px solid #222; padding-bottom:4px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#ccc; margin-bottom:2px;">
+                    <span style="font-weight:bold; color:#fff">${i+1}. ${p.name}</span>
+                    <span>
+                        <span style="color:${col}; font-weight:bold;">${p.xGBuildup.toFixed(2)}</span> 
+                        <span style="color:#666; font-size:0.6rem;">(${p.xGChain.toFixed(2)})</span>
+                    </span>
+                </div>
+                <div style="background:#222; height:6px; width:100%; position:relative; border-radius:3px; overflow:hidden;">
+                    <div style="background:#7f8c8d; height:100%; width:${(p.xGChain/max)*100}%; position:absolute; opacity:0.3;"></div>
+                    <div style="background:${col}; height:100%; width:${(p.xGBuildup/max)*100}%; position:absolute;"></div>
+                </div>
+            </div>
+        `).join('');
+    };
+
+    renderList('HOME', 'xgbListHome', '#3498db'); 
+    renderList('AWAY', 'xgbListAway', '#e74c3c');
+}
+function downloadXgBuildImg() {
+    downloadElementImage('boxXgBuild', 'xG_Buildup_Chain');
+}
+
+function downloadXgBuildExcel() {
+    // 1. REPLICAR LÓGICA DE CÁLCULO
+    const stats = {}; 
+    const initP = (n, t) => { if(!stats[n]) stats[n] = { name: n, team: t, xGChain: 0, xGBuildup: 0 }; };
+
+    let curPos = [], allPos = [];
+    // Ordenar cronológicamente
+    const sortedActs = [...DB.actions].sort((a,b) => a.id - b.id);
+    
+    sortedActs.forEach(a => { 
+        if(a.x < 0) return; 
+        if(curPos.length > 0 && curPos[0].team !== a.team) { allPos.push(curPos); curPos = []; } 
+        curPos.push(a); 
+    });
+    if(curPos.length > 0) allPos.push(curPos);
+
+    allPos.forEach(pos => {
+        let chainXG = 0;
+        let shooters = new Set();
+        let assisters = new Set();
+        let participants = new Set();
+
+        // Ver si la posesión acabó en tiro con xG
+        pos.forEach((a, i) => { 
+            participants.add(a.player); 
+            if(a.type === 'Disparo' && a.xg > 0) { 
+                chainXG += a.xg; 
+                shooters.add(a.player); 
+                // El asistente es el anterior (si es acción válida de pase)
+                if(i > 0 && ['Pase','Clave','Asist'].includes(pos[i-1].type)) {
+                    assisters.add(pos[i-1].player); 
+                }
+            } 
+        });
+
+        if(chainXG === 0) return;
+
+        // Repartir puntos
+        participants.forEach(p => { 
+            initP(p, pos[0].team); 
+            stats[p].xGChain += chainXG; 
+            // Buildup: Todos menos tirador y asistente
+            if(!shooters.has(p) && !assisters.has(p)) {
+                stats[p].xGBuildup += chainXG; 
+            }
+        });
+    });
+
+    // 2. PREPARAR DATOS PARA EXCEL
+    const data = [["Equipo", "Jugador", "xG Buildup", "xG Chain"]];
+    
+    // Ordenar por Chain de mayor a menor
+    Object.values(stats).sort((a,b) => b.xGChain - a.xGChain).forEach(p => {
+        const tName = p.team === 'HOME' ? DB.config.homeName : DB.config.awayName;
+        // Solo guardamos si tienen algún valor
+        if (p.xGChain > 0) {
+            data.push([tName, p.name, p.xGBuildup.toFixed(3), p.xGChain.toFixed(3)]);
+        }
+    });
+
+    // 3. DESCARGAR
+    if(data.length === 1) { 
+        showToast("⚠️ No hay datos de xG Chain (Faltan tiros con xG)"); 
+        return; 
+    }
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Ajustar ancho de columnas
+    const wscols = [{wch:20}, {wch:20}, {wch:15}, {wch:15}];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, "xG_Metrics");
+    XLSX.writeFile(wb, `xG_Chain_Buildup_${DB.config.homeName}.xlsx`);
+    showToast("📊 Datos xG Descargados");
+}
+// --- LÓGICA MODELO LIVERPOOL (PROGRESIÓN) ---
+
+// Calcula distancia a la portería rival (situada en 100, 50)
+function getDistToGoal(x, y) {
+    const dx = 100 - x;
+    const dy = 50 - y;
+    return Math.sqrt(dx*dx + dy*dy);
+}
+
+function calculateLiverpoolMetrics() {
+    const stats = {};
+    
+    // Función auxiliar para iniciar jugador si no existe
+    const initPlayer = (name, team) => {
+        if (!stats[name]) stats[name] = { 
+            name: name, 
+            team: team, 
+            progPasses: 0,      // Pases que avanzan >10m
+            deepCompletions: 0, // Pases que entran en últimos 20m
+            preAssists: 0,      // El pase anterior a la asistencia
+            xT_Generated: 0     // Amenaza generada acumulada
+        };
+    };
+
+    // Ordenamos cronológicamente para detectar secuencias
+    const sortedActs = [...DB.actions].sort((a,b) => a.id - b.id);
+
+    sortedActs.forEach((act, index) => {
+        if (act.x < 0) return; // Ignorar acciones sin coordenadas
+        initPlayer(act.player, act.team);
+
+        // 1. CÁLCULO DE AMENAZA (xT)
+        // Sumamos todo el xT positivo que genera el jugador
+        if (act.xt > 0) {
+            stats[act.player].xT_Generated += act.xt;
+        }
+
+        // 2. PASES PROGRESIVOS Y DEEP COMPLETIONS
+        // Solo analizamos acciones de pase completadas que tengan destino (endX)
+        if (['Pase', 'Clave', 'Conducción', 'Asist'].includes(act.type) && act.res === 'Completado' && act.endX != null) {
+            
+            const startDist = getDistToGoal(act.x, act.y);
+            const endDist = getDistToGoal(act.endX, act.endY);
+            
+            // A) Pase Progresivo: Acerca el balón al menos 10% (aprox 10m) 
+            // Y no es un pase en zona defensiva muy atrasada (x > 40)
+            if (startDist - endDist >= 10 && act.x > 40) {
+                stats[act.player].progPasses++;
+            }
+            // O si entra en el área rival (xStart < 83 y xEnd > 83)
+            else if (act.x < 83 && act.endX > 83) {
+                stats[act.player].progPasses++;
+            }
+
+            // B) Deep Completion: Pase completado en los últimos 20 metros
+            if (act.endX > 80) {
+                stats[act.player].deepCompletions++;
+            }
+        }
+
+        // 3. PRE-ASISTENCIAS (Hockey Assist)
+        // Miramos si la SIGUIENTE acción es una Asistencia del mismo equipo
+        if (index + 1 < sortedActs.length) {
+            const nextAct = sortedActs[index + 1];
+            if (nextAct.type === 'Asist' && nextAct.team === act.team && act.res === 'Completado') {
+                stats[act.player].preAssists++;
+            }
+        }
+    });
+
+    return Object.values(stats);
+}
+</script>
+</body>
+</html>

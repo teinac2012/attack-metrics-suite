@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿# Attack Metrics Suite\n\n## Setup\n1. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL, AUTH_SECRET.\n2. Generate client: npm run prisma\n3. Start dev: npm run dev\n\n## Deploy (Vercel)\n- Add env vars in Vercel project.\n- Provision Vercel Postgres and set DATABASE_URL.\n\n## Admin\n- Visit /admin (requires ADMIN user).\n\n## Single-device\n- Login creates a session lock; concurrent logins are blocked within 60s heartbeat.
 
-## Getting Started
 
-First, run the development server:
+## 🚀 Guía de Inicio Rápido
+
+### 1. Configurar Base de Datos
+
+Edita el archivo `.env` con tu conexión PostgreSQL:
+
+```env
+DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/attack_metrics"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="genera-un-secreto-con-openssl-rand-base64-32"
+```
+
+### 2. Crear las Tablas
+
+```bash
+npx prisma db push
+```
+
+### 3. Crear Usuario Administrador
+
+```bash
+npx tsx scripts/create-admin.ts [usuario] [contraseña] [email]
+```
+
+Ejemplo:
+```bash
+npx tsx scripts/create-admin.ts admin MiPassword123 admin@midominio.com
+```
+
+Si no pasas parámetros, usará:
+- Usuario: `admin`
+- Contraseña: `admin123`
+- Email: `admin@example.com`
+
+### 4. Instalar tsx (si no lo tienes)
+
+```bash
+npm install -g tsx
+```
+
+### 5. Iniciar el Servidor
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre http://localhost:3000/login
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 6. Tus 3 Aplicaciones
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Las aplicaciones están integradas en:
+- **App 1 - IA Pases Táctico**: http://localhost:3000/apps/app1
+- **App 2 - Attack Metrics**: http://localhost:3000/apps/app2  
+- **App 3 - Shooting Analysis**: http://localhost:3000/apps/app3
 
-## Learn More
+Cada aplicación:
+- ✅ Requiere login con licencia válida
+- ✅ Verifica sesión activa (solo 1 dispositivo a la vez)
+- ✅ Muestra el nombre del usuario actual
+- ✅ Permite volver al dashboard
 
-To learn more about Next.js, take a look at the following resources:
+### 7. Panel de Administración
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Accede a http://localhost:3000/admin para:
+- Ver todos los usuarios
+- Ver días restantes de licencia
+- Ver estado de conexión (en línea/desconectado)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📦 Deployment en Vercel
 
-## Deploy on Vercel
+1. **Sube tu código a GitHub**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Crea un proyecto en Vercel**
+   - Conecta tu repositorio
+   - Vercel detectará Next.js automáticamente
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. **Agrega Vercel Postgres**
+   - En el dashboard de Vercel → Storage → Create Database → Postgres
+   - Vercel configurará DATABASE_URL automáticamente
+
+4. **Configura Variables de Entorno**
+   ```
+   NEXTAUTH_URL=https://tu-dominio.vercel.app
+   NEXTAUTH_SECRET=tu-secreto-generado
+   ```
+
+5. **Ejecuta Prisma en Producción**
+   ```bash
+   npx prisma db push
+   ```
+
+6. **Crea el primer usuario admin**
+   Desde tu terminal local conectado a la DB de producción:
+   ```bash
+   DATABASE_URL="tu-url-de-vercel" npx tsx scripts/create-admin.ts
+   ```
+
+7. **Deploy**
+   - Push a GitHub
+   - Vercel desplegará automáticamente
+
+## 🔐 Seguridad
+
+- Las contraseñas se almacenan con bcrypt (10 rounds)
+- Las sesiones usan JWT tokens seguros
+- Solo 1 dispositivo puede estar activo a la vez (timeout: 60 segundos)
+- Los usuarios sin licencia activa no pueden acceder
+- Middleware protege todas las rutas /dashboard y /apps
+
+## 📱 Uso del Sistema
+
+### Para Usuarios:
+1. Login con usuario/contraseña
+2. Accede al dashboard
+3. Selecciona una de las 3 apps
+4. Trabaja normalmente - tus datos se guardan en cada app
+5. El sistema mantiene tu sesión activa (heartbeat automático)
+
+### Para Administradores:
+1. Todo lo anterior +
+2. Acceso al panel admin
+3. Visualización de todos los usuarios
+4. Monitoreo de licencias y días restantes
+5. Ver estado de conexión en tiempo real
+
+## 🛠️ Añadir Nuevos Usuarios
+
+Como admin, puedes crear scripts o APIs para:
+- Registrar nuevos usuarios
+- Asignar licencias de 1 año
+- Renovar licencias existentes
+- Desactivar usuarios
+
+Ejemplo de creación programática:
+```typescript
+const user = await prisma.user.create({
+  data: {
+    username: "nuevo_usuario",
+    email: "usuario@example.com",
+    passwordHash: await bcrypt.hash("password", 10),
+    role: "USER",
+    licenses: {
+      create: {
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        isActive: true
+      }
+    }
+  }
+});
+```
