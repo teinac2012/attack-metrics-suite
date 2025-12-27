@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showToast, setShowToast] = useState(false);
   // No redirigimos automáticamente si hay sesión; permitimos reautenticación
 
   const onSubmit = async (e: React.FormEvent) => { 
@@ -26,7 +27,9 @@ export default function LoginPage() {
     if (res?.ok) {
       window.location.href = '/dashboard'; 
     } else {
-      setError('❌ Usuario no encontrado, contraseña inválida o licencia expirada.');
+      setError('Usuario o contraseña incorrecta');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     }
   };
 
@@ -78,12 +81,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="px-4 py-3 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 text-sm">
-                {error}
-              </div>
-            )}
+            {/* Mensaje de error (se muestra como toast abajo a la derecha) */}
 
             {/* Login Button */}
             <button 
@@ -100,6 +98,13 @@ export default function LoginPage() {
           <p>© 2025 Attack Metrics Suite. Todos los derechos reservados.</p>
         </div>
       </div>
+      {/* Toast de error abajo a la derecha */}
+      {showToast && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg bg-red-600/90 text-white shadow-lg">
+          <span className="font-semibold">⚠️ </span>
+          <span>{error || 'Usuario o contraseña incorrecta'}</span>
+        </div>
+      )}
     </div>
   );
 }

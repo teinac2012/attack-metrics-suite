@@ -21,9 +21,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { username: credentials.username as string },
             include: { licenses: { where: { isActive: true, endDate: { gt: new Date() } } } }
           });
-          
-          if (!user || user.licenses.length === 0) {
-            console.error("[AUTH] User not found or no active license:", credentials.username);
+          if (!user) {
+            console.error("[AUTH] User not found:", credentials.username);
+            return null;
+          }
+          // Requerir licencia activa sólo para usuarios normales; permitir ADMIN sin licencia
+          if (user.role !== 'ADMIN' && user.licenses.length === 0) {
+            console.error("[AUTH] No active license for user:", credentials.username);
             return null;
           }
           
@@ -35,13 +39,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           
           const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
           if (lock && (Date.now() - new Date(lock.lastSeen).getTime() < 60_000)) {
-            console.error("[AUTH] User already logged in from another device:", credentials.username);
-            return null;
+            // Permitir a ADMIN iniciar sesión aunque exista lock reciente (toma el control)
+            if (user.role !== 'ADMIN') {
+              console.error("[AUTH] User already logged in from another device:", credentials.username);
+              return null;
+            } else {
+              console.warn("[AUTH] ADMIN overriding existing session lock:", credentials.username);
+            }
           }
           
           await prisma.sessionLock.upsert({
             where: { userId: user.id },
-            update: { lastSeen: new Date() },
+            update: { lastSeen: new Date(), sessionId: "temp" },
             create: { userId: user.id, sessionId: "temp", lastSeen: new Date() }
           });
           
