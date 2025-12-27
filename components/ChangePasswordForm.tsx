@@ -45,9 +45,10 @@ export default function ChangePasswordForm({ userId }: { userId: string }) {
         setNewPassword("");
         setConfirmPassword("");
         
-        // Cerrar sesión automáticamente después de 2 segundos
-        setTimeout(() => {
-          signOut({ callbackUrl: "/login" });
+        // Llamar al endpoint de logout que limpia el session lock
+        setTimeout(async () => {
+          await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+          window.location.href = "/login";
         }, 2000);
       } else {
         setError(data.error || "Error al cambiar contraseña");
