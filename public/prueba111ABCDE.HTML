@@ -14,14 +14,6 @@
             const tick = () => fetch('/api/session-lock', { method: 'POST' }).catch(() => {});
             tick(); // Initial ping
             setInterval(tick, 15000); // Every 15 seconds
-            
-            // Logout on tab close
-            const logout = () => {
-                const blob = new Blob(['{}'], { type: 'application/json' });
-                navigator.sendBeacon('/api/auth/logout', blob);
-            };
-            window.addEventListener('beforeunload', logout);
-            window.addEventListener('unload', logout);
         })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
