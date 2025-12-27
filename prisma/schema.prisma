@@ -138,3 +138,15 @@ model Analysis {
   @@index([appName])
   @@index([createdAt])
 }
+
+model AppData {
+  id        String   @id @default(cuid())
+  userId    String
+  appId     String   // "app1", "app2", "app3"
+  data      String   // JSON string con los datos de la app (archivos cargados, etc)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, appId])
+  @@index([userId])
+}

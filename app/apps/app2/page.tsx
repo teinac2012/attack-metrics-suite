@@ -26,7 +26,7 @@ export default async function App2Page() {
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       <SessionHeartbeat />
       <AppsNavBar userName={session.user.name || "Usuario"} />
-      <AppContainer appUrl="/prueba111ABCDE.HTML" appName="Attack Metrics" />
+      <AppContainer appUrl="/prueba111ABCDE.HTML" appName="Attack Metrics" appId="app2" />
     </div>
   );
 }
