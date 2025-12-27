@@ -53,6 +53,22 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <SessionHeartbeat />
       <div className="container mx-auto px-4 py-8">
+        {/* Alerta de Licencia */}
+        {daysLeft <= 7 && (
+          <div className="mb-6 bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-red-500/50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">⚠️</span>
+              <div>
+                <h3 className="text-xl font-bold text-red-300">¡Licencia por Vencer!</h3>
+                <p className="text-red-200">
+                  Tu licencia vence en <span className="font-bold">{daysLeft} días</span>. 
+                  Contacta al administrador para renovarla.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -77,6 +93,18 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="flex gap-3">
+            <Link
+              href="/historial"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              📊 Historial
+            </Link>
+            <Link
+              href="/perfil"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+            >
+              👤 Perfil
+            </Link>
             {(session.user as any).role === "ADMIN" && (
               <Link
                 href="/admin"

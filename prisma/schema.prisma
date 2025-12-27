@@ -23,6 +23,7 @@ model User {
   sessionLocks          SessionLock[]
   loginAttempts         LoginAttempt[]
   loginAudit            LoginAudit[]
+  analyses              Analysis[]
   isLocked              Boolean        @default(false)
   lockedUntil           DateTime?
   failedLoginCount      Int            @default(0)
@@ -116,4 +117,21 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appName     String   // "IA Pases Táctico", "Attack Metrics", "Shooting Analysis"
+  title       String   // Nombre del análisis (ej: "Real Madrid vs Barcelona")
+  data        String   // JSON string con los datos del análisis
+  tags        String[] // Tags/etiquetas para categorizar
+  notes       String?  // Notas adicionales del usuario
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([appName])
+  @@index([createdAt])
 }

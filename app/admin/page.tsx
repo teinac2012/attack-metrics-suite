@@ -43,9 +43,14 @@ export default async function AdminPage() {
               <h1 className="text-4xl font-bold text-white mb-2">Panel de Administración</h1>
               <p className="text-gray-400">Gestiona usuarios y licencias</p>
             </div>
-            <Link href="/dashboard" className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
-              ← Volver al Dashboard
-            </Link>
+            <div className="flex gap-3">
+              <Link href="/admin/logs" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors">
+                📋 Logs
+              </Link>
+              <Link href="/dashboard" className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
+                ← Volver al Dashboard
+              </Link>
+            </div>
           </div>
 
           {/* Stats */}
