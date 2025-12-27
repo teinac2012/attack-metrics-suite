@@ -15,26 +15,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          if (!credentials?.username || !credentials?.password) return null;
+          if (!credentials?.username || !credentials?.password) {
+            throw new Error("Credenciales incompletas");
+          }
           
           const user = await prisma.user.findUnique({ 
             where: { username: credentials.username as string },
             include: { licenses: { where: { isActive: true, endDate: { gt: new Date() } } } }
           });
+          
           if (!user) {
             console.error("[AUTH] User not found:", credentials.username);
-            return null;
+            throw new Error("Usuario o contraseña no válida");
           }
+          
           // Requerir licencia activa sólo para usuarios normales; permitir ADMIN sin licencia
           if (user.role !== 'ADMIN' && user.licenses.length === 0) {
             console.error("[AUTH] No active license for user:", credentials.username);
-            return null;
+            throw new Error("No tienes una licencia activa. Contacta al administrador.");
           }
           
           const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
           if (!valid) {
             console.error("[AUTH] Invalid password for user:", credentials.username);
-            return null;
+            throw new Error("Usuario o contraseña no válida");
           }
           
           const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
@@ -55,7 +59,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return { id: user.id, name: user.username, email: user.email, role: user.role };
         } catch (error) {
           console.error("[AUTH] Authorization error:", error);
-          return null;
+          // NextAuth capturará este error y lo pasará al frontend
+          throw error;
         }
       }
     })

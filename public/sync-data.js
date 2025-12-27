@@ -13,11 +13,13 @@ window.AnalysisDataSync = {
         data: data,
       })
     );
-    // Notificar a otras tabs
-    sessionStorage.setItem(
-      'sync_update',
-      JSON.stringify({ appId, timestamp: Date.now() })
-    );
+    // Notificar a otras tabs/iframes (usar localStorage para disparar 'storage')
+    try {
+      localStorage.setItem(
+        'sync_update',
+        JSON.stringify({ appId, timestamp: Date.now() })
+      );
+    } catch {}
   },
 
   // Cargar progreso
@@ -76,3 +78,20 @@ window.addEventListener('storage', function (e) {
     }
   }
 });
+
+// Fallback: BroadcastChannel si está disponible
+try {
+  const bc = new BroadcastChannel('analysis_sync');
+  bc.onmessage = (ev) => {
+    const update = ev.data;
+    if (typeof window.onDataSyncUpdate === 'function') {
+      window.onDataSyncUpdate(update);
+    }
+  };
+  // Sobrescribir saveProgress para emitir por canal
+  const origSave = window.AnalysisDataSync.saveProgress;
+  window.AnalysisDataSync.saveProgress = function(appId, data) {
+    origSave(appId, data);
+    try { bc.postMessage({ appId, timestamp: Date.now() }); } catch {}
+  };
+} catch {}

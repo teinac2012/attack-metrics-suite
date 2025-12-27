@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#121212">
     <title>Attack Metrics v3.1 - Red Filtrada</title>
     
+    <script src="/sync-data.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -998,13 +999,51 @@ function resetSubOptions() {
 window.addEventListener("dragover", function(e){e=e||event;e.preventDefault();},false);
 window.addEventListener("drop", function(e){e=e||event;e.preventDefault();},false);
 
-window.onload = () => {
-    if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
+window.onload = async () => {
+    try {
+        if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
+    } catch (err) { console.warn('LocalStorage load failed:', err); }
+
+    try {
+        if (window.AnalysisDataSync && typeof window.AnalysisDataSync.loadProgress === 'function') {
+            const synced = await window.AnalysisDataSync.loadProgress('attackMetrics');
+            if (synced && synced.DB) {
+                Object.assign(DB, synced.DB);
+            } else if (synced && typeof synced === 'object') {
+                Object.assign(DB, synced);
+            }
+            window.AnalysisDataSync.onProgress((payload) => {
+                if (payload && payload.key === 'attackMetrics') {
+                    const data = payload.data?.DB || payload.data;
+                    if (data) {
+                        Object.assign(DB, data);
+                        try { setMatchState('STOP'); } catch {}
+                        updateTeamLabels();
+                        renderUI();
+                        refreshPlayersFilter();
+                        updateDash();
+                        updateTimerDisplay();
+                        if (typeof drawPitch === 'function') drawPitch();
+                    }
+                }
+            });
+        }
+    } catch (err) { console.warn('AnalysisDataSync load failed:', err); }
+
     STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
 };
 
-function saveDB() { localStorage.setItem('am_v22_6', JSON.stringify(DB)); }
+function saveDB() {
+    localStorage.setItem('am_v22_6', JSON.stringify(DB));
+    try {
+        if (window.AnalysisDataSync && typeof window.AnalysisDataSync.saveProgress === 'function') {
+            window.AnalysisDataSync.saveProgress('attackMetrics', { DB });
+        }
+    } catch (err) {
+        console.warn('AnalysisDataSync save failed:', err);
+    }
+}
 
 
 function downloadBackup() {

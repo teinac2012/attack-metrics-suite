@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Match Data Hub - Pro Scout v18 (Player Edit)</title>
+    <script src="/sync-data.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -347,6 +348,7 @@
             
             <button onclick="resetMatch()">Reset</button>
             <button class="btn-excel" onclick="downloadExcel()">CSV</button>
+            <button onclick="document.getElementById('csvInput').click()">Importar CSV</button>
         </div>
     </div>
 </header>
@@ -477,11 +479,24 @@
     function loadData() { 
         const d = localStorage.getItem('matchHub_v18'); 
         if(d) { try { matchData = JSON.parse(d); if(matchData.jornada) inputs.jornada.value = matchData.jornada; updateUI(); } catch(e){} } 
+        // Intentar cargar progreso sincronizado desde otras apps
+        try {
+            const sync = window.AnalysisDataSync?.loadProgress?.('app3');
+            if (sync && sync.matchData) {
+                matchData = sync.matchData;
+                if(matchData.jornada) inputs.jornada.value = matchData.jornada;
+                updateUI();
+            }
+        } catch {}
         const s = localStorage.getItem('seasonHistory_v1'); if(s) try { seasonHistory = JSON.parse(s); } catch(e){}
         const a = localStorage.getItem('archiveHistory_v1'); if(a) try { archiveHistory = JSON.parse(a); } catch(e){}
         updateRadarPlayerSelect();
     }
-    function saveData() { matchData.jornada = inputs.jornada.value; localStorage.setItem('matchHub_v18', JSON.stringify(matchData)); }
+    function saveData() { 
+        matchData.jornada = inputs.jornada.value; 
+        localStorage.setItem('matchHub_v18', JSON.stringify(matchData)); 
+        try { window.AnalysisDataSync?.saveProgress?.('app3', { matchData }); } catch {}
+    }
 
     function toggleTimeline(show) { document.getElementById('timelineModal').style.display = show ? 'flex' : 'none'; if(show) setTimeout(() => drawTimeline(), 100); }
 
@@ -835,7 +850,50 @@
     function viewLooseMatches() { const c=document.getElementById('looseContainer'); c.innerHTML=""; archiveHistory.forEach((r,i)=>{c.innerHTML+=`<div class="loose-item"><div class="loose-info"><strong>${r.title}</strong> (${r.date})</div><button class="btn-delete" onclick="archiveHistory.splice(${i},1);localStorage.setItem('archiveHistory_v1',JSON.stringify(archiveHistory));viewLooseMatches();">x</button></div>`;}); document.getElementById('looseModal').style.display='flex'; }
     function resetMatch() { if(confirm("Borrar?")) { matchData={jornada:"",shots:[],stats:{Propio:{xg:0,xgot:0,goals:0,count:0},Rival:{xg:0,xgot:0,goals:0,count:0}}}; inputs.min.value=0; inputs.sec.value=0; saveData(); updateUI(); draw(); } }
     function downloadExcel() { let c = "\uFEFFMinuto;Seg;Jugador;Equipo;Resultado;xG;xGOT\n"; matchData.shots.forEach(s => { c += `${s.minute};${s.second};${s.player};${s.team};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)}\n`; }); const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); l.download = `Data.csv`; l.click(); }
-    function importCSV(input) {alert("Importado");}
+    async function importCSV(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
+            // Detect delimiter ; or ,
+            const delim = lines[0].includes(';') ? ';' : ',';
+            const header = lines[0].split(delim).map(h=>h.trim().toLowerCase());
+            const idx = (name) => header.indexOf(name.toLowerCase());
+            const iMin = idx('minuto'); const iSeg = idx('seg'); const iJug = idx('jugador');
+            const iEq = idx('equipo'); const iRes = idx('resultado'); const iXG = idx('xg'); const iXGOT = idx('xgot');
+            const iSX = idx('startx'); const iSY = idx('starty'); const iEY = idx('endy'); const iEZ = idx('endz');
+            const iGX = idx('gkx'); const iGY = idx('gky');
+            const shots = [];
+            for (let i=1;i<lines.length;i++) {
+                const cols = lines[i].split(delim);
+                if (cols.length < 5) continue;
+                const m = parseInt(cols[iMin]||'0')||0;
+                const s = parseInt(cols[iSeg]||'0')||0;
+                const timeFloat = m + (s/60);
+                const timeStr = `${m}:${s<10?'0'+s:s}`;
+                const team = (cols[iEq]||'').trim() || 'Propio';
+                const res = (cols[iRes]||'').trim() || 'Fuera';
+                const player = (cols[iJug]||'').trim();
+                const xg = parseFloat(cols[iXG]||'0')||0;
+                const xgot = parseFloat(cols[iXGOT]||'0')||0;
+                const startX = parseFloat(cols[iSX]||'103.5');
+                const startY = parseFloat(cols[iSY]||'40');
+                const endY = parseFloat(cols[iEY]||inputs.endY.value);
+                const endZ = parseFloat(cols[iEZ]||inputs.endZ.value);
+                const gkX = parseFloat(cols[iGX]||'118');
+                const gkY = parseFloat(cols[iGY]||'40');
+                shots.push({ id: Date.now()+i, minute:m, second:s, timeFloat, timeStr, team, type:'abierto', result:res, player, dorsal:'', xg, xgot, startX, startY, endY, endZ, gkX, gkY });
+            }
+            matchData.shots = shots;
+            recalc(); saveData(); updateUI(); draw();
+            alert(`Importado ${shots.length} tiros`);
+        } catch (e) {
+            alert('Error importando CSV');
+        } finally {
+            input.value = '';
+        }
+    }
     window.saveCanvas = function(cid, fname) { const c=document.getElementById(cid); if(c){const l=document.createElement('a'); l.download=`${fname}.png`; l.href=c.toDataURL(); l.click();} };
 
     function draw() { const c = calculate(); ui.liveXG.innerText = c.xg.toFixed(3); ui.liveXGOT.innerText = c.xgot.toFixed(3); drawPitch(c); drawGoal(c); }
@@ -843,6 +901,15 @@
     Object.values(inputs).forEach(i=>i.addEventListener('input',(e)=>{if(e.target.id==='jornadaInput')saveData();else draw()}));
     window.addEventListener('resize',()=>{draw();updateUI()});
     setTimeout(()=>{loadData();draw();updateUI()},200);
+    // React to sync updates from other apps
+    window.onDataSyncUpdate = function(update){
+        try {
+            if(update.appId !== 'app3') {
+                const sync = window.AnalysisDataSync?.loadProgress?.('app3');
+                if(sync && sync.matchData) { matchData = sync.matchData; updateUI(); draw(); }
+            }
+        } catch {}
+    };
 </script>
 </body>
 </html>

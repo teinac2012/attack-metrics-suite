@@ -10,26 +10,59 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
   // No redirigimos automáticamente si hay sesión; permitimos reautenticación
 
   const onSubmit = async (e: React.FormEvent) => { 
     e.preventDefault(); 
     if (!username || !password) {
       setError('Por favor, introduce usuario y contraseña.');
+      setToastType('warning');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
       return;
     }
     setLoading(true);
     setError(''); 
+    setShowToast(false);
+    
+    // Mostrar mensaje de procesando
+    setError('Verificando credenciales...');
+    setToastType('info');
+    setShowToast(true);
+    
     // Asegurar que se invalida la sesión previa antes de autenticar de nuevo
     try { await signOut({ redirect: false }); } catch {}
     const res = await signIn('credentials', { username, password, redirect: false }); 
     setLoading(false); 
+    
     if (res?.ok) {
-      window.location.href = '/dashboard'; 
-    } else {
-      setError('Usuario o contraseña incorrecta');
+      setError('✓ Inicio de sesión correcto');
+      setToastType('success');
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+    } else {
+      // Determinar el tipo de error basado en el mensaje de error de NextAuth
+      const errorMsg = res?.error || '';
+      
+      if (errorMsg.includes('licencia')) {
+        setError('⚠️ No tienes una licencia activa. Contacta al administrador.');
+        setToastType('warning');
+      } else if (errorMsg.includes('dispositivo') || errorMsg.includes('session') || errorMsg.includes('device')) {
+        setError('⚠️ Ya hay un dispositivo activo en esta cuenta');
+        setToastType('warning');
+      } else if (errorMsg.includes('Credenciales')) {
+        setError('⚠️ Por favor, completa usuario y contraseña');
+        setToastType('warning');
+      } else {
+        setError('⚠️ Usuario o contraseña no válida');
+        setToastType('error');
+      }
+      
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
     }
   };
 
@@ -98,11 +131,21 @@ export default function LoginPage() {
           <p>© 2025 Attack Metrics Suite. Todos los derechos reservados.</p>
         </div>
       </div>
-      {/* Toast de error abajo a la derecha */}
+      {/* Toast dinámico abajo a la derecha */}
       {showToast && (
-        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg bg-red-600/90 text-white shadow-lg">
-          <span className="font-semibold">⚠️ </span>
-          <span>{error || 'Usuario o contraseña incorrecta'}</span>
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg text-white shadow-lg transition-all duration-300 ${
+          toastType === 'success' ? 'bg-green-600/90' :
+          toastType === 'warning' ? 'bg-yellow-600/90' :
+          toastType === 'info' ? 'bg-blue-600/90' :
+          'bg-red-600/90'
+        }`}>
+          <span className="font-semibold">
+            {toastType === 'success' ? '✓ ' :
+             toastType === 'warning' ? '⚠️ ' :
+             toastType === 'info' ? 'ℹ️ ' :
+             '⚠️ '}
+          </span>
+          <span>{error}</span>
         </div>
       )}
     </div>
