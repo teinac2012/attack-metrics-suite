@@ -28,6 +28,13 @@ export default function AdminCreateUserForm() {
         setMessage({ type: 'success', text: "✅ Usuario creado correctamente" });
         setCreatedPassword(passwordToSend);
         setShowCreatedPassword(true);
+        // Guardar contraseña creada en localStorage asociada al nuevo usuario
+        const userId = (data?.user?.id as string) || '';
+        try {
+          if (userId) {
+            localStorage.setItem(`password:${userId}`, passwordToSend);
+          }
+        } catch {}
         setUsername("");
         setEmail("");
         setPassword("");
