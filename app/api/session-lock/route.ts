@@ -8,10 +8,18 @@ export async function POST() {
     return new Response('Unauthorized', { status: 401 });
   }
   
-  await prisma.sessionLock.update({
+  // Usar upsert en lugar de update para evitar errores si el registro no existe
+  await prisma.sessionLock.upsert({
     where: { userId: (session.user as any).id },
-    data: { lastSeen: new Date() }
-  }).catch(() => {});
+    update: { lastSeen: new Date() },
+    create: { 
+      userId: (session.user as any).id, 
+      sessionId: "heartbeat",
+      lastSeen: new Date()
+    }
+  }).catch(err => {
+    console.error("[SESSION_LOCK] Heartbeat error:", err);
+  });
   
   return new Response('ok');
 }

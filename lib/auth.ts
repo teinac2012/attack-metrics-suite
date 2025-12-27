@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { generateDeviceHash } from "@/lib/auth-security";
 
 // Clase personalizada para errores de autenticación
 class AuthError extends Error {
@@ -65,19 +66,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
             // Si es ADMIN, permitir sobrescribir y eliminar el lock previo
             console.warn("[AUTH] ADMIN override - removing existing session lock for:", credentials.username);
-            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
+            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(err => {
+              console.warn("[AUTH] Could not delete lock:", err);
+            });
           } else if (lock && timeSinceLastSeen >= 120_000) {
             // Limpiar locks antiguos (más de 2 minutos sin actividad)
             console.log("[AUTH] Cleaning stale session lock for:", credentials.username);
-            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(() => {});
+            await prisma.sessionLock.delete({ where: { userId: user.id } }).catch(err => {
+              console.warn("[AUTH] Could not delete stale lock:", err);
+            });
           }
           
-          // Crear nuevo session lock
-          await prisma.sessionLock.upsert({
-            where: { userId: user.id },
-            update: { lastSeen: new Date(), sessionId: "temp" },
-            create: { userId: user.id, sessionId: "temp", lastSeen: new Date() }
-          });
+          // Crear nuevo session lock - siempre crear, no actualizar
+          try {
+            await prisma.sessionLock.create({
+              data: { 
+                userId: user.id, 
+                sessionId: "temp",
+                lastSeen: new Date(),
+                deviceHash: generateDeviceHash()
+              }
+            });
+          } catch (lockErr: any) {
+            // Si el registro ya existe, actualizar
+            if (lockErr?.code === 'P2002') {
+              await prisma.sessionLock.update({
+                where: { userId: user.id },
+                data: { 
+                  lastSeen: new Date(),
+                  sessionId: "temp",
+                  deviceHash: generateDeviceHash()
+                }
+              }).catch(err => {
+                console.warn("[AUTH] Could not update lock:", err);
+              });
+            }
+          }
           
           console.log("[AUTH] Login successful for user:", credentials.username);
           return { id: user.id, name: user.username, email: user.email, role: user.role };
