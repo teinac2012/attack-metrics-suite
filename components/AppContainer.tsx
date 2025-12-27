@@ -11,25 +11,34 @@ interface AppContainerProps {
 export default function AppContainer({ appUrl, appName, appId }: AppContainerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cargar datos guardados cuando el iframe carga
   useEffect(() => {
     const loadAppData = async () => {
       try {
+        console.log(`[AppContainer] Cargando datos para ${appId}...`);
         const response = await fetch(`/api/apps/data?appId=${appId}`);
         const result = await response.json();
 
         if (result.success && result.data) {
+          console.log(`[AppContainer] Datos encontrados para ${appId}`, result.data);
           // Esperar a que el iframe esté listo y enviar los datos
           setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-              {
-                type: "LOAD_DATA",
-                data: result.data,
-              },
-              "*"
-            );
-          }, 1500);
+            if (iframeRef.current?.contentWindow) {
+              iframeRef.current.contentWindow.postMessage(
+                {
+                  type: "LOAD_DATA",
+                  data: result.data,
+                  appId: appId,
+                },
+                "*"
+              );
+              console.log(`[AppContainer] Datos enviados al iframe ${appId}`);
+            }
+          }, 1000);
+        } else {
+          console.log(`[AppContainer] No hay datos guardados para ${appId}`);
         }
       } catch (error) {
         console.warn("Error cargando datos:", error);
@@ -42,20 +51,26 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
     if (iframeEl) {
       // Escuchar cuando el iframe está listo
       iframeEl.onload = () => {
+        console.log(`[AppContainer] Iframe ${appId} cargado`);
         loadAppData();
       };
     }
 
     return () => {
+      // Limpiar timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
       // Guardar datos antes de desmontar el componente
       saveAppData();
     };
   }, [appId]);
 
-  // Guardar datos antes de dejar la página
+  // Guardar datos antes de dejar la página (debounced)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      saveAppData();
+      console.log(`[AppContainer] Guardando datos antes de descargar ${appId}...`);
+      saveAppDataImmediate();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -67,13 +82,22 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
   // Escuchar mensajes del iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Solo procesar mensajes del iframe actual
       if (event.source !== iframeRef.current?.contentWindow) return;
 
       if (event.data.type === "SAVE_DATA") {
-        // Guardar datos cuando el iframe lo solicita
-        saveAppData(event.data.data);
+        console.log(`[AppContainer] Recibido SAVE_DATA de ${appId}`, event.data.count);
+        // Debounced save
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+          saveAppData(event.data.data);
+        }, 500);
       } else if (event.data.type === "LOG") {
-        console.log("[App " + appId + "]:", event.data.message);
+        console.log(`[${appName}]:`, event.data.message);
+      } else if (event.data.type === "APP_READY") {
+        console.log(`[AppContainer] App ${appId} está lista`);
       }
     };
 
@@ -81,29 +105,18 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [appId]);
+  }, [appId, appName]);
 
   const saveAppData = async (data?: any) => {
     try {
       let dataToSave = data;
 
-      // Si no hay datos específicos, intentar obtener del iframe
-      if (!data && iframeRef.current?.contentWindow) {
-        try {
-          // Solicitar datos al iframe
-          iframeRef.current.contentWindow.postMessage(
-            { type: "REQUEST_DATA" },
-            "*"
-          );
-          // Dar tiempo al iframe para responder
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          return;
-        } catch (e) {
-          console.warn("No se pudo obtener datos del iframe");
-        }
+      if (!dataToSave) {
+        console.log(`[AppContainer] No hay datos específicos para guardar`);
+        return;
       }
 
-      if (!dataToSave) return;
+      console.log(`[AppContainer] Guardando datos para ${appId}...`);
 
       const response = await fetch("/api/apps/data", {
         method: "POST",
@@ -114,12 +127,21 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
         }),
       });
 
-      if (!response.ok) {
-        console.error("Error guardando datos");
+      if (response.ok) {
+        console.log(`[AppContainer] Datos guardados exitosamente para ${appId}`);
+      } else {
+        console.error(`[AppContainer] Error guardando datos:`, response.status);
       }
     } catch (error) {
       console.error("Error en saveAppData:", error);
     }
+  };
+
+  const saveAppDataImmediate = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveAppData();
   };
 
   return (
@@ -140,7 +162,10 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
           className="w-full h-full"
           title={appName}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-storage"
-          onLoad={() => setIsLoading(false)}
+          onLoad={() => {
+            console.log(`[AppContainer] Iframe ${appId} se ha cargado completamente`);
+            setIsLoading(false);
+          }}
         />
       </div>
     </div>
