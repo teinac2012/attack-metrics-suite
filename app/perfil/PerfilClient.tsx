@@ -1,6 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 interface PerfilClientProps {
   username: string;
@@ -33,11 +34,11 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-10 flex items-center justify-between"
+        className="mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
       >
         <div>
           <motion.h1 
-            className="text-5xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400"
+            className="text-4xl sm:text-5xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
@@ -45,7 +46,7 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
             👤 Mi Perfil
           </motion.h1>
           <motion.p 
-            className="text-gray-400 text-lg"
+            className="text-gray-400 text-base sm:text-lg"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -60,12 +61,15 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
         >
           <Link
             href="/dashboard"
-            className="group relative px-6 py-3 bg-gray-800/80 backdrop-blur-sm hover:bg-gray-700/80 text-white rounded-xl font-medium transition-all duration-300 border border-gray-700/50 hover:border-gray-600/50 overflow-hidden"
+            className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur-sm hover:from-gray-700/90 hover:to-gray-600/90 text-white rounded-xl font-semibold transition-all duration-300 border border-gray-600/50 hover:border-gray-500/70 shadow-lg hover:shadow-xl hover:scale-105 overflow-hidden"
           >
             <span className="relative z-10 flex items-center gap-2">
-              ← Volver
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              Volver
             </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-600/0 via-gray-600/20 to-gray-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-purple-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
           </Link>
         </motion.div>
       </motion.div>
@@ -171,7 +175,7 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
           </div>
         </motion.div>
 
-        {/* Cambiar Contraseña - Import the component */}
+        {/* Cambiar Contraseña */}
         <motion.div variants={item}>
           <div className="relative overflow-hidden rounded-2xl h-full">
             <div className="absolute inset-0 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-md" />
@@ -183,8 +187,7 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
                 <span className="text-orange-400">🔐</span>
                 Cambiar Contraseña
               </h2>
-              {/* We'll need to import ChangePasswordForm here */}
-              <div id="change-password-form-container" data-user-id={userId} />
+              <ChangePasswordForm userId={userId} />
             </div>
           </div>
         </motion.div>

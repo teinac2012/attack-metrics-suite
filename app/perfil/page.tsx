@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import SessionHeartbeat from "@/components/SessionHeartbeat";
 import PerfilClient from "./PerfilClient";
-import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 export default async function PerfilPage() {
   const session = await auth();
@@ -42,22 +41,6 @@ export default async function PerfilPage() {
           createdAt={user.createdAt}
           userId={user.id}
         />
-        
-        {/* Password Form placed outside for proper server component */}
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div /> {/* Spacer */}
-          <div className="relative overflow-hidden rounded-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-md" />
-            <div className="absolute inset-0 border border-gray-700/50 rounded-2xl" />
-            <div className="relative p-8">
-              <h2 className="text-3xl font-bold mb-8 flex items-center gap-3">
-                <span className="text-orange-400">🔐</span>
-                Cambiar Contraseña
-              </h2>
-              <ChangePasswordForm userId={user.id} />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
