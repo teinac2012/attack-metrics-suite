@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 
 export async function POST(request: Request) {
   try {
@@ -20,11 +20,9 @@ export async function POST(request: Request) {
     }
     
     // Llamar a signOut de NextAuth
-    await signOut({ redirect: false });
-    
-    return NextResponse.json({ success: true }, { status: 200 });
+    await signOut({ redirectTo: "/login" });
   } catch (error) {
     console.error("[LOGOUT] Error:", error);
-    return NextResponse.json({ error: "Error al cerrar sesión" }, { status: 500 });
+    redirect("/login");
   }
 }
