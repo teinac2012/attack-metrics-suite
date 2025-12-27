@@ -61,3 +61,31 @@ export async function POST(req: Request) {
 
   return new Response(JSON.stringify({ success: true, user }), { status: 201 });
 }
+
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if ((session?.user as any)?.role !== "ADMIN") {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get("userId");
+
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "userId requerido" }), { status: 400 });
+  }
+
+  // Evitar que el admin se elimine a sí mismo
+  if (userId === (session?.user as any)?.id) {
+    return new Response(JSON.stringify({ error: "No puedes eliminarte a ti mismo" }), { status: 400 });
+  }
+
+  try {
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: "Error al eliminar usuario" }), { status: 500 });
+  }
+}
