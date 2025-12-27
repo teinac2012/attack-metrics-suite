@@ -30,8 +30,8 @@ export default async function DashboardPage() {
   const apps = [
     {
       id: 1,
-      name: "IA Pases Táctico",
-      description: "Analista Pro v5.5 - Análisis inteligente de pases y patrones tácticos",
+      name: "Analista Pro",
+      description: "Análisis inteligente de pases y patrones tácticos con IA avanzada",
       icon: "🎯",
       href: "/apps/app1",
       color: "from-purple-500 to-purple-700"
@@ -39,16 +39,16 @@ export default async function DashboardPage() {
     {
       id: 2,
       name: "Attack Metrics",
-      description: "v3.1 - Análisis completo de ataques, regates y penetraciones",
+      description: "Análisis completo de ataques, regates y penetraciones defensivas",
       icon: "⚡",
       href: "/apps/app2",
       color: "from-orange-500 to-orange-700"
     },
     {
       id: 3,
-      name: "Shooting Analysis",
-      description: "Pro Scout v18 - Análisis detallado de tiros y finalización",
-      icon: "🎯",
+      name: "Data Hub",
+      description: "Análisis detallado de tiros, finalización y métricas de desempeño",
+      icon: "📊",
       href: "/apps/app3",
       color: "from-blue-500 to-blue-700"
     }

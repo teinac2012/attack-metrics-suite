@@ -13,24 +13,24 @@ interface App {
 const apps: App[] = [
   {
     id: 1,
-    name: "IA Pases",
+    name: "Analista Pro",
     href: "/apps/app1",
     icon: "🎯",
-    description: "Análisis táctico"
+    description: "Análisis táctico avanzado"
   },
   {
     id: 2,
     name: "Attack Metrics",
     href: "/apps/app2",
     icon: "⚡",
-    description: "Análisis de ataques"
+    description: "Análisis de ataques y regates"
   },
   {
     id: 3,
-    name: "Shooting",
+    name: "Data Hub",
     href: "/apps/app3",
-    icon: "🏹",
-    description: "Análisis de tiros"
+    icon: "📊",
+    description: "Análisis de datos avanzado"
   }
 ];
 

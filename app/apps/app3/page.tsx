@@ -32,7 +32,7 @@ export default async function App3Page() {
           <iframe 
             src="/SHOOTING31.html"
             className="w-full h-full"
-            title="Shooting Analysis"
+            title="Data Hub"
           />
         </div>
       </div>

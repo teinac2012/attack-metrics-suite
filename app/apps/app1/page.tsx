@@ -32,7 +32,7 @@ export default async function App1Page() {
           <iframe 
             src="/IA%20PASES%20TACTICO1bCDEFG.html"
             className="w-full h-full"
-            title="IA Pases Táctico"
+            title="Analista Pro"
           />
         </div>
       </div>
