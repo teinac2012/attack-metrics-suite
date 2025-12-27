@@ -150,6 +150,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = (user as any).role;
         (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
       }
+      
+      // Validar licencia en cada renovación del JWT
+      if (token.id) {
+        const userWithLicense = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          include: { licenses: { where: { isActive: true, endDate: { gt: new Date() } }, take: 1 } }
+        });
+        
+        // Si no tiene licencia válida, marcar token como inválido
+        if (!userWithLicense || userWithLicense.licenses.length === 0) {
+          (token as any).licenseValid = false;
+          return token;
+        }
+        (token as any).licenseValid = true;
+      }
+      
       return token;
     },
     async session({ session, token }) {
@@ -157,6 +173,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
         (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
+        (session.user as any).licenseValid = (token as any).licenseValid ?? true;
       }
       return session;
     }
