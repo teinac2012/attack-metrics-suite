@@ -232,6 +232,7 @@
             <div class="repo-head">
                 <span id="repoStats">Filas: 0</span>
                 <button onclick="downloadCutsScript()" style="width:auto; background:#27ae60; padding:2px 8px; font-size:0.7rem;">✂️ Script</button>
+                <button onclick="saveData()" style="width:auto; background:#3498db; padding:2px 8px; font-size:0.7rem; margin-left:5px;">💾 Guardar</button>
             </div>
             <div class="table-wrap">
                 <table id="repoTable">
@@ -784,7 +785,12 @@ function updateTable(){
             <td>${p.posId}</td>
             <td>${p.context}</td>
             <td>${p.min}</td>
-            <td style="color:${durColor}; font-weight:bold;">${(p.duration||0).toFixed(1)}s</td>
+            <td style="color:${durColor}; font-weight:bold;">
+                <input type="number" step="0.1" value="${(p.duration||0).toFixed(1)}" 
+                       style="width:50px; padding:2px; background:#333; color:${durColor}; border:1px solid ${durColor}; text-align:center; font-weight:bold;" 
+                       onclick="event.stopPropagation()"
+                       onchange="updatePossessionDuration('${p.uid}', this.value); saveData();"
+                       title="Editable: cambia la duración manualmente">s</td>
             <td>${p.actions.length}</td>
             <td style="font-size:0.65rem;">${p.actions[0].action}...</td>
             <td>${p.result}</td>
@@ -793,6 +799,30 @@ function updateTable(){
         t.appendChild(tr);
     });
 }
+
+function updatePossessionDuration(uid, newDuration){
+    const idx = STATE.filtered.findIndex(p => p.uid === uid);
+    if(idx !== -1) {
+        STATE.filtered[idx].duration = parseFloat(newDuration);
+        // Recalcular acciones si es necesario
+        const oldEnd = STATE.filtered[idx].actions[STATE.filtered[idx].actions.length - 1].min;
+        const dur = parseFloat(newDuration);
+        const newEnd = (parseFloat(STATE.filtered[idx].min) + dur / 60).toFixed(3);
+        STATE.filtered[idx].actions[STATE.filtered[idx].actions.length - 1].min = newEnd;
+    }
+}
+
+function saveData(){
+    try {
+        if(window.AnalysisDataSync && typeof window.AnalysisDataSync.saveProgress === 'function'){
+            window.AnalysisDataSync.saveProgress('attackMetrics', { DB: STATE.filtered });
+            console.log('[IA PASES] Datos guardados en sync');
+        }
+    } catch(err){
+        console.warn('[IA PASES] Error al guardar:', err);
+    }
+}
+
 function handleVideoLoad(i){ Array.from(i.files).forEach(f=>STATE.videos.push({name:f.name,url:URL.createObjectURL(f)})); if(STATE.currentVidIdx===-1) playVideo(0); toggleVideo(true); }
 function playVideo(i){ STATE.currentVidIdx=i; document.getElementById('mainVideo').src=STATE.videos[i].url; }
 function toggleVideo(s){ document.getElementById('videoPanel').style.display=s?'block':'none'; setTimeout(fitCanvas,100); }
