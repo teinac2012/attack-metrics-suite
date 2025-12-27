@@ -1,11 +1,22 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SessionHeartbeat from "@/components/SessionHeartbeat";
+import { prisma } from "@/lib/prisma";
 
 export default async function App3Page() {
   const session = await auth();
   
   if (!session?.user) {
+    redirect("/login");
+  }
+
+  // Validar que tenga licencia activa
+  const user = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    include: { licenses: { where: { isActive: true }, take: 1 } }
+  });
+
+  if (!user || user.licenses.length === 0) {
     redirect("/login");
   }
 

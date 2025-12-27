@@ -17,7 +17,12 @@ export default async function DashboardPage() {
     include: { licenses: { where: { isActive: true }, take: 1 } }
   });
 
-  const license = user?.licenses[0];
+  // Si no hay usuario o no tiene licencia válida, redirigir al login
+  if (!user || user.licenses.length === 0) {
+    redirect("/login");
+  }
+
+  const license = user.licenses[0];
   const daysLeft = license 
     ? Math.ceil((new Date(license.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 0;

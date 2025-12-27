@@ -13,6 +13,19 @@ import AdminClient from "./AdminClient";
 export default async function AdminPage() {
   const session = await auth();
   
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="text-center relative z-10">
+          <h1 className="text-5xl font-black text-white mb-4">No Autorizado</h1>
+          <Link href="/login" className="inline-block px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl font-bold">
+            Ir al Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if ((session?.user as any)?.role !== "ADMIN") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -27,6 +40,26 @@ export default async function AdminPage() {
           <p className="text-gray-400 mb-8 text-lg">Solo administradores pueden acceder a esta página.</p>
           <Link href="/dashboard" className="inline-block px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-blue-500/50 hover:scale-105">
             ← Volver al Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Validar licencia del admin
+  const adminUser = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    include: { licenses: { where: { isActive: true }, take: 1 } }
+  });
+
+  if (!adminUser || adminUser.licenses.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="text-center relative z-10">
+          <h1 className="text-5xl font-black text-white mb-4 bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400">Licencia Vencida</h1>
+          <p className="text-gray-400 mb-8 text-lg">Tu acceso ha expirado. Por favor, contacta para renovar.</p>
+          <Link href="/login" className="inline-block px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-blue-500/50 hover:scale-105">
+            Ir al Login
           </Link>
         </div>
       </div>

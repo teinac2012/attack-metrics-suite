@@ -16,7 +16,9 @@ export default async function PerfilPage() {
     include: { licenses: { where: { isActive: true }, take: 1 } },
   });
 
-  if (!user) redirect("/login");
+  if (!user || user.licenses.length === 0) {
+    redirect("/login");
+  }
 
   const license = user.licenses[0];
   const daysLeft = license 
