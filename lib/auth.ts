@@ -51,6 +51,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             console.error("[AUTH] Invalid password for user:", credentials.username);
             throw new Error("Usuario o contraseña no válida");
           }
+
+          // Política de rotación de contraseña (365 días)
+          const rotatedAt = user.passwordRotatedAt ?? user.createdAt;
+          const rotationMs = 365 * 24 * 60 * 60 * 1000;
+          const isExpired = Date.now() - new Date(rotatedAt).getTime() > rotationMs;
+          if (isExpired && !user.mustChangePassword) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { mustChangePassword: true }
+            }).catch(err => console.warn("[AUTH] Could not set mustChangePassword:", err));
+            user.mustChangePassword = true;
+          }
           
           // Verificar si hay un dispositivo activo (session lock reciente < 2 minutos)
           const lock = await prisma.sessionLock.findUnique({ where: { userId: user.id } });
@@ -119,7 +131,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
           
           console.log("[AUTH] Login successful for user:", credentials.username);
-          return { id: user.id, name: user.username, email: user.email, role: user.role };
+          return { id: user.id, name: user.username, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword } as any;
         } catch (error) {
           console.error("[AUTH] Authorization error:", error);
           // NextAuth capturará este error, intentamos pasar el mensaje si es posible
@@ -136,6 +148,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
+        (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
       }
       return token;
     },
@@ -143,6 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
+        (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
       }
       return session;
     }

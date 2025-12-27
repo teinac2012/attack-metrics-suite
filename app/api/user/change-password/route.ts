@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     // Actualizar contraseña
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: { passwordHash, passwordRotatedAt: new Date(), mustChangePassword: false },
     });
 
     return NextResponse.json({

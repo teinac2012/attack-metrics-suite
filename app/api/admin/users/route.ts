@@ -41,6 +41,8 @@ export async function POST(req: Request) {
       username,
       email,
       passwordHash,
+      passwordRotatedAt: new Date(),
+      mustChangePassword: false,
       role: "USER",
       licenses: {
         create: {
@@ -112,7 +114,7 @@ export async function PUT(req: Request) {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash }
+      data: { passwordHash, passwordRotatedAt: new Date(), mustChangePassword: false }
     });
 
     return new Response(JSON.stringify({ success: true }), { status: 200 });

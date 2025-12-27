@@ -9,6 +9,8 @@ export default function LoginClient() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [licenseExpired, setLicenseExpired] = useState(false);
+  const contactEmail = (process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'admin@attack.com');
 
   const onSubmit = async (e: React.FormEvent) => { 
     e.preventDefault(); 
@@ -36,7 +38,8 @@ export default function LoginClient() {
         const errorMsg = validateData?.error || '';
         
         if (errorCode === 'NO_LICENSE') {
-          toast.error('No tienes una licencia activa. Contacta al administrador.', {
+          setLicenseExpired(true);
+          toast.error('Tu periodo ha terminado. Contacta para renovar.', {
             style: { background: '#1f2937', color: '#fff' },
             duration: 4000
           });
@@ -175,6 +178,16 @@ export default function LoginClient() {
               <h2 className="text-3xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
                 Iniciar Sesión
               </h2>
+              {licenseExpired && (
+                <div className="mb-6 border border-red-500/40 bg-red-500/10 rounded-xl p-4 text-red-300">
+                  <p className="font-semibold mb-1">Licencia vencida</p>
+                  <p className="text-sm text-red-200/80">Tu periodo ha terminado. Para reactivar el acceso, contacta al administrador.</p>
+                  <div className="mt-3 flex gap-3">
+                    <a href={`mailto:${contactEmail}?subject=Renovación%20de%20licencia`} className="px-3 py-2 bg-red-600/30 hover:bg-red-600/40 rounded-lg text-sm">Contactar por email</a>
+                    <a href="https://wa.me/" target="_blank" rel="noopener" className="px-3 py-2 bg-green-600/30 hover:bg-green-600/40 rounded-lg text-sm">WhatsApp</a>
+                  </div>
+                </div>
+              )}
               
               <form onSubmit={onSubmit} className="space-y-6">
                 {/* Usuario */}

@@ -37,6 +37,16 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {daysLeft <= 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-3 border border-red-500/30 bg-red-500/10 rounded-lg p-4"
+          >
+            <p className="text-red-300 font-semibold">Licencia vencida</p>
+            <p className="text-sm text-red-200/80">Tu acceso está restringido. Contacta al administrador para renovar tu licencia y recuperar acceso.</p>
+          </motion.div>
+        )}
         {/* Información Principal */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -136,7 +146,13 @@ export default function PerfilClient({ username, email, role, daysLeft, createdA
             </svg>
             Seguridad
           </h2>
-          <ChangePasswordForm userId={userId} />
+          {daysLeft <= 0 ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-200">
+              Para cambiar la contraseña, necesitas una licencia activa. Contacta al administrador para renovar.
+            </div>
+          ) : (
+            <ChangePasswordForm userId={userId} />
+          )}
         </motion.div>
       </div>
     </div>
