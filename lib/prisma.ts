@@ -2,18 +2,18 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as any;
 
-export const getPrisma = () => {
+export const prisma = (() => {
   if (!globalForPrisma.prisma) {
-    globalForPrisma.prisma = new PrismaClient();
+    try {
+      globalForPrisma.prisma = new PrismaClient({
+        log: ['error', 'warn'],
+      });
+    } catch (error) {
+      console.error("Failed to initialize Prisma:", error);
+      throw error;
+    }
   }
   return globalForPrisma.prisma;
-};
+})() as PrismaClient;
 
-export const prisma = (() => {
-  try {
-    return getPrisma();
-  } catch {
-    // Return a dummy object during build; will be replaced at runtime
-    return null;
-  }
-})() as any;
+export default prisma;
