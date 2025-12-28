@@ -2566,7 +2566,7 @@ function openAvgPosModal() {
 
 function setAvgPosTeam(team) {
     currentAvgTeam = team;
-    document.getElementById('').className = team === 'HOME' ? 't-opt active-home' : 't-opt';
+    document.getElementById('btnAvgHome').className = team === 'HOME' ? 't-opt active-home' : 't-opt';
     document.getElementById('btnAvgAway').className = team === 'AWAY' ? 't-opt active-away' : 't-opt';
     const bHome = document.getElementById('btnAvgHome'); const bAway = document.getElementById('btnAvgAway');
     if(team === 'HOME') { bHome.style.background = '#2c3e50'; bHome.style.borderBottom = '3px solid #3498db'; bAway.style.background = '#111'; bAway.style.borderBottom = 'none'; } 

@@ -110,16 +110,19 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
     };
   }, [appId, appName]);
 
-  const handleDownload = (downloadData: { filename: string; data: string }) => {
+  const handleDownload = (downloadData: { filename: string; data: string; mimeType?: string }) => {
     try {
       // Convertir base64 a blob
+      if (typeof downloadData.data !== "string" || downloadData.data.length === 0) {
+        throw new Error("Datos de descarga inválidos");
+      }
       const byteCharacters = atob(downloadData.data);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray]);
+      const blob = new Blob([byteArray], { type: downloadData.mimeType || "application/octet-stream" });
 
       // Crear URL de descarga
       const url = URL.createObjectURL(blob);
@@ -201,7 +204,7 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
           src={appUrl}
           className="w-full h-full"
           title={appName}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-storage"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-storage allow-downloads allow-downloads-without-user-activation"
           onLoad={() => {
             console.log(`[AppContainer] Iframe ${appId} se ha cargado completamente`);
             setIsLoading(false);

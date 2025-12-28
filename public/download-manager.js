@@ -5,19 +5,31 @@
 
 window.DownloadManager = {
   // Descargar archivo como blob
-  downloadBlob: function(blob, filename) {
-    console.log('[DownloadManager] Descargando:', filename);
-    
-    // Enviar al parent para procesar la descarga
-    window.parent.postMessage(
-      {
-        type: 'DOWNLOAD_FILE',
-        filename: filename,
-        // Convertir blob a base64 para transferencia
-        data: this.blobToBase64(blob),
-      },
-      '*'
-    );
+  downloadBlob: async function(blob, filename) {
+    try {
+      console.log('[DownloadManager] Descargando:', filename);
+      const base64 = await this.blobToBase64(blob);
+
+      // Enviar al parent para procesar la descarga
+      window.parent.postMessage(
+        {
+          type: 'DOWNLOAD_FILE',
+          filename: filename,
+          data: base64,
+          mimeType: blob.type || undefined,
+        },
+        '*'
+      );
+    } catch (err) {
+      console.error('[DownloadManager] Error preparando la descarga:', err);
+      window.parent.postMessage(
+        {
+          type: 'LOG',
+          message: '[DownloadManager] Error preparando la descarga: ' + (err && err.message ? err.message : String(err)),
+        },
+        '*'
+      );
+    }
   },
 
   // Descargar JSON
