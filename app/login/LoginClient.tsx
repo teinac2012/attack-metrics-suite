@@ -148,7 +148,7 @@ export default function LoginClient() {
               transition={{ duration: 5, repeat: Infinity }}
               style={{ backgroundSize: '200% 200%' }}
             >
-              Attack Metrics
+              Attack Métrics Hub
             </motion.h1>
             <motion.p 
               className="text-gray-400 text-lg"
@@ -293,7 +293,7 @@ export default function LoginClient() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            <p>© 2025 Attack Metrics Suite. Todos los derechos reservados.</p>
+            <p>© 2025 Attack Métrics Hub. Todos los derechos reservados.</p>
           </motion.div>
         </motion.div>
       </div>

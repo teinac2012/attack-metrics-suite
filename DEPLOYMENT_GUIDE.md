@@ -1,4 +1,4 @@
-# Attack Metrics Suite - Guía de Despliegue y Uso
+# Attack Métrics Hub - Guía de Despliegue y Uso
 
 ## 🎯 Descripción General
 

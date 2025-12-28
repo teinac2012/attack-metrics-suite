@@ -1,5 +1,19 @@
-﻿# Attack Metrics Suite\n\n## Setup\n1. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL, AUTH_SECRET.\n2. Generate client: npm run prisma\n3. Start dev: npm run dev\n\n## Deploy (Vercel)\n- Add env vars in Vercel project.\n- Provision Vercel Postgres and set DATABASE_URL.\n\n## Admin\n- Visit /admin (requires ADMIN user).\n\n## Single-device\n- Login creates a session lock; concurrent logins are blocked within 60s heartbeat.
+﻿# Attack Métrics Hub
 
+## Setup
+1. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL, AUTH_SECRET.
+2. Generate client: npm run prisma
+3. Start dev: npm run dev
+
+## Deploy (Vercel)
+- Add env vars in Vercel project.
+- Provision Vercel Postgres and set DATABASE_URL.
+
+## Admin
+- Visit /admin (requires ADMIN user).
+
+## Single-device
+- Login creates a session lock; concurrent logins are blocked within 60s heartbeat.
 
 ## 🚀 Guía de Inicio Rápido
 

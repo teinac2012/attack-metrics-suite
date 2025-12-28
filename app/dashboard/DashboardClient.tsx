@@ -91,7 +91,7 @@ export default function DashboardClient({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            Attack Metrics Suite
+            Attack Métrics Hub
           </motion.h1>
           <motion.p 
             className="text-gray-400 text-lg"

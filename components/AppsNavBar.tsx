@@ -104,7 +104,7 @@ export default function AppsNavBar({ userName }: { userName: string }) {
       <div className="h-16 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b border-gray-700/50 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-40 shadow-lg">
         <div className="flex items-center gap-8">
           <Link href="/dashboard" className="text-white font-bold text-lg hover:text-blue-400 transition-colors">
-            Attack Metrics
+            Attack Métrics Hub
           </Link>
           
           {/* Navegación entre apps */}

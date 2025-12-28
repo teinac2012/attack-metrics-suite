@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Attack Metrics Suite",
+  title: "Attack Métrics Hub",
   description: "Plataforma de análisis táctico de fútbol",
 };
 
