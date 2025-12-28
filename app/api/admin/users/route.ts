@@ -82,6 +82,15 @@ export async function DELETE(req: Request) {
     return new Response(JSON.stringify({ error: "No puedes eliminarte a ti mismo" }), { status: 400 });
   }
 
+  // Proteger al usuario "david" para que no pueda ser eliminado
+  const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!targetUser) {
+    return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404 });
+  }
+  if (targetUser.username?.toLowerCase() === "david") {
+    return new Response(JSON.stringify({ error: "El usuario 'david' está protegido y no se puede eliminar" }), { status: 400 });
+  }
+
   try {
     await prisma.user.delete({
       where: { id: userId },

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-const MAX_FAILED_ATTEMPTS = 5;
+const MAX_FAILED_ATTEMPTS = 20;
 const LOCKOUT_DURATION_MINUTES = 15;
 const ATTEMPT_WINDOW_MINUTES = 15;
 
