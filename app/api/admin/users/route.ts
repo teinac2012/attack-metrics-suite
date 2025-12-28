@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+const PROTECTED_USERNAMES = ["david", "santibuzon"];
+
 export async function POST(req: Request) {
   const session = await auth();
   if ((session?.user as any)?.role !== "ADMIN") {
@@ -82,13 +84,13 @@ export async function DELETE(req: Request) {
     return new Response(JSON.stringify({ error: "No puedes eliminarte a ti mismo" }), { status: 400 });
   }
 
-  // Proteger al usuario "david" para que no pueda ser eliminado
+  // Proteger usuarios específicos para que no puedan ser eliminados
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) {
     return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404 });
   }
-  if (targetUser.username?.toLowerCase() === "david") {
-    return new Response(JSON.stringify({ error: "El usuario 'david' está protegido y no se puede eliminar" }), { status: 400 });
+  if (targetUser.username && PROTECTED_USERNAMES.includes(targetUser.username.toLowerCase())) {
+    return new Response(JSON.stringify({ error: `El usuario '${targetUser.username}' está protegido y no se puede eliminar` }), { status: 400 });
   }
 
   try {
