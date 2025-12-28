@@ -2622,7 +2622,22 @@ function openAvgPosModal() {
     document.getElementById('modalAvgPos').style.display = 'flex';
     document.getElementById('btnAvgHome').innerText = DB.config.homeName;
     document.getElementById('btnAvgAway').innerText = DB.config.awayName;
-    setTimeout(() => { setAvgPosTeam('HOME'); }, 100);
+    // Asegurar render estable tras layout: activar HOME y observar redimension
+    setTimeout(() => {
+        setAvgPosTeam('HOME');
+        try {
+            const cv = document.getElementById('avgPosCanvas');
+            const container = cv.parentElement;
+            if (!window._avgPosRO) {
+                window._avgPosRO = new ResizeObserver(() => {
+                    drawAvgPos();
+                });
+                window._avgPosRO.observe(container);
+            }
+            // Forzar un primer render cuando el modal ya calculó tamaños
+            requestAnimationFrame(() => drawAvgPos());
+        } catch (e) { console.warn('ResizeObserver AvgPos init error:', e); }
+    }, 100);
 }
 
 function setAvgPosTeam(team) {
