@@ -110,19 +110,20 @@
 
 <header>
     <div class="filters">
-        <div style="display:flex; align-items:center;">
+        <div style="display:flex; align-items:center; gap:4px;">
             <select id="selGK" class="hdr-select" onchange="updateGK()"></select>
-            <button class="btn-edit" onclick="renameGK()">✏️</button>
+            <button class="btn-edit" onclick="renameGK()" title="Renombrar portero">✏️</button>
+            <button class="btn-edit" onclick="addGK()" title="Añadir portero">➕</button>
         </div>
-        <select id="selMatch" class="hdr-select">
-            <option value="single">⭐ Partido Único</option>
-            <optgroup label="Temporada Regular" id="optSeason"></optgroup>
-        </select>
+        <div style="display:flex; align-items:center; gap:4px;">
+            <select id="selMatch" class="hdr-select" onchange="setMatch()"></select>
+            <button class="btn-edit" onclick="addFriendly()" title="Añadir amistoso">+Am</button>
+        </div>
     </div>
     <div class="tools">
         <button class="btn-icon" onclick="toggleView()">📊</button>
         <button class="btn-icon" onclick="downloadCSV()">💾</button>
-        <button class="btn-icon" onclick="resetData()">🗑️</button>
+        <button class="btn-icon" onclick="clearCurrentMatch()" title="Borrar solo este partido/portero">🧹</button>
     </div>
 </header>
 
@@ -149,6 +150,7 @@
             <div class="radar-canvas-container" id="boxRadarCanvas">
                 <canvas id="cvRadar"></canvas>
             </div>
+            <div id="compareList" style="display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px;"></div>
             <div class="radar-stats-container" id="radarStats"></div>
         </div>
     </div>
@@ -201,7 +203,10 @@
 </div>
 
 <script>
-    // --- DATOS ---
+    // --- CONFIG Y ESTADO PERSISTENTE ---
+    const STORAGE_KEY = 'gk_suite_v20';
+    const COLORS = ['#3498db', '#e74c3c', '#f39c12', '#9b59b6', '#2ecc71', '#1abc9c', '#d35400'];
+
     const ACTIONS_DB = {
         "Defensa": { "Blocaje": ["Raso", "Media Altura", "Alto", "Con caída"], "Desvío": ["Mano cambiada", "Mano natural", "Pie", "Rechace Corto"] },
         "Aéreo": { "Salida": ["Puños (1 o 2)", "Blocaje Aéreo", "Prolongación"] },
@@ -209,30 +214,131 @@
         "Ofensivo": { "Distribución": ["Volea", "Bote pronto", "Mano (Béisbol)", "Mano (Jabalina)", "Mano (Rasa)", "Pie (Raso)", "Pie (Largo)", "Apoyo Pie Corto", "Apoyo Pie Largo"] }
     };
 
-    let gkNames = { 1: "Portero 1", 2: "Portero 2" };
-    let state = { gk: 1, match: 'single', pitch: { ox: 50, oy: 10, ax: 50, ay: 80 }, goal: { bx: 50, by: 50, gx: 50, gy: 50 }, modeP: 'org', modeG: 'ball', actions: [], view: 'field' };
-    
+    let store = {
+        gks: [{ id: 1, name: 'Portero 1' }],
+        gk: 1,
+        compare: [1],
+        match: 'single',
+        friends: [],
+        pitch: { ox: 50, oy: 10, ax: 50, ay: 80 },
+        goal: { bx: 50, by: 50, gx: 50, gy: 50 },
+        modeP: 'org',
+        modeG: 'ball',
+        view: 'field',
+        actions: []
+    };
+
     let pendingCat = ""; let pendingKey = ""; let pendingVar = "";
 
-    function init() {
-        const storedNames = localStorage.getItem('gk_names_v16');
-        if(storedNames) gkNames = JSON.parse(storedNames);
-        updateGKSelect();
-        const grp = document.getElementById('optSeason');
-        for(let i=1; i<=38; i++) { let o=document.createElement('option'); o.value=i; o.innerText=`Jornada ${i}`; grp.appendChild(o); }
-        resize();
+    // --- INIT ---
+    function loadStore() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try { store = { ...store, ...JSON.parse(saved) }; } catch {}
+        }
+        if (!store.gk && store.gks.length) store.gk = store.gks[0].id;
+        if (!Array.isArray(store.compare)) store.compare = [store.gk];
+        ensureCompareIncludesCurrent(true);
     }
 
-    function updateGKSelect() {
-        const s = document.getElementById('selGK'); s.innerHTML = '';
-        for(let k in gkNames) { let o = document.createElement('option'); o.value=k; o.innerText=gkNames[k]; s.appendChild(o); }
-        s.value = state.gk;
+    function saveStore() { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+
+    function init() {
+        loadStore();
+        renderGKSelect();
+        renderMatchSelect();
+        renderCompareList();
+        resize();
+        updateLog();
+        if (store.view === 'radar') drawRadar();
     }
+
+    // --- GK MANAGEMENT ---
+    function renderGKSelect() {
+        const s = document.getElementById('selGK');
+        s.innerHTML = '';
+        store.gks.forEach((g) => {
+            const o = document.createElement('option');
+            o.value = g.id; o.innerText = g.name; s.appendChild(o);
+        });
+        s.value = store.gk;
+    }
+
+    function ensureCompareIncludesCurrent(force) {
+        if (force && !store.compare.includes(store.gk)) store.compare.push(store.gk);
+        store.compare = Array.from(new Set(store.compare));
+    }
+
+    function addGK() {
+        const name = prompt('Nombre del portero:');
+        if (!name) return;
+        const id = Date.now();
+        store.gks.push({ id, name: name.trim() });
+        store.gk = id;
+        ensureCompareIncludesCurrent(true);
+        saveStore();
+        renderGKSelect();
+        renderCompareList();
+        updateLog();
+        drawAll();
+    }
+
     function renameGK() {
-        const current = gkNames[state.gk]; const newName = prompt("Nuevo nombre:", current);
-        if(newName && newName.trim() !== "") { gkNames[state.gk] = newName.trim(); localStorage.setItem('gk_names_v16', JSON.stringify(gkNames)); updateGKSelect(); if(state.view === 'radar') drawRadar(); }
+        const current = store.gks.find(g => g.id == store.gk);
+        if (!current) return;
+        const nn = prompt('Nuevo nombre:', current.name);
+        if (nn && nn.trim() !== '') {
+            current.name = nn.trim();
+            saveStore();
+            renderGKSelect();
+            renderCompareList();
+            if (store.view === 'radar') drawRadar();
+        }
     }
-    function updateGK() { state.gk = document.getElementById('selGK').value; if(state.view === 'radar') drawRadar(); }
+
+    function updateGK() {
+        store.gk = parseInt(document.getElementById('selGK').value, 10);
+        ensureCompareIncludesCurrent(true);
+        saveStore();
+        renderCompareList();
+        updateLog();
+        if (store.view === 'radar') drawRadar(); else drawAll();
+    }
+
+    // --- MATCH MANAGEMENT ---
+    function renderMatchSelect() {
+        const s = document.getElementById('selMatch');
+        s.innerHTML = '';
+        const single = document.createElement('option'); single.value = 'single'; single.textContent = '⭐ Partido Único'; s.appendChild(single);
+        const grp = document.createElement('optgroup'); grp.label = 'Temporada Regular';
+        for (let i = 1; i <= 38; i++) { const o = document.createElement('option'); o.value = String(i); o.innerText = `Jornada ${i}`; grp.appendChild(o); }
+        s.appendChild(grp);
+        if (store.friends.length) {
+            const g2 = document.createElement('optgroup'); g2.label = 'Amistosos';
+            store.friends.forEach(f => { const o = document.createElement('option'); o.value = f.id; o.innerText = f.name; g2.appendChild(o); });
+            s.appendChild(g2);
+        }
+        s.value = store.match;
+        if (!s.value) { store.match = 'single'; s.value = store.match; }
+    }
+
+    function addFriendly() {
+        const name = prompt('Nombre del amistoso:');
+        if (!name) return;
+        const id = 'F-' + Date.now();
+        store.friends.push({ id, name: name.trim() });
+        store.match = id;
+        saveStore();
+        renderMatchSelect();
+        setMatch();
+    }
+
+    function setMatch() {
+        store.match = document.getElementById('selMatch').value;
+        saveStore();
+        updateLog();
+        if (store.view === 'radar') drawRadar();
+    }
 
     // --- MENÚS ---
     const modal = document.getElementById('subModal');
@@ -241,7 +347,7 @@
 
     function openMenu(category, actionKey) {
         pendingCat = category; pendingKey = actionKey;
-        modalTitle.innerText = `${actionKey}`; 
+        modalTitle.innerText = `${actionKey}`;
         let html = '<div class="sub-grid">';
         ACTIONS_DB[category][actionKey].forEach(variant => { html += `<button class="btn-sub" onclick="askResult('${variant}')">${variant}</button>`; });
         html += '</div>';
@@ -252,9 +358,8 @@
     function askResult(variant) {
         pendingVar = variant;
         modalTitle.innerText = `RESULTADO Y XGOT`;
-        
-        let showXgot = (pendingCat === 'Defensa' || pendingCat === 'Duelo');
-        
+
+        const showXgot = (pendingCat === 'Defensa' || pendingCat === 'Duelo');
         let html = `
             <div class="res-grid">
                 <button class="btn-res res-ok" onclick="finalSave('OK')">✅ PARADA / ÉXITO</button>
@@ -262,7 +367,7 @@
             </div>
         `;
 
-        if(showXgot) {
+        if (showXgot) {
             html += `
             <div class="xgot-container">
                 <label class="xgot-label">Valor xGOT (Probabilidad de Gol 0.00 - 0.99)</label>
@@ -274,17 +379,17 @@
         }
 
         modalContent.innerHTML = html;
-        setTimeout(() => { 
-            const inp = document.getElementById('inputXGOT'); 
-            if(inp && inp.type !== 'hidden') inp.focus(); 
-        }, 100);
+        setTimeout(() => {
+            const inp = document.getElementById('inputXGOT');
+            if (inp && inp.type !== 'hidden') inp.focus();
+        }, 120);
     }
 
     function registerDirect(cat, action, res) {
         pendingCat = cat; pendingKey = action; pendingVar = '-';
-        if(cat === 'Defensa' || cat === 'Duelo' || action.includes('Fallo')) {
-             modalTitle.innerText = `${action}`;
-             let html = `
+        if (cat === 'Defensa' || cat === 'Duelo' || action.toLowerCase().includes('fallo')) {
+            modalTitle.innerText = `${action}`;
+            const html = `
                 <div style="text-align:center; margin-bottom:10px; color:#ccc;">Introduce el xGOT de esta jugada</div>
                 <div class="xgot-container">
                     <label class="xgot-label">xGOT (0.00 - 0.99)</label>
@@ -294,110 +399,145 @@
             `;
             modalContent.innerHTML = html;
             modal.classList.add('open');
-            setTimeout(() => { document.getElementById('inputXGOT').focus(); }, 100);
+            setTimeout(() => { document.getElementById('inputXGOT').focus(); }, 120);
         } else {
             saveAction(cat, action, '-', res, 0);
         }
     }
 
-    function finalSave(result) { 
+    function finalSave(result) {
         const inp = document.getElementById('inputXGOT');
         let xgVal = 0;
-        if(inp && inp.value !== "") xgVal = parseFloat(inp.value);
-        if(isNaN(xgVal)) xgVal = 0;
-        closeModal(); 
-        saveAction(pendingCat, pendingKey, pendingVar, result, xgVal); 
+        if (inp && inp.value !== "") xgVal = parseFloat(inp.value);
+        if (isNaN(xgVal)) xgVal = 0;
+        closeModal();
+        saveAction(pendingCat, pendingKey, pendingVar, result, xgVal);
     }
 
     function closeModal(e) { if (!e || e.target === modal || e.target.classList.contains('btn-close')) modal.classList.remove('open'); }
 
+    // --- DATA OPS ---
     function saveAction(cat, key, variant, result, xgot) {
-        state.match = document.getElementById('selMatch').value;
-        const act = { id: Date.now(), gk: state.gk, match: state.match, cat: cat, key: key, var: variant, res: result, xgot: xgot };
-        state.actions.unshift(act);
-        updateLog(); if(state.view === 'field') drawAll(); else drawRadar(); 
+        const act = { id: Date.now(), gk: store.gk, match: store.match, cat, key, var: variant, res: result, xgot: xgot || 0, pitch: { ...store.pitch }, goal: { ...store.goal } };
+        store.actions.unshift(act);
+        saveStore();
+        updateLog();
+        if (store.view === 'radar') drawRadar(); else drawAll();
     }
 
-    function deleteAction(id) { if(confirm("¿Eliminar acción?")) { state.actions = state.actions.filter(a => a.id !== id); updateLog(); if(state.view === 'radar') drawRadar(); } }
+    function deleteAction(id) {
+        if (!confirm('¿Eliminar acción?')) return;
+        store.actions = store.actions.filter(a => a.id !== id);
+        saveStore();
+        updateLog();
+        if (store.view === 'radar') drawRadar();
+    }
+
+    function clearCurrentMatch() {
+        if (!confirm('¿Borrar solo las acciones de este partido y portero?')) return;
+        store.actions = store.actions.filter(a => !(a.gk == store.gk && a.match === store.match));
+        saveStore();
+        updateLog();
+        if (store.view === 'radar') drawRadar();
+    }
 
     function updateLog() {
-        document.getElementById('logTable').innerHTML = state.actions.map(a => {
-            let col = a.res === 'OK' ? '#2ecc71' : '#e74c3c';
-            let xgShow = (a.cat === 'Defensa' || a.cat === 'Duelo') ? `<b>${a.xgot.toFixed(2)}</b>` : '-';
-            return `<tr><td style="color:#c0392b;cursor:pointer;font-weight:bold" onclick="deleteAction(${a.id})">×</td><td>${a.match === 'single' ? '⭐' : 'J'+a.match}</td><td><b>${a.key}</b></td><td>${a.var}</td><td>${xgShow}</td><td style="color:${col}; font-weight:bold">${a.res}</td></tr>`;
-        }).join('');
+        const tbody = document.getElementById('logTable');
+        tbody.innerHTML = '';
+        store.actions
+            .filter(a => a.gk == store.gk && a.match === store.match)
+            .forEach(a => {
+                const tr = document.createElement('tr');
+                const col = a.res === 'OK' ? '#2ecc71' : '#e74c3c';
+                const xgShow = (a.cat === 'Defensa' || a.cat === 'Duelo') ? `<b>${(a.xgot || 0).toFixed(2)}</b>` : '-';
+                tr.innerHTML = `<td style="color:#c0392b;cursor:pointer;font-weight:bold" onclick="deleteAction(${a.id})">×</td><td>${a.match === 'single' ? '⭐' : 'J'+a.match}</td><td><b>${a.key}</b></td><td>${a.var}</td><td>${xgShow}</td><td style="color:${col}; font-weight:bold">${a.res}</td>`;
+                tbody.appendChild(tr);
+            });
     }
 
+    // --- VIEW SWITCH ---
     function toggleView() {
-        state.view = (state.view === 'field') ? 'radar' : 'field';
-        document.getElementById('viewField').style.display = (state.view === 'field') ? 'flex' : 'none';
+        store.view = (store.view === 'field') ? 'radar' : 'field';
+        document.getElementById('viewField').style.display = (store.view === 'field') ? 'flex' : 'none';
         const radarDiv = document.getElementById('viewRadar');
-        radarDiv.classList.toggle('active', state.view === 'radar');
-        if(state.view === 'radar') setTimeout(drawRadar, 100); else resize();
+        radarDiv.classList.toggle('active', store.view === 'radar');
+        if (store.view === 'radar') setTimeout(drawRadar, 120); else resize();
+        saveStore();
     }
 
     const cvP = document.getElementById('cvPitch'); const cvG = document.getElementById('cvGoal');
 
     function resize() {
-        if(state.view !== 'field') return;
+        if (store.view !== 'field') return;
         cvP.width = cvP.parentElement.clientWidth; cvP.height = cvP.parentElement.clientHeight;
         cvG.width = cvG.parentElement.clientWidth; cvG.height = cvG.parentElement.clientHeight;
         drawAll();
     }
-    window.onresize = resize; setTimeout(resize, 100);
+    window.onresize = resize; setTimeout(resize, 120);
 
     function setMode(canvas, m) {
-        if(canvas==='pitch') { state.modeP=m; document.getElementById('mPitchOrg').className=`mode-opt ${m=='org'?'active':''}`; document.getElementById('mPitchAct').className=`mode-opt ${m=='act'?'active':''}`; }
-        if(canvas==='goal') { state.modeG=m; document.getElementById('mGoalBall').className=`mode-opt ${m=='ball'?'active':''}`; document.getElementById('mGoalGK').className=`mode-opt ${m=='gk'?'active':''}`; }
+        if (canvas === 'pitch') {
+            store.modeP = m;
+            document.getElementById('mPitchOrg').className = `mode-opt ${m === 'org' ? 'active' : ''}`;
+            document.getElementById('mPitchAct').className = `mode-opt ${m === 'act' ? 'active' : ''}`;
+        }
+        if (canvas === 'goal') {
+            store.modeG = m;
+            document.getElementById('mGoalBall').className = `mode-opt ${m === 'ball' ? 'active' : ''}`;
+            document.getElementById('mGoalGK').className = `mode-opt ${m === 'gk' ? 'active' : ''}`;
+        }
+        saveStore();
     }
 
     function touchHandler(e, cvType) {
-        if(state.view !== 'field') return;
+        if (store.view !== 'field') return;
         e.preventDefault();
         const cv = e.target; const rect = cv.getBoundingClientRect();
         const t = e.changedTouches ? e.changedTouches[0] : e;
         const x = (t.clientX - rect.left) / rect.width * 100;
         const y = (t.clientY - rect.top) / rect.height * 100;
-        if (cvType === 'pitch') { if (state.modeP === 'org') { state.pitch.ox = x; state.pitch.oy = y; } else { state.pitch.ax = x; state.pitch.ay = y; } } 
-        else { if (state.modeG === 'ball') { state.goal.bx = x; state.goal.by = y; } else { state.goal.gx = x; state.goal.gy = y; } }
+        if (cvType === 'pitch') { if (store.modeP === 'org') { store.pitch.ox = x; store.pitch.oy = y; } else { store.pitch.ax = x; store.pitch.ay = y; } }
+        else { if (store.modeG === 'ball') { store.goal.bx = x; store.goal.by = y; } else { store.goal.gx = x; store.goal.gy = y; } }
+        saveStore();
         drawAll();
     }
     [cvP, cvG].forEach(c => {
-        c.addEventListener('mousedown', e => touchHandler(e, c===cvP?'pitch':'goal'));
-        c.addEventListener('touchstart', e => touchHandler(e, c===cvP?'pitch':'goal'), {passive:false});
-        c.addEventListener('touchmove', e => touchHandler(e, c===cvP?'pitch':'goal'), {passive:false});
+        c.addEventListener('mousedown', e => touchHandler(e, c === cvP ? 'pitch' : 'goal'));
+        c.addEventListener('touchstart', e => touchHandler(e, c === cvP ? 'pitch' : 'goal'), { passive: false });
+        c.addEventListener('touchmove', e => touchHandler(e, c === cvP ? 'pitch' : 'goal'), { passive: false });
     });
 
+    // --- DRAW FIELD & GOAL ---
     function drawAll() {
         const ctxP = cvP.getContext('2d'); const w = cvP.width, h = cvP.height; const m = h / 60; const fw = 68 * m; const sx = (w - fw) / 2; const ty = 10;
         ctxP.fillStyle = "#388e3c"; ctxP.fillRect(0,0,w,h);
-        ctxP.fillStyle = "rgba(0,0,0,0.05)"; for(let i=0; i<h; i+=5.5*m*2) ctxP.fillRect(0,i,w,5.5*m);
-        ctxP.lineWidth=2; ctxP.strokeStyle="rgba(255,255,255,0.7)";
-        ctxP.strokeRect(sx, ty, fw, h-ty); ctxP.strokeRect(sx + (fw - 40.32*m)/2, ty, 40.32*m, 16.5*m); ctxP.strokeRect(sx + (fw - 18.32*m)/2, ty, 18.32*m, 5.5*m);
-        ctxP.beginPath(); ctxP.arc(w/2, ty + 11*m, 2, 0, Math.PI*2); ctxP.fillStyle="#fff"; ctxP.fill(); ctxP.stroke();
-        ctxP.beginPath(); ctxP.arc(w/2, ty + 11*m, 9.15*m, 0.65, Math.PI - 0.65); ctxP.stroke();
+        ctxP.fillStyle = "rgba(0,0,0,0.05)"; for (let i = 0; i < h; i += 5.5 * m * 2) ctxP.fillRect(0, i, w, 5.5 * m);
+        ctxP.lineWidth = 2; ctxP.strokeStyle = "rgba(255,255,255,0.7)";
+        ctxP.strokeRect(sx, ty, fw, h - ty); ctxP.strokeRect(sx + (fw - 40.32 * m) / 2, ty, 40.32 * m, 16.5 * m); ctxP.strokeRect(sx + (fw - 18.32 * m) / 2, ty, 18.32 * m, 5.5 * m);
+        ctxP.beginPath(); ctxP.arc(w / 2, ty + 11 * m, 2, 0, Math.PI * 2); ctxP.fillStyle = "#fff"; ctxP.fill(); ctxP.stroke();
+        ctxP.beginPath(); ctxP.arc(w / 2, ty + 11 * m, 9.15 * m, 0.65, Math.PI - 0.65); ctxP.stroke();
 
-        ctxP.beginPath(); ctxP.moveTo(state.pitch.ox/100*w, state.pitch.oy/100*h); ctxP.lineTo(state.pitch.ax/100*w, state.pitch.ay/100*h);
-        ctxP.setLineDash([5,5]); ctxP.strokeStyle="rgba(255,255,255,0.6)"; ctxP.stroke(); ctxP.setLineDash([]);
-        ctxP.beginPath(); ctxP.arc(state.pitch.ox/100*w, state.pitch.oy/100*h, 6, 0, Math.PI*2); ctxP.fillStyle="#f1c40f"; ctxP.fill(); 
-        ctxP.beginPath(); ctxP.arc(state.pitch.ax/100*w, state.pitch.ay/100*h, 6, 0, Math.PI*2); ctxP.fillStyle="#3498db"; ctxP.fill();
+        ctxP.beginPath(); ctxP.moveTo(store.pitch.ox / 100 * w, store.pitch.oy / 100 * h); ctxP.lineTo(store.pitch.ax / 100 * w, store.pitch.ay / 100 * h);
+        ctxP.setLineDash([5, 5]); ctxP.strokeStyle = "rgba(255,255,255,0.6)"; ctxP.stroke(); ctxP.setLineDash([]);
+        ctxP.beginPath(); ctxP.arc(store.pitch.ox / 100 * w, store.pitch.oy / 100 * h, 6, 0, Math.PI * 2); ctxP.fillStyle = "#f1c40f"; ctxP.fill();
+        ctxP.beginPath(); ctxP.arc(store.pitch.ax / 100 * w, store.pitch.ay / 100 * h, 6, 0, Math.PI * 2); ctxP.fillStyle = "#3498db"; ctxP.fill();
 
         const ctxG = cvG.getContext('2d'); const gw = cvG.width, gh = cvG.height;
-        ctxG.clearRect(0,0,gw,gh); ctxG.fillStyle = "#444"; ctxG.fillRect(0,0,gw,gh);
-        const mx=gw*0.2, my=gh*0.25, fy=gh-30, gx=mx, gy=my, g_w=gw-mx*2, g_h=fy-my;
-        ctxG.fillStyle="#222"; ctxG.fillRect(0,0,gw,fy); ctxG.fillStyle="#27ae60"; ctxG.fillRect(0,fy,gw,gh-fy);
-        ctxG.fillStyle="rgba(255,255,255,0.1)"; ctxG.fillRect(gx,gy,g_w,g_h);
-        ctxG.strokeStyle="#ecf0f1"; ctxG.lineWidth=6; ctxG.lineJoin="round";
-        ctxG.beginPath(); ctxG.moveTo(gx,fy); ctxG.lineTo(gx,gy); ctxG.lineTo(gx+g_w,gy); ctxG.lineTo(gx+g_w,fy); ctxG.stroke();
-        
-        drawGKBody(ctxG, state.goal.gx/100*gw, state.goal.gy/100*gh, g_h*0.75, '#3498db');
+        ctxG.clearRect(0, 0, gw, gh); ctxG.fillStyle = "#444"; ctxG.fillRect(0, 0, gw, gh);
+        const mx = gw * 0.2, my = gh * 0.25, fy = gh - 30, gx = mx, gy = my, g_w = gw - mx * 2, g_h = fy - my;
+        ctxG.fillStyle = "#222"; ctxG.fillRect(0, 0, gw, fy); ctxG.fillStyle = "#27ae60"; ctxG.fillRect(0, fy, gw, gh - fy);
+        ctxG.fillStyle = "rgba(255,255,255,0.1)"; ctxG.fillRect(gx, gy, g_w, g_h);
+        ctxG.strokeStyle = "#ecf0f1"; ctxG.lineWidth = 6; ctxG.lineJoin = "round";
+        ctxG.beginPath(); ctxG.moveTo(gx, fy); ctxG.lineTo(gx, gy); ctxG.lineTo(gx + g_w, gy); ctxG.lineTo(gx + g_w, fy); ctxG.stroke();
 
-        ctxG.beginPath(); ctxG.arc(state.goal.bx/100*gw, state.goal.by/100*gh, 7, 0, Math.PI*2); ctxG.fillStyle="#e67e22"; ctxG.fill(); ctxG.strokeStyle="#fff"; ctxG.lineWidth=2; ctxG.stroke();
+        drawGKBody(ctxG, store.goal.gx / 100 * gw, store.goal.gy / 100 * gh, g_h * 0.75, '#3498db');
+
+        ctxG.beginPath(); ctxG.arc(store.goal.bx / 100 * gw, store.goal.by / 100 * gh, 7, 0, Math.PI * 2); ctxG.fillStyle = "#e67e22"; ctxG.fill(); ctxG.strokeStyle = "#fff"; ctxG.lineWidth = 2; ctxG.stroke();
     }
 
     function drawGKBody(ctx, x, y, h, col) {
-        ctx.save(); ctx.translate(x, y); var s = h / 120; ctx.scale(s * 0.7, s); ctx.fillStyle = col;
-        ctx.beginPath(); ctx.arc(0, -50, 11, 0, Math.PI*2);
+        ctx.save(); ctx.translate(x, y); const s = h / 120; ctx.scale(s * 0.7, s); ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(0, -50, 11, 0, Math.PI * 2);
         ctx.moveTo(-22, -35); ctx.lineTo(22, -35); ctx.lineTo(42, -10); ctx.lineTo(52, 10); ctx.lineTo(42, 14); ctx.lineTo(32, 0); ctx.lineTo(10, 15);
         ctx.lineTo(30, 40); ctx.lineTo(35, 60); ctx.lineTo(25, 60); ctx.lineTo(15, 40); ctx.lineTo(2, 25); ctx.lineTo(-2, 25);
         ctx.lineTo(-15, 40); ctx.lineTo(-25, 60); ctx.lineTo(-35, 60); ctx.lineTo(-30, 40); ctx.lineTo(-10, 15);
@@ -405,101 +545,126 @@
         ctx.fill(); ctx.restore();
     }
 
+    // --- RADAR ---
+    function renderCompareList() {
+        const c = document.getElementById('compareList');
+        if (!c) return;
+        c.innerHTML = '';
+        store.gks.forEach((g, i) => {
+            const wrap = document.createElement('div');
+            wrap.style = `display:flex;align-items:center;gap:6px;background:#222;padding:4px 8px;border-radius:10px;border:1px solid ${COLORS[i % COLORS.length]}`;
+            const dot = document.createElement('span'); dot.style = `width:10px;height:10px;border-radius:50%;background:${COLORS[i % COLORS.length]}`;
+            const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = store.compare.includes(g.id); chk.onclick = () => toggleCompare(g.id);
+            const lbl = document.createElement('span'); lbl.style = 'color:#ccc;font-size:0.75rem;'; lbl.innerText = g.name;
+            wrap.appendChild(dot); wrap.appendChild(chk); wrap.appendChild(lbl); c.appendChild(wrap);
+        });
+    }
+
+    function toggleCompare(id) {
+        if (store.compare.includes(id)) store.compare = store.compare.filter(c => c !== id); else store.compare.push(id);
+        ensureCompareIncludesCurrent(true);
+        saveStore();
+        renderCompareList();
+        if (store.view === 'radar') drawRadar();
+    }
+
+    function collectStatsForGK(id) {
+        const stats = { saves: { ok: 0, tot: 0 }, air: { ok: 0, tot: 0 }, foot: { ok: 0, tot: 0 }, hand: { ok: 0, tot: 0 }, xg_total: 0, goals_conceded: 0 };
+        store.actions.forEach(a => {
+            if (a.gk != id) return;
+            if (a.cat === 'Defensa' || a.cat === 'Duelo') { stats.saves.tot++; if (a.res === 'OK') stats.saves.ok++; stats.xg_total += (a.xgot || 0); if (a.res === 'KO') stats.goals_conceded++; }
+            if (a.cat === 'Aéreo') { stats.air.tot++; if (a.res === 'OK') stats.air.ok++; }
+            if (a.cat === 'Ofensivo') {
+                if ((a.var || '').includes('Pie') || (a.var || '').includes('Volea') || (a.var || '').includes('Bote')) {
+                    stats.foot.tot++; if (a.res === 'OK') stats.foot.ok++;
+                } else {
+                    stats.hand.tot++; if (a.res === 'OK') stats.hand.ok++;
+                }
+            }
+        });
+        const pct = (o) => o.tot > 0 ? (o.ok / o.tot) : 0;
+        const psxgRaw = stats.xg_total - stats.goals_conceded;
+        let psxgNorm = 0.5 + (psxgRaw / 3.0); psxgNorm = Math.max(0.1, Math.min(1, psxgNorm));
+        return { data: [pct(stats.saves), pct(stats.foot), pct(stats.hand), pct(stats.air), psxgNorm], stats, psxgRaw };
+    }
+
     function drawRadar() {
-        const box = document.getElementById('boxRadarCanvas'); 
+        const box = document.getElementById('boxRadarCanvas');
         const cv = document.getElementById('cvRadar');
         cv.width = box.clientWidth; cv.height = box.clientHeight;
         const ctx = cv.getContext('2d');
         const w = cv.width, h = cv.height;
-        const cx = w/2, cy = h/2, r = Math.min(w,h)*0.35;
+        const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.35;
 
-        // Stats Calculation
-        let stats = { saves: {ok:0, tot:0}, air: {ok:0, tot:0}, foot: {ok:0, tot:0}, hand: {ok:0, tot:0}, xg_total: 0, goals_conceded: 0 };
-        
-        state.actions.forEach(a => {
-            if(a.gk != state.gk) return;
-            // % Stats
-            if(a.cat === 'Defensa' || a.cat === 'Duelo') { stats.saves.tot++; if(a.res === 'OK') stats.saves.ok++; }
-            if(a.cat === 'Aéreo') { stats.air.tot++; if(a.res === 'OK') stats.air.ok++; }
-            if(a.cat === 'Ofensivo') {
-                if(a.var.includes('Pie') || a.var.includes('Volea') || a.var.includes('Bote')) { 
-                    stats.foot.tot++; if(a.res === 'OK') stats.foot.ok++; 
-                } else { 
-                    stats.hand.tot++; if(a.res === 'OK') stats.hand.ok++; 
-                }
-            }
-            // PSxG Calc
-            if(a.cat === 'Defensa' || a.cat === 'Duelo') {
-                stats.xg_total += (a.xgot || 0);
-                if(a.res === 'KO') stats.goals_conceded++;
-            }
-        });
+        ctx.clearRect(0, 0, w, h);
+        ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.fillStyle = "#aaa"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
 
-        const getPct = (o) => o.tot > 0 ? (o.ok/o.tot) : 0;
-        
-        // PSxG Logic
-        let psxgRaw = stats.xg_total - stats.goals_conceded;
-        let psxgNorm = 0.5 + (psxgRaw / 3.0); 
-        if(psxgNorm > 1) psxgNorm = 1; if(psxgNorm < 0.1) psxgNorm = 0.1;
-
-        const data = [getPct(stats.saves), getPct(stats.foot), getPct(stats.hand), getPct(stats.air), psxgNorm];
         const labels = ["PARADAS", "J. PIE", "J. MANO", "AÉREO", "PSxG +/-"];
-
-        // Draw Radar Background (Pentagon)
-        ctx.clearRect(0,0,w,h);
-        ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.fillStyle="#aaa"; ctx.font="bold 10px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-        
         const sides = 5;
-        for(let level=1; level<=4; level++) {
+        for (let level = 1; level <= 4; level++) {
             ctx.beginPath();
-            for(let i=0; i<sides; i++) { 
-                let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
-                let rad = r * (level/4); 
-                let x = cx + Math.cos(ang)*rad, y = cy + Math.sin(ang)*rad; 
-                if(i==0) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
+            for (let i = 0; i < sides; i++) {
+                const ang = (Math.PI * 2 * i) / sides - Math.PI / 2;
+                const rad = r * (level / 4);
+                const x = cx + Math.cos(ang) * rad, y = cy + Math.sin(ang) * rad;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             }
             ctx.closePath(); ctx.stroke();
         }
-
-        // Labels
-        for(let i=0; i<sides; i++) { 
-            let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
-            let x = cx + Math.cos(ang)*(r+25), y = cy + Math.sin(ang)*(r+25); 
-            ctx.fillText(labels[i], x, y); 
+        for (let i = 0; i < sides; i++) {
+            const ang = (Math.PI * 2 * i) / sides - Math.PI / 2;
+            const x = cx + Math.cos(ang) * (r + 24), y = cy + Math.sin(ang) * (r + 24);
+            ctx.fillText(labels[i], x, y);
         }
 
-        // Draw Data Polygon
-        ctx.beginPath();
-        for(let i=0; i<sides; i++) { 
-            let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
-            let val = Math.max(0.1, data[i]); 
-            let x = cx + Math.cos(ang)*(r*val), y = cy + Math.sin(ang)*(r*val); 
-            if(i==0) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
-        }
-        ctx.closePath(); ctx.strokeStyle = "#3498db"; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = "rgba(52, 152, 219, 0.4)"; ctx.fill();
+        // Polígonos comparados
+        store.compare.forEach((id, idx) => {
+            const { data } = collectStatsForGK(id);
+            ctx.beginPath();
+            for (let i = 0; i < sides; i++) {
+                const ang = (Math.PI * 2 * i) / sides - Math.PI / 2;
+                const val = Math.max(0.1, data[i]);
+                const x = cx + Math.cos(ang) * (r * val);
+                const y = cy + Math.sin(ang) * (r * val);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            const col = COLORS[idx % COLORS.length];
+            ctx.strokeStyle = col; ctx.lineWidth = (id == store.gk) ? 3 : 1.5; ctx.stroke();
+            ctx.fillStyle = col + '33'; ctx.fill();
+        });
 
-        // Render Stats Grid
-        let psxgColor = psxgRaw >= 0 ? '#2ecc71' : '#e74c3c';
-        let psxgSign = psxgRaw > 0 ? '+' : '';
-        
+        // Stats del GK activo
+        const activeStats = collectStatsForGK(store.gk);
+        const s = activeStats.stats;
+        const psxgRaw = activeStats.psxgRaw;
+        const psxgColor = psxgRaw >= 0 ? '#2ecc71' : '#e74c3c';
+        const psxgSign = psxgRaw > 0 ? '+' : '';
+
         document.getElementById('radarStats').innerHTML = `
-            <div class="stat-box"><span class="stat-lbl">PARADAS</span><span class="stat-val" style="color:#2ecc71">${Math.round(data[0]*100)}%</span><small>${stats.saves.ok}/${stats.saves.tot}</small></div>
-            <div class="stat-box"><span class="stat-lbl">J. PIE</span><span class="stat-val" style="color:#3498db">${Math.round(data[1]*100)}%</span><small>${stats.foot.ok}/${stats.foot.tot}</small></div>
-            <div class="stat-box"><span class="stat-lbl">J. MANO</span><span class="stat-val" style="color:#9b59b6">${Math.round(data[2]*100)}%</span><small>${stats.hand.ok}/${stats.hand.tot}</small></div>
-            <div class="stat-box"><span class="stat-lbl">AÉREO</span><span class="stat-val" style="color:#f39c12">${Math.round(data[3]*100)}%</span><small>${stats.air.ok}/${stats.air.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">PARADAS</span><span class="stat-val" style="color:#2ecc71">${Math.round(activeStats.data[0]*100)}%</span><small>${s.saves.ok}/${s.saves.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">J. PIE</span><span class="stat-val" style="color:#3498db">${Math.round(activeStats.data[1]*100)}%</span><small>${s.foot.ok}/${s.foot.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">J. MANO</span><span class="stat-val" style="color:#9b59b6">${Math.round(activeStats.data[2]*100)}%</span><small>${s.hand.ok}/${s.hand.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">AÉREO</span><span class="stat-val" style="color:#f39c12">${Math.round(activeStats.data[3]*100)}%</span><small>${s.air.ok}/${s.air.tot}</small></div>
             <div class="stat-box box-psxg">
                 <div><span class="stat-lbl">GOLES EVITADOS (PSxG)</span><span class="stat-val" style="color:${psxgColor}">${psxgSign}${psxgRaw.toFixed(2)}</span></div>
-                <div style="text-align:right"><span class="stat-lbl">xGOT RECIBIDO</span><span class="stat-val" style="font-size:0.9rem">${stats.xg_total.toFixed(2)}</span></div>
+                <div style="text-align:right"><span class="stat-lbl">xGOT RECIBIDO</span><span class="stat-val" style="font-size:0.9rem">${s.xg_total.toFixed(2)}</span></div>
             </div>
         `;
     }
 
+    // --- EXPORT ---
     function downloadCSV() {
         let csv = "Jornada,Portero,Categoria,Accion,Variante,Res,xGOT\n";
-        state.actions.forEach(a => { let gkName = gkNames[a.gk] || ("GK "+a.gk); let matchLabel = a.match === 'single' ? 'Partido Unico' : 'J'+a.match; csv += `${matchLabel},${gkName},${a.cat},${a.key},${a.var},${a.res},${a.xgot||0}\n` });
-        const b = new Blob([csv], {type:'text/csv'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'GK_Data_Elite.csv'; a.click();
+        store.actions.forEach(a => {
+            const gkName = (store.gks.find(g => g.id == a.gk)?.name) || ('GK ' + a.gk);
+            const matchLabel = a.match === 'single' ? 'Partido Unico' : a.match;
+            csv += `${matchLabel},${gkName},${a.cat},${a.key},${a.var},${a.res},${a.xgot || 0}\n`;
+        });
+        const b = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b); a.download = 'GK_Data_Elite.csv'; a.click();
     }
-    function resetData() { if(confirm('¿Borrar datos?')) { state.actions = []; updateLog(); if(state.view==='radar') drawRadar(); } }
 
     init();
 </script>
