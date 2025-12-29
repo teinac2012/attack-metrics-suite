@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GK Elite Pro v19.6 - xGOT Fixed</title>
+    <style>
+        /* --- ESTILOS BASE --- */
+        :root {
+            --bg: #121212; --card: #1e1e24; --border: #333;
+            --accent: #9b59b6; --success: #27ae60; --danger: #c0392b; --warn: #f39c12; --info: #2980b9;
+            --text: #ecf0f1; --field: #388e3c;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header { min-height: 50px; background: #000; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 8px; flex-shrink: 0; gap: 5px;}
+        .filters { display: flex; gap: 6px; align-items: center; flex: 1; }
+        .hdr-select { background: #222; color: #fff; border: 1px solid #444; padding: 6px; border-radius: 6px; font-weight: bold; max-width: 120px;}
+        .btn-icon { background: #2d3436; border: 1px solid #444; color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; }
+        .btn-edit { padding: 4px 8px; font-size: 0.8rem; background: #444; border: 1px solid #666; color: #fff; border-radius: 4px; cursor: pointer; margin-right: 5px;}
+
+        /* LAYOUT */
+        .layout { display: flex; flex: 1; overflow: hidden; height: 100%; position: relative; }
+        .view-container { flex: 55; display: flex; flex-direction: column; border-right: 1px solid var(--border); padding: 5px; gap: 5px; background: #000; position: relative;}
+        .ctrl-col { flex: 45; background: var(--card); display: flex; flex-direction: column; min-width: 300px; overflow-y: auto; }
+
+        /* VISTAS */
+        #viewField { display: flex; flex-direction: column; gap: 5px; height: 100%; width: 100%; }
+        
+        #viewRadar { 
+            display: none; flex-direction: column; height: 100%; width: 100%; 
+            background: #151515; padding: 10px; overflow-y: auto; 
+        }
+        #viewRadar.active { display: flex; }
+        
+        .radar-canvas-container { flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center; width: 100%; }
+        
+        /* GRID DE ESTADISTICAS */
+        .radar-stats-container { flex-shrink: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-top: 10px; width: 100%; }
+        .stat-box { background: #222; padding: 6px; border-radius: 6px; border: 1px solid #444; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 55px;}
+        .stat-val { font-size: 1rem; font-weight: bold; display: block; margin-bottom: 2px; }
+        .stat-lbl { font-size: 0.6rem; color: #aaa; text-transform: uppercase; }
+        
+        /* Celdas específicas */
+        .box-psxg { grid-column: span 3; background: #1a1a20; border: 1px solid #555; flex-direction: row; align-items: center; justify-content: space-around; gap: 10px;}
+        .box-psxg .stat-val { font-size: 1.4rem; }
+
+        /* CAMPOS CANVAS */
+        .canvas-box { position: relative; width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid #444; background: #222; flex-shrink: 0; touch-action: none; }
+        #boxPitch { height: 50%; background: var(--field); }
+        #boxGoal { height: 35%; background: #333; }
+        canvas { width: 100%; height: 100%; display: block; }
+        
+        .mode-switch { position: absolute; top: 5px; right: 5px; display: flex; background: rgba(0,0,0,0.8); border-radius: 6px; border: 1px solid #555; z-index: 10; }
+        .mode-opt { padding: 4px 8px; font-size: 0.65rem; font-weight: bold; color: #aaa; cursor: pointer; }
+        .mode-opt.active { background: #f1c40f; color: #000; }
+
+        /* CONTROLES */
+        .scroll-area { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .ctrl-panel { background: #2d2d2d; padding: 8px; border-radius: 8px; border: 1px solid #3a3a3a; }
+        .panel-header { font-size: 0.7rem; color: var(--accent); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #444; padding-bottom: 4px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+        .btn { padding: 0; border: none; border-radius: 6px; color: #fff; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.1s; font-size: 0.8rem; min-height: 44px; box-shadow: 0 2px 0 rgba(0,0,0,0.3); position: relative; }
+        .btn:active { transform: translateY(2px); box-shadow: none; }
+        .btn small { font-size: 0.6rem; opacity: 0.7; font-weight: normal; margin-top: 2px; }
+        
+        .b-def { background: #27ae60; } .b-aer { background: #e67e22; } .b-duel { background: #c0392b; } .b-off { background: #2980b9; } .b-aux { background: #555; border: 1px dashed #777; }
+
+        /* MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: #1e1e24; border: 1px solid #555; width: 90%; max-width: 400px; border-radius: 12px; padding: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: column; gap: 10px; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .modal-title { text-align: center; color: var(--accent); font-weight: bold; font-size: 1.1rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 8px;}
+        .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-sub { background: #333; border: 1px solid #555; color: #eee; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; }
+        .btn-sub:active { background: var(--accent); color: #fff; }
+        
+        .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+        .btn-res { padding: 15px; border-radius: 8px; border: none; font-weight: bold; font-size: 1rem; color: #fff; cursor: pointer; }
+        .res-ok { background: #27ae60; border: 2px solid #2ecc71; } 
+        .res-ko { background: #c0392b; border: 2px solid #e74c3c; } 
+        .btn-close { width: 100%; background: transparent; border: 1px solid #444; color: #888; padding: 8px; border-radius: 6px; cursor: pointer;}
+
+        /* INPUT XGOT */
+        .xgot-container { margin: 5px 0; background: #111; padding: 10px; border-radius: 8px; border: 1px solid #444; }
+        .xgot-label { display: block; text-align: center; color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .xgot-input { width: 100%; background: #222; color: #f1c40f; border: 1px solid #555; padding: 10px; font-size: 1.5rem; font-weight: bold; text-align: center; border-radius: 6px; outline: none; }
+        .xgot-input:focus { border-color: #f1c40f; }
+
+        /* LOG */
+        .log-area { flex: 0 0 120px; background: #111; border-top: 1px solid var(--border); overflow-y: auto; font-size: 0.7rem; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 4px 6px; text-align: left; border-bottom: 1px solid #222; }
+        th { background: #222; position: sticky; top: 0; }
+
+        @media (max-width: 900px) {
+            .layout { flex-direction: column; }
+            .view-container { flex: none; height: auto; padding: 5px; min-height: 350px;}
+            #boxPitch { height: 200px; } #boxGoal { height: 150px; }
+            .ctrl-col { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="filters">
+        <div style="display:flex; align-items:center;">
+            <select id="selGK" class="hdr-select" onchange="updateGK()"></select>
+            <button class="btn-edit" onclick="renameGK()">✏️</button>
+        </div>
+        <select id="selMatch" class="hdr-select">
+            <option value="single">⭐ Partido Único</option>
+            <optgroup label="Temporada Regular" id="optSeason"></optgroup>
+        </select>
+    </div>
+    <div class="tools">
+        <button class="btn-icon" onclick="toggleView()">📊</button>
+        <button class="btn-icon" onclick="downloadCSV()">💾</button>
+        <button class="btn-icon" onclick="resetData()">🗑️</button>
+    </div>
+</header>
+
+<div class="layout">
+    <div class="view-container">
+        <div id="viewField">
+            <div class="canvas-box" id="boxPitch">
+                <div class="mode-switch">
+                    <div class="mode-opt active" id="mPitchOrg" onclick="setMode('pitch','org')">ORIGEN</div>
+                    <div class="mode-opt" id="mPitchAct" onclick="setMode('pitch','act')">ACCIÓN</div>
+                </div>
+                <canvas id="cvPitch"></canvas>
+            </div>
+            <div class="canvas-box" id="boxGoal">
+                <div class="mode-switch">
+                    <div class="mode-opt active" id="mGoalBall" onclick="setMode('goal','ball')">BALÓN</div>
+                    <div class="mode-opt" id="mGoalGK" onclick="setMode('goal','gk')">PORTERO</div>
+                </div>
+                <canvas id="cvGoal"></canvas>
+            </div>
+        </div>
+
+        <div id="viewRadar">
+            <div class="radar-canvas-container" id="boxRadarCanvas">
+                <canvas id="cvRadar"></canvas>
+            </div>
+            <div class="radar-stats-container" id="radarStats"></div>
+        </div>
+    </div>
+
+    <div class="ctrl-col">
+        <div class="scroll-area">
+            <div class="ctrl-panel">
+                <div class="panel-header">1. DEFENSA DE DISPARO</div>
+                <div class="grid-2">
+                    <button class="btn b-def" onclick="openMenu('Defensa', 'Blocaje')">BLOCAJE<small>Raso, Alto, Caída...</small></button>
+                    <button class="btn b-def" onclick="openMenu('Defensa', 'Desvío')">DESVÍO<small>Mano cambiada/natural...</small></button>
+                </div>
+                <div class="grid-2" style="margin-top:6px">
+                     <button class="btn b-aux" onclick="registerDirect('Defensa', 'Gol Imparable', 'KO')">GOL IMPARABLE</button>
+                     <button class="btn b-aux" style="border-color:var(--danger); color:var(--danger)" onclick="registerDirect('Defensa', 'Error Grave', 'KO')">ERROR / FALLO</button>
+                </div>
+            </div>
+
+            <div class="ctrl-panel">
+                <div class="panel-header">2. DUELO DIRECTO</div>
+                <button class="btn b-duel" style="width:100%" onclick="openMenu('Duelo', '1 vs 1')">1 vs 1 (MANO A MANO)<small>Cruz, Achique, Ataque...</small></button>
+            </div>
+
+            <div class="ctrl-panel">
+                <div class="panel-header">3. JUEGO AÉREO</div>
+                <div class="grid-2">
+                    <button class="btn b-aer" onclick="openMenu('Aéreo', 'Salida')">SALIDA<small>Puños, Blocaje...</small></button>
+                    <button class="btn b-aux" onclick="registerDirect('Aéreo', 'Duda / Fallo', 'KO')">FALLO AÉREO</button>
+                </div>
+            </div>
+
+            <div class="ctrl-panel">
+                <div class="panel-header">4. OFENSIVO</div>
+                <button class="btn b-off" style="width:100%" onclick="openMenu('Ofensivo', 'Distribución')">DISTRIBUCIÓN<small>Volea, Mano, Apoyos...</small></button>
+            </div>
+        </div>
+
+        <div class="log-area">
+            <table><thead><tr><th>X</th><th>Jor</th><th>Acción</th><th>Var</th><th>xGOT</th><th>Res</th></tr></thead><tbody id="logTable"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div id="subModal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-box" id="modalBox">
+        <div class="modal-title" id="modalTitle">OPCIONES</div>
+        <div id="modalContent"></div>
+        <button class="btn-close" onclick="closeModal()">Cancelar</button>
+    </div>
+</div>
+
+<script>
+    // --- DATOS ---
+    const ACTIONS_DB = {
+        "Defensa": { "Blocaje": ["Raso", "Media Altura", "Alto", "Con caída"], "Desvío": ["Mano cambiada", "Mano natural", "Pie", "Rechace Corto"] },
+        "Aéreo": { "Salida": ["Puños (1 o 2)", "Blocaje Aéreo", "Prolongación"] },
+        "Duelo": { "1 vs 1": ["La Cruz", "Achique", "Ataque balón"] },
+        "Ofensivo": { "Distribución": ["Volea", "Bote pronto", "Mano (Béisbol)", "Mano (Jabalina)", "Mano (Rasa)", "Pie (Raso)", "Pie (Largo)", "Apoyo Pie Corto", "Apoyo Pie Largo"] }
+    };
+
+    let gkNames = { 1: "Portero 1", 2: "Portero 2" };
+    let state = { gk: 1, match: 'single', pitch: { ox: 50, oy: 10, ax: 50, ay: 80 }, goal: { bx: 50, by: 50, gx: 50, gy: 50 }, modeP: 'org', modeG: 'ball', actions: [], view: 'field' };
+    
+    let pendingCat = ""; let pendingKey = ""; let pendingVar = "";
+
+    function init() {
+        const storedNames = localStorage.getItem('gk_names_v16');
+        if(storedNames) gkNames = JSON.parse(storedNames);
+        updateGKSelect();
+        const grp = document.getElementById('optSeason');
+        for(let i=1; i<=38; i++) { let o=document.createElement('option'); o.value=i; o.innerText=`Jornada ${i}`; grp.appendChild(o); }
+        resize();
+    }
+
+    function updateGKSelect() {
+        const s = document.getElementById('selGK'); s.innerHTML = '';
+        for(let k in gkNames) { let o = document.createElement('option'); o.value=k; o.innerText=gkNames[k]; s.appendChild(o); }
+        s.value = state.gk;
+    }
+    function renameGK() {
+        const current = gkNames[state.gk]; const newName = prompt("Nuevo nombre:", current);
+        if(newName && newName.trim() !== "") { gkNames[state.gk] = newName.trim(); localStorage.setItem('gk_names_v16', JSON.stringify(gkNames)); updateGKSelect(); if(state.view === 'radar') drawRadar(); }
+    }
+    function updateGK() { state.gk = document.getElementById('selGK').value; if(state.view === 'radar') drawRadar(); }
+
+    // --- MENÚS ---
+    const modal = document.getElementById('subModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+
+    function openMenu(category, actionKey) {
+        pendingCat = category; pendingKey = actionKey;
+        modalTitle.innerText = `${actionKey}`; 
+        let html = '<div class="sub-grid">';
+        ACTIONS_DB[category][actionKey].forEach(variant => { html += `<button class="btn-sub" onclick="askResult('${variant}')">${variant}</button>`; });
+        html += '</div>';
+        modalContent.innerHTML = html;
+        modal.classList.add('open');
+    }
+
+    function askResult(variant) {
+        pendingVar = variant;
+        modalTitle.innerText = `RESULTADO Y XGOT`;
+        
+        let showXgot = (pendingCat === 'Defensa' || pendingCat === 'Duelo');
+        
+        let html = `
+            <div class="res-grid">
+                <button class="btn-res res-ok" onclick="finalSave('OK')">✅ PARADA / ÉXITO</button>
+                <button class="btn-res res-ko" onclick="finalSave('KO')">❌ GOL / ERROR</button>
+            </div>
+        `;
+
+        if(showXgot) {
+            html += `
+            <div class="xgot-container">
+                <label class="xgot-label">Valor xGOT (Probabilidad de Gol 0.00 - 0.99)</label>
+                <input type="number" id="inputXGOT" class="xgot-input" step="0.01" min="0" max="0.99" placeholder="0.35">
+            </div>
+            `;
+        } else {
+            html += `<input type="hidden" id="inputXGOT" value="0">`;
+        }
+
+        modalContent.innerHTML = html;
+        setTimeout(() => { 
+            const inp = document.getElementById('inputXGOT'); 
+            if(inp && inp.type !== 'hidden') inp.focus(); 
+        }, 100);
+    }
+
+    function registerDirect(cat, action, res) {
+        pendingCat = cat; pendingKey = action; pendingVar = '-';
+        if(cat === 'Defensa' || cat === 'Duelo' || action.includes('Fallo')) {
+             modalTitle.innerText = `${action}`;
+             let html = `
+                <div style="text-align:center; margin-bottom:10px; color:#ccc;">Introduce el xGOT de esta jugada</div>
+                <div class="xgot-container">
+                    <label class="xgot-label">xGOT (0.00 - 0.99)</label>
+                    <input type="number" id="inputXGOT" class="xgot-input" step="0.01" min="0" max="0.99" placeholder="0.50">
+                </div>
+                <button class="btn-res res-ko" style="width:100%" onclick="finalSave('${res}')">CONFIRMAR ${action}</button>
+            `;
+            modalContent.innerHTML = html;
+            modal.classList.add('open');
+            setTimeout(() => { document.getElementById('inputXGOT').focus(); }, 100);
+        } else {
+            saveAction(cat, action, '-', res, 0);
+        }
+    }
+
+    function finalSave(result) { 
+        const inp = document.getElementById('inputXGOT');
+        let xgVal = 0;
+        if(inp && inp.value !== "") xgVal = parseFloat(inp.value);
+        if(isNaN(xgVal)) xgVal = 0;
+        closeModal(); 
+        saveAction(pendingCat, pendingKey, pendingVar, result, xgVal); 
+    }
+
+    function closeModal(e) { if (!e || e.target === modal || e.target.classList.contains('btn-close')) modal.classList.remove('open'); }
+
+    function saveAction(cat, key, variant, result, xgot) {
+        state.match = document.getElementById('selMatch').value;
+        const act = { id: Date.now(), gk: state.gk, match: state.match, cat: cat, key: key, var: variant, res: result, xgot: xgot };
+        state.actions.unshift(act);
+        updateLog(); if(state.view === 'field') drawAll(); else drawRadar(); 
+    }
+
+    function deleteAction(id) { if(confirm("¿Eliminar acción?")) { state.actions = state.actions.filter(a => a.id !== id); updateLog(); if(state.view === 'radar') drawRadar(); } }
+
+    function updateLog() {
+        document.getElementById('logTable').innerHTML = state.actions.map(a => {
+            let col = a.res === 'OK' ? '#2ecc71' : '#e74c3c';
+            let xgShow = (a.cat === 'Defensa' || a.cat === 'Duelo') ? `<b>${a.xgot.toFixed(2)}</b>` : '-';
+            return `<tr><td style="color:#c0392b;cursor:pointer;font-weight:bold" onclick="deleteAction(${a.id})">×</td><td>${a.match === 'single' ? '⭐' : 'J'+a.match}</td><td><b>${a.key}</b></td><td>${a.var}</td><td>${xgShow}</td><td style="color:${col}; font-weight:bold">${a.res}</td></tr>`;
+        }).join('');
+    }
+
+    function toggleView() {
+        state.view = (state.view === 'field') ? 'radar' : 'field';
+        document.getElementById('viewField').style.display = (state.view === 'field') ? 'flex' : 'none';
+        const radarDiv = document.getElementById('viewRadar');
+        radarDiv.classList.toggle('active', state.view === 'radar');
+        if(state.view === 'radar') setTimeout(drawRadar, 100); else resize();
+    }
+
+    const cvP = document.getElementById('cvPitch'); const cvG = document.getElementById('cvGoal');
+
+    function resize() {
+        if(state.view !== 'field') return;
+        cvP.width = cvP.parentElement.clientWidth; cvP.height = cvP.parentElement.clientHeight;
+        cvG.width = cvG.parentElement.clientWidth; cvG.height = cvG.parentElement.clientHeight;
+        drawAll();
+    }
+    window.onresize = resize; setTimeout(resize, 100);
+
+    function setMode(canvas, m) {
+        if(canvas==='pitch') { state.modeP=m; document.getElementById('mPitchOrg').className=`mode-opt ${m=='org'?'active':''}`; document.getElementById('mPitchAct').className=`mode-opt ${m=='act'?'active':''}`; }
+        if(canvas==='goal') { state.modeG=m; document.getElementById('mGoalBall').className=`mode-opt ${m=='ball'?'active':''}`; document.getElementById('mGoalGK').className=`mode-opt ${m=='gk'?'active':''}`; }
+    }
+
+    function touchHandler(e, cvType) {
+        if(state.view !== 'field') return;
+        e.preventDefault();
+        const cv = e.target; const rect = cv.getBoundingClientRect();
+        const t = e.changedTouches ? e.changedTouches[0] : e;
+        const x = (t.clientX - rect.left) / rect.width * 100;
+        const y = (t.clientY - rect.top) / rect.height * 100;
+        if (cvType === 'pitch') { if (state.modeP === 'org') { state.pitch.ox = x; state.pitch.oy = y; } else { state.pitch.ax = x; state.pitch.ay = y; } } 
+        else { if (state.modeG === 'ball') { state.goal.bx = x; state.goal.by = y; } else { state.goal.gx = x; state.goal.gy = y; } }
+        drawAll();
+    }
+    [cvP, cvG].forEach(c => {
+        c.addEventListener('mousedown', e => touchHandler(e, c===cvP?'pitch':'goal'));
+        c.addEventListener('touchstart', e => touchHandler(e, c===cvP?'pitch':'goal'), {passive:false});
+        c.addEventListener('touchmove', e => touchHandler(e, c===cvP?'pitch':'goal'), {passive:false});
+    });
+
+    function drawAll() {
+        const ctxP = cvP.getContext('2d'); const w = cvP.width, h = cvP.height; const m = h / 60; const fw = 68 * m; const sx = (w - fw) / 2; const ty = 10;
+        ctxP.fillStyle = "#388e3c"; ctxP.fillRect(0,0,w,h);
+        ctxP.fillStyle = "rgba(0,0,0,0.05)"; for(let i=0; i<h; i+=5.5*m*2) ctxP.fillRect(0,i,w,5.5*m);
+        ctxP.lineWidth=2; ctxP.strokeStyle="rgba(255,255,255,0.7)";
+        ctxP.strokeRect(sx, ty, fw, h-ty); ctxP.strokeRect(sx + (fw - 40.32*m)/2, ty, 40.32*m, 16.5*m); ctxP.strokeRect(sx + (fw - 18.32*m)/2, ty, 18.32*m, 5.5*m);
+        ctxP.beginPath(); ctxP.arc(w/2, ty + 11*m, 2, 0, Math.PI*2); ctxP.fillStyle="#fff"; ctxP.fill(); ctxP.stroke();
+        ctxP.beginPath(); ctxP.arc(w/2, ty + 11*m, 9.15*m, 0.65, Math.PI - 0.65); ctxP.stroke();
+
+        ctxP.beginPath(); ctxP.moveTo(state.pitch.ox/100*w, state.pitch.oy/100*h); ctxP.lineTo(state.pitch.ax/100*w, state.pitch.ay/100*h);
+        ctxP.setLineDash([5,5]); ctxP.strokeStyle="rgba(255,255,255,0.6)"; ctxP.stroke(); ctxP.setLineDash([]);
+        ctxP.beginPath(); ctxP.arc(state.pitch.ox/100*w, state.pitch.oy/100*h, 6, 0, Math.PI*2); ctxP.fillStyle="#f1c40f"; ctxP.fill(); 
+        ctxP.beginPath(); ctxP.arc(state.pitch.ax/100*w, state.pitch.ay/100*h, 6, 0, Math.PI*2); ctxP.fillStyle="#3498db"; ctxP.fill();
+
+        const ctxG = cvG.getContext('2d'); const gw = cvG.width, gh = cvG.height;
+        ctxG.clearRect(0,0,gw,gh); ctxG.fillStyle = "#444"; ctxG.fillRect(0,0,gw,gh);
+        const mx=gw*0.2, my=gh*0.25, fy=gh-30, gx=mx, gy=my, g_w=gw-mx*2, g_h=fy-my;
+        ctxG.fillStyle="#222"; ctxG.fillRect(0,0,gw,fy); ctxG.fillStyle="#27ae60"; ctxG.fillRect(0,fy,gw,gh-fy);
+        ctxG.fillStyle="rgba(255,255,255,0.1)"; ctxG.fillRect(gx,gy,g_w,g_h);
+        ctxG.strokeStyle="#ecf0f1"; ctxG.lineWidth=6; ctxG.lineJoin="round";
+        ctxG.beginPath(); ctxG.moveTo(gx,fy); ctxG.lineTo(gx,gy); ctxG.lineTo(gx+g_w,gy); ctxG.lineTo(gx+g_w,fy); ctxG.stroke();
+        
+        drawGKBody(ctxG, state.goal.gx/100*gw, state.goal.gy/100*gh, g_h*0.75, '#3498db');
+
+        ctxG.beginPath(); ctxG.arc(state.goal.bx/100*gw, state.goal.by/100*gh, 7, 0, Math.PI*2); ctxG.fillStyle="#e67e22"; ctxG.fill(); ctxG.strokeStyle="#fff"; ctxG.lineWidth=2; ctxG.stroke();
+    }
+
+    function drawGKBody(ctx, x, y, h, col) {
+        ctx.save(); ctx.translate(x, y); var s = h / 120; ctx.scale(s * 0.7, s); ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(0, -50, 11, 0, Math.PI*2);
+        ctx.moveTo(-22, -35); ctx.lineTo(22, -35); ctx.lineTo(42, -10); ctx.lineTo(52, 10); ctx.lineTo(42, 14); ctx.lineTo(32, 0); ctx.lineTo(10, 15);
+        ctx.lineTo(30, 40); ctx.lineTo(35, 60); ctx.lineTo(25, 60); ctx.lineTo(15, 40); ctx.lineTo(2, 25); ctx.lineTo(-2, 25);
+        ctx.lineTo(-15, 40); ctx.lineTo(-25, 60); ctx.lineTo(-35, 60); ctx.lineTo(-30, 40); ctx.lineTo(-10, 15);
+        ctx.lineTo(-32, 0); ctx.lineTo(-42, 14); ctx.lineTo(-52, 10); ctx.lineTo(-42, -10); ctx.lineTo(-22, -35);
+        ctx.fill(); ctx.restore();
+    }
+
+    function drawRadar() {
+        const box = document.getElementById('boxRadarCanvas'); 
+        const cv = document.getElementById('cvRadar');
+        cv.width = box.clientWidth; cv.height = box.clientHeight;
+        const ctx = cv.getContext('2d');
+        const w = cv.width, h = cv.height;
+        const cx = w/2, cy = h/2, r = Math.min(w,h)*0.35;
+
+        // Stats Calculation
+        let stats = { saves: {ok:0, tot:0}, air: {ok:0, tot:0}, foot: {ok:0, tot:0}, hand: {ok:0, tot:0}, xg_total: 0, goals_conceded: 0 };
+        
+        state.actions.forEach(a => {
+            if(a.gk != state.gk) return;
+            // % Stats
+            if(a.cat === 'Defensa' || a.cat === 'Duelo') { stats.saves.tot++; if(a.res === 'OK') stats.saves.ok++; }
+            if(a.cat === 'Aéreo') { stats.air.tot++; if(a.res === 'OK') stats.air.ok++; }
+            if(a.cat === 'Ofensivo') {
+                if(a.var.includes('Pie') || a.var.includes('Volea') || a.var.includes('Bote')) { 
+                    stats.foot.tot++; if(a.res === 'OK') stats.foot.ok++; 
+                } else { 
+                    stats.hand.tot++; if(a.res === 'OK') stats.hand.ok++; 
+                }
+            }
+            // PSxG Calc
+            if(a.cat === 'Defensa' || a.cat === 'Duelo') {
+                stats.xg_total += (a.xgot || 0);
+                if(a.res === 'KO') stats.goals_conceded++;
+            }
+        });
+
+        const getPct = (o) => o.tot > 0 ? (o.ok/o.tot) : 0;
+        
+        // PSxG Logic
+        let psxgRaw = stats.xg_total - stats.goals_conceded;
+        let psxgNorm = 0.5 + (psxgRaw / 3.0); 
+        if(psxgNorm > 1) psxgNorm = 1; if(psxgNorm < 0.1) psxgNorm = 0.1;
+
+        const data = [getPct(stats.saves), getPct(stats.foot), getPct(stats.hand), getPct(stats.air), psxgNorm];
+        const labels = ["PARADAS", "J. PIE", "J. MANO", "AÉREO", "PSxG +/-"];
+
+        // Draw Radar Background (Pentagon)
+        ctx.clearRect(0,0,w,h);
+        ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.fillStyle="#aaa"; ctx.font="bold 10px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+        
+        const sides = 5;
+        for(let level=1; level<=4; level++) {
+            ctx.beginPath();
+            for(let i=0; i<sides; i++) { 
+                let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
+                let rad = r * (level/4); 
+                let x = cx + Math.cos(ang)*rad, y = cy + Math.sin(ang)*rad; 
+                if(i==0) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
+            }
+            ctx.closePath(); ctx.stroke();
+        }
+
+        // Labels
+        for(let i=0; i<sides; i++) { 
+            let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
+            let x = cx + Math.cos(ang)*(r+25), y = cy + Math.sin(ang)*(r+25); 
+            ctx.fillText(labels[i], x, y); 
+        }
+
+        // Draw Data Polygon
+        ctx.beginPath();
+        for(let i=0; i<sides; i++) { 
+            let ang = (Math.PI*2 * i)/sides - Math.PI/2; 
+            let val = Math.max(0.1, data[i]); 
+            let x = cx + Math.cos(ang)*(r*val), y = cy + Math.sin(ang)*(r*val); 
+            if(i==0) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
+        }
+        ctx.closePath(); ctx.strokeStyle = "#3498db"; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = "rgba(52, 152, 219, 0.4)"; ctx.fill();
+
+        // Render Stats Grid
+        let psxgColor = psxgRaw >= 0 ? '#2ecc71' : '#e74c3c';
+        let psxgSign = psxgRaw > 0 ? '+' : '';
+        
+        document.getElementById('radarStats').innerHTML = `
+            <div class="stat-box"><span class="stat-lbl">PARADAS</span><span class="stat-val" style="color:#2ecc71">${Math.round(data[0]*100)}%</span><small>${stats.saves.ok}/${stats.saves.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">J. PIE</span><span class="stat-val" style="color:#3498db">${Math.round(data[1]*100)}%</span><small>${stats.foot.ok}/${stats.foot.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">J. MANO</span><span class="stat-val" style="color:#9b59b6">${Math.round(data[2]*100)}%</span><small>${stats.hand.ok}/${stats.hand.tot}</small></div>
+            <div class="stat-box"><span class="stat-lbl">AÉREO</span><span class="stat-val" style="color:#f39c12">${Math.round(data[3]*100)}%</span><small>${stats.air.ok}/${stats.air.tot}</small></div>
+            <div class="stat-box box-psxg">
+                <div><span class="stat-lbl">GOLES EVITADOS (PSxG)</span><span class="stat-val" style="color:${psxgColor}">${psxgSign}${psxgRaw.toFixed(2)}</span></div>
+                <div style="text-align:right"><span class="stat-lbl">xGOT RECIBIDO</span><span class="stat-val" style="font-size:0.9rem">${stats.xg_total.toFixed(2)}</span></div>
+            </div>
+        `;
+    }
+
+    function downloadCSV() {
+        let csv = "Jornada,Portero,Categoria,Accion,Variante,Res,xGOT\n";
+        state.actions.forEach(a => { let gkName = gkNames[a.gk] || ("GK "+a.gk); let matchLabel = a.match === 'single' ? 'Partido Unico' : 'J'+a.match; csv += `${matchLabel},${gkName},${a.cat},${a.key},${a.var},${a.res},${a.xgot||0}\n` });
+        const b = new Blob([csv], {type:'text/csv'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'GK_Data_Elite.csv'; a.click();
+    }
+    function resetData() { if(confirm('¿Borrar datos?')) { state.actions = []; updateLog(); if(state.view==='radar') drawRadar(); } }
+
+    init();
+</script>
+</body>
+</html>

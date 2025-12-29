@@ -2740,6 +2740,7 @@ function drawAvgPos() {
     playerPositions.sort((a, b) => a.x - b.x);
 
     let defLineX = 0, attLineX = 0;
+    let blockLabel = null;
     if (playerPositions.length > 2) {
         if (currentAvgTeam === 'HOME') {
             defLineX = playerPositions[1].x; 
@@ -2778,9 +2779,8 @@ function drawAvgPos() {
         ctx.beginPath(); ctx.moveTo(screenAttX, h*0.05); ctx.lineTo(screenAttX, h*0.95); ctx.stroke();
         
         const meters = Math.abs((attLineX - defLineX) * 1.05).toFixed(1); 
-        ctx.fillStyle = "#fff"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
         const midBlockX = (screenDefX + screenAttX) / 2;
-        ctx.fillText(`↔ ${meters}m`, midBlockX, h * 0.92); 
+        blockLabel = { x: midBlockX, y: h * 0.1, text: `↔ ${meters}m` };
         ctx.restore();
     }
 
@@ -2846,6 +2846,20 @@ function drawAvgPos() {
         ctx.strokeText(dorsal, screenX, textY); 
         ctx.fillText(dorsal, screenX, textY);
     });
+
+    // --- ETIQUETA DE LONGITUD DEL BLOQUE SOBRE LOS JUGADORES ---
+    if (blockLabel) {
+        ctx.save();
+        ctx.font = "bold 11px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const txtW = ctx.measureText(blockLabel.text).width;
+        ctx.fillStyle = "rgba(0,0,0,0.75)";
+        ctx.fillRect(blockLabel.x - txtW / 2 - 6, blockLabel.y - 10, txtW + 12, 20);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(blockLabel.text, blockLabel.x, blockLabel.y);
+        ctx.restore();
+    }
     
     // --- LÍNEA DE ALTURA MEDIA (MANTENIDO) ---
     if (playerCount > 0) {

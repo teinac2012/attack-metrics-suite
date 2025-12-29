@@ -33,6 +33,13 @@ const apps: App[] = [
     href: "/apps/app3",
     icon: "📊",
     description: "Análisis de datos avanzado"
+  },
+  {
+    id: 4,
+    name: "Portero",
+    href: "/apps/app4",
+    icon: "🧤",
+    description: "Análisis especializado de porteros"
   }
 ];
 
@@ -42,7 +49,7 @@ export default function AppsNavBar({ userName }: { userName: string }) {
 
   const handleResetAllApps = async () => {
     const confirmed = window.confirm(
-      "¿Estás seguro de que deseas resetear todos los datos de las 3 aplicaciones? Esta acción no se puede deshacer."
+      "¿Estás seguro de que deseas resetear todos los datos de las 4 aplicaciones? Esta acción no se puede deshacer."
     );
 
     if (!confirmed) return;
