@@ -51,6 +51,14 @@ export default async function DashboardPage() {
       icon: "📊",
       href: "/apps/app3",
       color: "from-blue-500 to-blue-700"
+    },
+    {
+      id: 4,
+      name: "Portero",
+      description: "Análisis especializado de porteros y PSxG",
+      icon: "🧤",
+      href: "/apps/app4",
+      color: "from-emerald-500 to-teal-700"
     }
   ];
 
