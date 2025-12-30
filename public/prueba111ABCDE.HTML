@@ -3755,7 +3755,7 @@ function openReportModal() {
         opt.innerText = `${pName} (${players[pName].count} acciones - ${players[pName].team})`;
         sel.appendChild(opt);
     });
-    openModal('modalReport');
+    document.getElementById('modalReport').style.display = 'flex';
 }
 
 function togglePlayerSelectReport() {
