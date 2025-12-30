@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analista Pro v5.7: Player Highlight</title>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0;
@@ -228,6 +231,25 @@
                 <button onclick="visualizePassMap()" style="background:#ff6b6b; margin-top:5px;">📺 Mostrar en Cancha</button>
 
                 <button onclick="downloadMetricsExcel()" style="background:#27ae60; margin-top:8px;">📥 Exportar Excel</button>
+            </div>
+
+            <div class="box">
+                <h4 style="color:#e74c3c">📄 Reporte PDF</h4>
+                <label style="font-size:0.65rem; color:#aaa;">Jugador para Análisis</label>
+                <select id="pdfPlayerSelect">
+                    <option value="">Selecciona jugador...</option>
+                </select>
+                
+                <div style="font-size:0.65rem; color:#888; margin:8px 0; line-height:1.4;">
+                    <strong>Incluye:</strong><br>
+                    ✓ Mapa de calor posicional<br>
+                    ✓ Gráfico de acciones (%)<br>
+                    ✓ xT, Buildup & Chain<br>
+                    ✓ Scatterplot (xG/xT)<br>
+                    ✓ Z-Score individual
+                </div>
+                
+                <button onclick="generatePlayerPDF()" style="background:#e74c3c; font-weight:bold;">📄 Generar PDF</button>
             </div>
         </div>
     </div>
@@ -1251,6 +1273,20 @@ function compareTeams() {
 // Actualizar dropdown cuando carga datos
 function updateAllMetricsSelects() {
     updateMetricsDisplay();
+    
+    // Actualizar dropdown de PDF
+    const pdfSelect = document.getElementById('pdfPlayerSelect');
+    const players = new Set();
+    STATE.filtered.forEach(p => {
+        p.actions.forEach(a => players.add(a.player));
+    });
+    pdfSelect.innerHTML = '<option value="">Todos los jugadores</option>';
+    Array.from(players).sort().forEach(pl => {
+        const opt = document.createElement('option');
+        opt.value = pl;
+        opt.textContent = pl || 'Sin nombre';
+        pdfSelect.appendChild(opt);
+    });
 }
 
 function visualizePassMap() {
@@ -1290,6 +1326,267 @@ function visualizePassMap() {
     STATE.metricsVisualization = { mode, team, passData };
     STATE.aiMode = 'PASS_MAP';
     render();
+}
+
+// === GENERACIÓN DE PDF ===
+async function generatePlayerPDF() {
+    const selectedPlayer = document.getElementById('pdfPlayerSelect').value;
+    if (!selectedPlayer && STATE.filtered.length === 0) {
+        return alert('Carga datos primero');
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    // Filtrar datos del jugador
+    const playerData = selectedPlayer ? 
+        STATE.filtered.filter(p => p.actions.some(a => a.player === selectedPlayer)) :
+        STATE.filtered;
+    
+    if (playerData.length === 0) {
+        return alert('No hay datos para este jugador');
+    }
+    
+    // PÁGINA 1: Portada y Estadísticas Generales
+    pdf.setFillColor(30, 30, 30);
+    pdf.rect(0, 0, pageWidth, 40, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(24);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('REPORTE DE ANÁLISIS TÁCTICO', pageWidth / 2, 20, { align: 'center' });
+    pdf.setFontSize(14);
+    pdf.text(selectedPlayer || 'Análisis Completo del Equipo', pageWidth / 2, 30, { align: 'center' });
+    
+    // Estadísticas generales
+    let yPos = 50;
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('ESTADÍSTICAS GENERALES', 20, yPos);
+    
+    yPos += 10;
+    const totalActions = playerData.reduce((sum, p) => sum + p.actions.filter(a => !selectedPlayer || a.player === selectedPlayer).length, 0);
+    const passes = playerData.reduce((sum, p) => sum + p.actions.filter(a => (!selectedPlayer || a.player === selectedPlayer) && a.action.toLowerCase().includes('pase')).length, 0);
+    const shots = playerData.reduce((sum, p) => sum + p.actions.filter(a => (!selectedPlayer || a.player === selectedPlayer) && a.action.toLowerCase().includes('disparo')).length, 0);
+    const carries = playerData.reduce((sum, p) => sum + p.actions.filter(a => (!selectedPlayer || a.player === selectedPlayer) && a.action.toLowerCase().includes('conduc')).length, 0);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text(`Total de Acciones: ${totalActions}`, 25, yPos);
+    pdf.text(`Pases: ${passes} (${((passes/totalActions)*100).toFixed(1)}%)`, 25, yPos + 7);
+    pdf.text(`Disparos: ${shots} (${((shots/totalActions)*100).toFixed(1)}%)`, 25, yPos + 14);
+    pdf.text(`Conducciones: ${carries} (${((carries/totalActions)*100).toFixed(1)}%)`, 25, yPos + 21);
+    
+    // Métricas xT, Buildup & Chain
+    yPos += 35;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.text('MÉTRICAS AVANZADAS', 20, yPos);
+    
+    yPos += 10;
+    let totalXT = 0;
+    let buildupChain = 0;
+    let chainCount = 0;
+    
+    playerData.forEach(possession => {
+        possession.actions.forEach((action, idx) => {
+            if (selectedPlayer && action.player !== selectedPlayer) return;
+            
+            // xT (xThreat)
+            const dist = Math.sqrt(Math.pow(action.x - 105, 2) + Math.pow(action.y - 34, 2));
+            totalXT += Math.max(0, 1 - (dist / 120));
+            
+            // Buildup Chain: participación en cadenas que llevan a gol/disparo
+            if (possession.result && possession.result.toLowerCase().includes('gol')) {
+                buildupChain += 1.5;
+                chainCount++;
+            } else if (possession.result && possession.result.toLowerCase().includes('disparo')) {
+                buildupChain += 1;
+                chainCount++;
+            }
+        });
+    });
+    
+    const avgXT = totalActions > 0 ? (totalXT / totalActions).toFixed(3) : 0;
+    const avgBuildup = chainCount > 0 ? (buildupChain / chainCount).toFixed(2) : 0;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text(`xThreat Promedio: ${avgXT}`, 25, yPos);
+    pdf.text(`Buildup Chain Score: ${avgBuildup}`, 25, yPos + 7);
+    pdf.text(`Participaciones en Cadenas: ${chainCount}`, 25, yPos + 14);
+    
+    // Z-Score
+    yPos += 28;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Z-SCORE (Desviación Estándar)', 20, yPos);
+    
+    const allPlayers = {};
+    STATE.filtered.forEach(p => {
+        p.actions.forEach(a => {
+            if (!allPlayers[a.player]) allPlayers[a.player] = 0;
+            allPlayers[a.player]++;
+        });
+    });
+    
+    const actionCounts = Object.values(allPlayers);
+    const mean = actionCounts.reduce((a,b) => a+b, 0) / actionCounts.length;
+    const stdDev = Math.sqrt(actionCounts.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / actionCounts.length);
+    const playerActions = selectedPlayer ? (allPlayers[selectedPlayer] || 0) : totalActions;
+    const zScore = stdDev > 0 ? ((playerActions - mean) / stdDev).toFixed(2) : 0;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    yPos += 7;
+    pdf.text(`Media del equipo: ${mean.toFixed(1)} acciones`, 25, yPos);
+    pdf.text(`Desviación estándar: ${stdDev.toFixed(1)}`, 25, yPos + 7);
+    pdf.text(`Z-Score del ${selectedPlayer || 'equipo'}: ${zScore}`, 25, yPos + 14);
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`(Z>1.5: Alto | Z<-1.5: Bajo)`, 25, yPos + 21);
+    
+    // PÁGINA 2: Gráfico de barras (acciones)
+    pdf.addPage();
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DISTRIBUCIÓN DE ACCIONES', 20, 20);
+    
+    // Crear canvas temporal para gráfico de barras
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = 800;
+    tempCanvas.height = 400;
+    document.body.appendChild(tempCanvas);
+    
+    const barChart = new Chart(tempCanvas, {
+        type: 'bar',
+        data: {
+            labels: ['Pases', 'Disparos', 'Conducciones', 'Recuperaciones'],
+            datasets: [{
+                label: 'Cantidad',
+                data: [
+                    passes,
+                    shots,
+                    carries,
+                    playerData.reduce((sum, p) => sum + p.actions.filter(a => (!selectedPlayer || a.player === selectedPlayer) && a.action.toLowerCase().includes('recup')).length, 0)
+                ],
+                backgroundColor: ['#00d2d3', '#ff6b6b', '#feca57', '#a29bfe']
+            }]
+        },
+        options: {
+            responsive: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const barImg = tempCanvas.toDataURL('image/png');
+    pdf.addImage(barImg, 'PNG', 20, 30, 170, 85);
+    document.body.removeChild(tempCanvas);
+    
+    // PÁGINA 3: Mapa de calor
+    pdf.addPage();
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('MAPA DE CALOR POSICIONAL', 20, 20);
+    
+    // Crear canvas temporal para mapa de calor
+    const heatCanvas = document.createElement('canvas');
+    heatCanvas.width = 1050;
+    heatCanvas.height = 680;
+    const heatCtx = heatCanvas.getContext('2d');
+    
+    // Dibujar cancha
+    heatCtx.fillStyle = '#2e5c40';
+    heatCtx.fillRect(0, 0, 1050, 680);
+    heatCtx.strokeStyle = 'rgba(255,255,255,0.6)';
+    heatCtx.lineWidth = 2;
+    heatCtx.strokeRect(0, 0, 1050, 680);
+    heatCtx.strokeRect(525, 0, 525, 680);
+    
+    // Crear grid de calor
+    const cellSize = 8;
+    const grid = {};
+    playerData.forEach(p => {
+        p.actions.forEach(a => {
+            if (selectedPlayer && a.player !== selectedPlayer) return;
+            const cellX = Math.floor(a.x / cellSize);
+            const cellY = Math.floor(a.y / cellSize);
+            const key = `${cellX},${cellY}`;
+            grid[key] = (grid[key] || 0) + 1;
+        });
+    });
+    
+    const maxHeat = Math.max(...Object.values(grid));
+    Object.entries(grid).forEach(([key, count]) => {
+        const [cellX, cellY] = key.split(',').map(Number);
+        const x = (cellX * cellSize) * 10;
+        const y = (cellY * cellSize) * 10;
+        const w = cellSize * 10;
+        const h = cellSize * 10;
+        
+        const intensity = count / maxHeat;
+        heatCtx.fillStyle = `rgba(255, ${255 - intensity * 200}, 0, ${0.3 + intensity * 0.5})`;
+        heatCtx.fillRect(x, y, w, h);
+    });
+    
+    const heatImg = heatCanvas.toDataURL('image/png');
+    pdf.addImage(heatImg, 'PNG', 20, 30, 170, 110);
+    
+    // PÁGINA 4: Scatterplot xG vs xT
+    pdf.addPage();
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('SCATTERPLOT: xG vs xThreat', 20, 20);
+    
+    const scatterCanvas = document.createElement('canvas');
+    scatterCanvas.width = 800;
+    scatterCanvas.height = 400;
+    document.body.appendChild(scatterCanvas);
+    
+    const scatterData = [];
+    playerData.forEach(p => {
+        p.actions.forEach(a => {
+            if (selectedPlayer && a.player !== selectedPlayer) return;
+            const dist = Math.sqrt(Math.pow(a.x - 105, 2) + Math.pow(a.y - 34, 2));
+            const xT = Math.max(0, 1 - (dist / 120));
+            const xG = a.action.toLowerCase().includes('disparo') ? 0.5 : 0;
+            scatterData.push({ x: xT, y: xG });
+        });
+    });
+    
+    const scatterChart = new Chart(scatterCanvas, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Acciones',
+                data: scatterData,
+                backgroundColor: 'rgba(52, 152, 219, 0.6)'
+            }]
+        },
+        options: {
+            responsive: false,
+            scales: {
+                x: { title: { display: true, text: 'xThreat' }},
+                y: { title: { display: true, text: 'xG' }}
+            }
+        }
+    });
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const scatterImg = scatterCanvas.toDataURL('image/png');
+    pdf.addImage(scatterImg, 'PNG', 20, 30, 170, 85);
+    document.body.removeChild(scatterCanvas);
+    
+    // Guardar PDF
+    pdf.save(`reporte_${selectedPlayer || 'completo'}_${Date.now()}.pdf`);
 }
 
 // Exrender personalizado para mapas de pases - se llama desde render() con la cancha dibujada
