@@ -3764,229 +3764,239 @@ function togglePlayerSelectReport() {
 }
 
 async function generatePDFReportAttack() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const type = document.getElementById('reportType').value;
-    const playerName = type === 'player' ? document.getElementById('reportPlayer').value : 'TODO EL EQUIPO';
-    const includeHeatmap = document.getElementById('includeHeatmapReport').checked;
-    const includeTable = document.getElementById('includeTableReport').checked;
-    const includeRadar = document.getElementById('includeRadarReport').checked;
-
-    // Filtrar acciones
-    const filteredActions = type === 'player' 
-        ? DB.actions.filter(a => (a.player || "Anónimo") === playerName)
-        : DB.actions;
-
-    if(filteredActions.length === 0) {
-        alert('No hay datos para este jugador');
-        return;
-    }
-
-    // Calcular estadísticas
-    const stats = {
-        acciones: filteredActions.length,
-        pases: filteredActions.filter(a => a.type === 'Pase' && a.res === 'Completado').length,
-        regates: filteredActions.filter(a => a.type === 'Regate' && a.res === 'Exitoso').length,
-        clave: filteredActions.filter(a => a.type === 'Clave' && a.res === 'Completado').length,
-        asist: filteredActions.filter(a => a.type === 'Asist').length,
-        perdidas: filteredActions.filter(a => a.res === 'Fallado' || a.res === 'Pérdida').length
-    };
-
-    let yPos = 20;
-
-    // === PORTADA ===
-    doc.setFillColor(18, 18, 18);
-    doc.rect(0, 0, 210, 60, 'F');
-    doc.setTextColor(243, 156, 18);
-    doc.setFontSize(24);
-    doc.setFont(undefined, 'bold');
-    doc.text('ATTACK METRICS', 105, 20, { align: 'center' });
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.text('Reporte de Rendimiento Ofensivo', 105, 30, { align: 'center' });
-    
-    doc.setFontSize(18);
-    doc.setTextColor(52, 152, 219);
-    doc.text(playerName, 105, 45, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Partido: ${DB.teams.home} vs ${DB.teams.away}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
-
-    yPos = 70;
-
-    // === RESUMEN ESTADÍSTICO ===
-    doc.setFillColor(30, 30, 36);
-    doc.roundedRect(15, yPos, 180, 40, 3, 3, 'F');
-    
-    doc.setFontSize(12);
-    doc.setTextColor(243, 156, 18);
-    doc.setFont(undefined, 'bold');
-    doc.text('RESUMEN ESTADÍSTICO', 105, yPos + 8, { align: 'center' });
-
-    const boxW = 28;
-    const startX = 18;
-    const boxY = yPos + 15;
-    
-    const statBoxes = [
-        { label: 'ACCIONES', val: stats.acciones, color: [52, 152, 219] },
-        { label: 'PASES', val: stats.pases, color: [46, 204, 113] },
-        { label: 'REGATES', val: stats.regates, color: [241, 196, 15] },
-        { label: 'P.CLAVE', val: stats.clave, color: [155, 89, 182] },
-        { label: 'ASIST', val: stats.asist, color: [26, 188, 156] },
-        { label: 'PÉRDIDAS', val: stats.perdidas, color: [231, 76, 60] }
-    ];
-
-    statBoxes.forEach((box, i) => {
-        const x = startX + (i * 30);
-        doc.setDrawColor(box.color[0], box.color[1], box.color[2]);
-        doc.setLineWidth(0.5);
-        doc.rect(x, boxY, boxW, 14);
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(box.color[0], box.color[1], box.color[2]);
-        doc.text(String(box.val), x + boxW/2, boxY + 7, { align: 'center' });
-        doc.setFontSize(6);
-        doc.setTextColor(150, 150, 150);
-        doc.text(box.label, x + boxW/2, boxY + 11, { align: 'center' });
-    });
-
-    yPos += 50;
-
-    // === MAPA DE CALOR ===
-    if(includeHeatmap && filteredActions.length > 0) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = 800;
-        tempCanvas.height = 533;
-        const ctx = tempCanvas.getContext('2d');
-        
-        // Dibujar campo
-        ctx.fillStyle = "#2d5016";
-        ctx.fillRect(0, 0, 800, 533);
-        ctx.strokeStyle = "rgba(255,255,255,0.3)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(20, 20, 760, 493);
-        
-        // Dibujar puntos de calor
-        ctx.globalCompositeOperation = 'lighter';
-        filteredActions.forEach(a => {
-            if(a.x < 0 || a.y < 0) return;
-            const xPct = a.x / 100;
-            const yPct = a.y / 80;
-            const x = 20 + (760 * xPct);
-            const y = 20 + (493 * yPct);
-            const grd = ctx.createRadialGradient(x, y, 0, x, y, 35);
-            const intensity = a.res === 'Completado' || a.res === 'Exitoso' ? 0.7 : 0.3;
-            const color = a.res === 'Completado' || a.res === 'Exitoso' ? '46,204,113' : '231,76,60';
-            grd.addColorStop(0, `rgba(${color},${intensity})`);
-            grd.addColorStop(1, `rgba(${color},0)`);
-            ctx.fillStyle = grd;
-            ctx.beginPath();
-            ctx.arc(x, y, 35, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.globalCompositeOperation = 'source-over';
-
-        const heatmapImg = tempCanvas.toDataURL('image/png');
-        doc.setFontSize(11);
-        doc.setTextColor(243, 156, 18);
-        doc.setFont(undefined, 'bold');
-        doc.text('🔥 MAPA DE CALOR DE ACCIONES', 15, yPos);
-        yPos += 5;
-        doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 120);
-        yPos += 125;
-    }
-
-    // === RADAR ===
-    if(includeRadar) {
-        if(yPos > 200) {
-            doc.addPage();
-            yPos = 20;
+    try {
+        if (!window.jspdf) {
+            alert('Error: Biblioteca jsPDF no cargada');
+            return;
         }
-        
-        // Calcular métricas para radar
-        const totalActions = filteredActions.length;
-        const passSuccess = stats.pases / Math.max(1, filteredActions.filter(a => a.type === 'Pase').length);
-        const dribSuccess = stats.regates / Math.max(1, filteredActions.filter(a => a.type === 'Regate').length);
-        const creativity = (stats.clave + stats.asist) / Math.max(1, totalActions) * 10;
-        const involvement = Math.min(totalActions / 50, 1); // Normalizado
-        const efficiency = (stats.acciones - stats.perdidas) / Math.max(1, stats.acciones);
 
-        doc.setFontSize(11);
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const type = document.getElementById('reportType').value;
+        const playerName = type === 'player' ? document.getElementById('reportPlayer').value : 'TODO EL EQUIPO';
+        const includeHeatmap = document.getElementById('includeHeatmapReport').checked;
+        const includeTable = document.getElementById('includeTableReport').checked;
+        const includeRadar = document.getElementById('includeRadarReport').checked;
+
+        // Filtrar acciones
+        const filteredActions = type === 'player' 
+            ? DB.actions.filter(a => (a.player || "Anónimo") === playerName)
+            : DB.actions;
+
+        if(filteredActions.length === 0) {
+            alert('No hay datos para este jugador');
+            return;
+        }
+
+        // Calcular estadísticas
+        const stats = {
+            acciones: filteredActions.length,
+            pases: filteredActions.filter(a => a.type === 'Pase' && a.res === 'Completado').length,
+            regates: filteredActions.filter(a => a.type === 'Regate' && a.res === 'Exitoso').length,
+            clave: filteredActions.filter(a => a.type === 'Clave' && a.res === 'Completado').length,
+            asist: filteredActions.filter(a => a.type === 'Asist').length,
+            perdidas: filteredActions.filter(a => a.res === 'Fallado' || a.res === 'Pérdida').length
+        };
+
+        let yPos = 20;
+
+        // === PORTADA ===
+        doc.setFillColor(18, 18, 18);
+        doc.rect(0, 0, 210, 60, 'F');
+        doc.setTextColor(243, 156, 18);
+        doc.setFontSize(24);
+        doc.setFont(undefined, 'bold');
+        doc.text('ATTACK METRICS', 105, 20, { align: 'center' });
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Reporte de Rendimiento Ofensivo', 105, 30, { align: 'center' });
+        
+        doc.setFontSize(18);
+        doc.setTextColor(52, 152, 219);
+        doc.text(playerName, 105, 45, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Partido: ${DB.teams.home} vs ${DB.teams.away}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
+
+        yPos = 70;
+
+        // === RESUMEN ESTADÍSTICO ===
+        doc.setFillColor(30, 30, 36);
+        doc.roundedRect(15, yPos, 180, 40, 3, 3, 'F');
+        
+        doc.setFontSize(12);
         doc.setTextColor(243, 156, 18);
         doc.setFont(undefined, 'bold');
-        doc.text('📊 RADAR DE RENDIMIENTO', 15, yPos);
-        yPos += 10;
+        doc.text('RESUMEN ESTADÍSTICO', 105, yPos + 8, { align: 'center' });
 
-        const radarData = [
-            ['Métrica', 'Valor'],
-            ['Pases (%)', (passSuccess * 100).toFixed(0) + '%'],
-            ['Regates (%)', (dribSuccess * 100).toFixed(0) + '%'],
-            ['Creatividad', creativity.toFixed(1)],
-            ['Participación', (involvement * 100).toFixed(0) + '%'],
-            ['Eficiencia', (efficiency * 100).toFixed(0) + '%']
+        const boxW = 28;
+        const startX = 18;
+        const boxY = yPos + 15;
+        
+        const statBoxes = [
+            { label: 'ACCIONES', val: stats.acciones, color: [52, 152, 219] },
+            { label: 'PASES', val: stats.pases, color: [46, 204, 113] },
+            { label: 'REGATES', val: stats.regates, color: [241, 196, 15] },
+            { label: 'P.CLAVE', val: stats.clave, color: [155, 89, 182] },
+            { label: 'ASIST', val: stats.asist, color: [26, 188, 156] },
+            { label: 'PÉRDIDAS', val: stats.perdidas, color: [231, 76, 60] }
         ];
 
-        doc.autoTable({
-            startY: yPos,
-            head: [radarData[0]],
-            body: radarData.slice(1),
-            theme: 'grid',
-            headStyles: { fillColor: [243, 156, 18], textColor: 0, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 10 },
-            alternateRowStyles: { fillColor: [40, 40, 40] },
-            margin: { left: 60, right: 60 }
+        statBoxes.forEach((box, i) => {
+            const x = startX + (i * 30);
+            doc.setDrawColor(box.color[0], box.color[1], box.color[2]);
+            doc.setLineWidth(0.5);
+            doc.rect(x, boxY, boxW, 14);
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(box.color[0], box.color[1], box.color[2]);
+            doc.text(String(box.val), x + boxW/2, boxY + 7, { align: 'center' });
+            doc.setFontSize(6);
+            doc.setTextColor(150, 150, 150);
+            doc.text(box.label, x + boxW/2, boxY + 11, { align: 'center' });
         });
 
-        yPos = doc.lastAutoTable.finalY + 10;
-    }
+        yPos += 50;
 
-    // === TABLA DE ACCIONES ===
-    if(includeTable) {
-        if(yPos > 220) {
-            doc.addPage();
-            yPos = 20;
+        // === MAPA DE CALOR ===
+        if(includeHeatmap && filteredActions.length > 0) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 800;
+            tempCanvas.height = 533;
+            const ctx = tempCanvas.getContext('2d');
+            
+            // Dibujar campo
+            ctx.fillStyle = "#2d5016";
+            ctx.fillRect(0, 0, 800, 533);
+            ctx.strokeStyle = "rgba(255,255,255,0.3)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(20, 20, 760, 493);
+            
+            // Dibujar puntos de calor
+            ctx.globalCompositeOperation = 'lighter';
+            filteredActions.forEach(a => {
+                if(a.x < 0 || a.y < 0) return;
+                const xPct = a.x / 100;
+                const yPct = a.y / 80;
+                const x = 20 + (760 * xPct);
+                const y = 20 + (493 * yPct);
+                const grd = ctx.createRadialGradient(x, y, 0, x, y, 35);
+                const intensity = a.res === 'Completado' || a.res === 'Exitoso' ? 0.7 : 0.3;
+                const color = a.res === 'Completado' || a.res === 'Exitoso' ? '46,204,113' : '231,76,60';
+                grd.addColorStop(0, `rgba(${color},${intensity})`);
+                grd.addColorStop(1, `rgba(${color},0)`);
+                ctx.fillStyle = grd;
+                ctx.beginPath();
+                ctx.arc(x, y, 35, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalCompositeOperation = 'source-over';
+
+            const heatmapImg = tempCanvas.toDataURL('image/png');
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('🔥 MAPA DE CALOR DE ACCIONES', 15, yPos);
+            yPos += 5;
+            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 120);
+            yPos += 125;
         }
-        doc.setFontSize(11);
-        doc.setTextColor(243, 156, 18);
-        doc.setFont(undefined, 'bold');
-        doc.text('📋 DETALLE DE ACCIONES', 15, yPos);
-        yPos += 5;
 
-        const tableData = filteredActions.slice(0, 30).map(a => [
-            `${Math.floor(a.time/60)}:${(a.time%60).toString().padStart(2,'0')}`,
-            a.type,
-            a.zone || '-',
-            a.res,
-            a.xt ? a.xt.toFixed(2) : '-'
-        ]);
+        // === RADAR ===
+        if(includeRadar) {
+            if(yPos > 200) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            // Calcular métricas para radar
+            const totalActions = filteredActions.length;
+            const passSuccess = stats.pases / Math.max(1, filteredActions.filter(a => a.type === 'Pase').length);
+            const dribSuccess = stats.regates / Math.max(1, filteredActions.filter(a => a.type === 'Regate').length);
+            const creativity = (stats.clave + stats.asist) / Math.max(1, totalActions) * 10;
+            const involvement = Math.min(totalActions / 50, 1); // Normalizado
+            const efficiency = (stats.acciones - stats.perdidas) / Math.max(1, stats.acciones);
 
-        doc.autoTable({
-            startY: yPos,
-            head: [['Minuto', 'Tipo', 'Zona', 'Resultado', 'xT']],
-            body: tableData,
-            theme: 'grid',
-            headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-            bodyStyles: { fontSize: 7, textColor: [200, 200, 200] },
-            alternateRowStyles: { fillColor: [30, 30, 36] },
-            styles: { cellPadding: 1.5, lineColor: [60, 60, 60], lineWidth: 0.1 },
-            margin: { left: 15, right: 15 }
-        });
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('📊 RADAR DE RENDIMIENTO', 15, yPos);
+            yPos += 10;
+
+            const radarData = [
+                ['Métrica', 'Valor'],
+                ['Pases (%)', (passSuccess * 100).toFixed(0) + '%'],
+                ['Regates (%)', (dribSuccess * 100).toFixed(0) + '%'],
+                ['Creatividad', creativity.toFixed(1)],
+                ['Participación', (involvement * 100).toFixed(0) + '%'],
+                ['Eficiencia', (efficiency * 100).toFixed(0) + '%']
+            ];
+
+            doc.autoTable({
+                startY: yPos,
+                head: [radarData[0]],
+                body: radarData.slice(1),
+                theme: 'grid',
+                headStyles: { fillColor: [243, 156, 18], textColor: 0, fontStyle: 'bold' },
+                bodyStyles: { fontSize: 10 },
+                alternateRowStyles: { fillColor: [40, 40, 40] },
+                margin: { left: 60, right: 60 }
+            });
+
+            yPos = doc.lastAutoTable.finalY + 10;
+        }
+
+        // === TABLA DE ACCIONES ===
+        if(includeTable) {
+            if(yPos > 220) {
+                doc.addPage();
+                yPos = 20;
+            }
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('📋 DETALLE DE ACCIONES', 15, yPos);
+            yPos += 5;
+
+            const tableData = filteredActions.slice(0, 30).map(a => [
+                `${Math.floor(a.time/60)}:${(a.time%60).toString().padStart(2,'0')}`,
+                a.type,
+                a.zone || '-',
+                a.res,
+                a.xt ? a.xt.toFixed(2) : '-'
+            ]);
+
+            doc.autoTable({
+                startY: yPos,
+                head: [['Minuto', 'Tipo', 'Zona', 'Resultado', 'xT']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { fontSize: 7, textColor: [200, 200, 200] },
+                alternateRowStyles: { fillColor: [30, 30, 36] },
+                styles: { cellPadding: 1.5, lineColor: [60, 60, 60], lineWidth: 0.1 },
+                margin: { left: 15, right: 15 }
+            });
+        }
+
+        // === PIE DE PÁGINA ===
+        const pageCount = doc.internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generado por Attack Metrics v3.1 - Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+        }
+
+        // Descargar
+        const fileName = `Reporte_${playerName.replace(/ /g, '_')}_${DB.teams.home}_vs_${DB.teams.away}.pdf`;
+        doc.save(fileName);
+        document.getElementById('modalReport').style.display = 'none';
+    } catch(error) {
+        console.error('Error generando PDF:', error);
+        alert('Error generando PDF: ' + error.message);
     }
-
-    // === PIE DE PÁGINA ===
-    const pageCount = doc.internal.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Generado por Attack Metrics v3.1 - Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
-    }
-
-    // Descargar
-    const fileName = `Reporte_${playerName.replace(/ /g, '_')}_${DB.teams.home}_vs_${DB.teams.away}.pdf`;
-    doc.save(fileName);
-    closeModal('modalReport');
 }
 </script>
 </body>
