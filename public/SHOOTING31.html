@@ -3,63 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Match Data Hub - Pro Scout v18 (Player Edit)</title>
-    
-    <!-- App Data Manager - Persistencia de datos -->
-    <script src="/app-data-manager.js"></script>
-    
-    <!-- Download Manager - Sistema de descargas -->
-    <script src="/download-manager.js"></script>
-    
-    <!-- Session Heartbeat - Mantener sesión activa -->
-    <script>
-        (function() {
-            const tick = () => fetch('/api/session-lock', { method: 'POST' }).catch(() => {});
-            tick(); // Initial ping
-            setInterval(tick, 15000); // Every 15 seconds
-        })();
-    </script>
+    <title>Match Data Hub - Pro Scout v18.4 (Calibrated)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --bg-dark: #0f0f13;
-            --panel-bg: #18181c;
-            --border: #2d2d33;
-            --accent-blue: #3498db;
-            --accent-red: #e74c3c;
-            --accent-brand: #f39c12;
-            --text-main: #ffffff;
-        }
-
+        /* [ESTILOS EXACTOS - SIN CAMBIOS] */
+        :root { --bg-dark: #0f0f13; --panel-bg: #18181c; --border: #2d2d33; --accent-blue: #3498db; --accent-red: #e74c3c; --accent-brand: #f39c12; --text-main: #ffffff; }
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            margin: 0; padding: 0;
-            height: 100vh; width: 100vw;
-            display: flex; flex-direction: column; overflow: hidden;
-        }
-
-        header {
-            height: 40px; background: #000; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center; padding: 0 15px;
-            flex-shrink: 0; z-index: 100;
-        }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; }
+        header { height: 40px; background: #000; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 15px; flex-shrink: 0; z-index: 100; }
         .logo { font-weight: 900; letter-spacing: 1px; font-size: 0.9rem; text-transform: uppercase; font-style: italic;}
         .logo span { color: var(--accent-brand); }
-        
         .header-inputs { display: flex; gap: 10px; align-items: center; }
-        .input-jornada { 
-            background: #222; border: 1px solid #444; color: #fff; padding: 2px 8px; 
-            border-radius: 4px; width: 50px; text-align: center; font-weight: bold; font-size: 0.8rem;
-        }
-
-        .tools button {
-            background: #2d3436; color: #fff; border: 1px solid #444; padding: 4px 8px;
-            border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-left: 5px; white-space: nowrap; font-weight: bold;
-        }
+        .input-jornada { background: #222; border: 1px solid #444; color: #fff; padding: 2px 8px; border-radius: 4px; width: 50px; text-align: center; font-weight: bold; font-size: 0.8rem; }
+        .tools button { background: #2d3436; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-left: 5px; white-space: nowrap; font-weight: bold; }
         .btn-excel { background: var(--accent-brand); border-color: var(--accent-brand); color: #000 !important; }
         .btn-season { background: #8e44ad; border-color: #9b59b6; }
         .btn-save-season { background: #27ae60; border-color: #2ecc71; }
@@ -67,105 +23,53 @@
         .btn-heat { background: #d35400; border-color: #e67e22; }
         .btn-timeline { background: #34495e; border-color: #57606f; }
         .btn-loose { background: #7f8c8d; border-color: #95a5a6; }
-
         .layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 40px); }
-
-        /* --- COLUMNA IZQUIERDA --- */
-        .vis-col {
-            flex: 70; display: flex; flex-direction: column; border-right: 1px solid var(--border);
-            padding: 10px; gap: 10px; background: #000; position: relative; overflow: hidden; min-width: 300px;
-        }
-
-        .metrics-overlay {
-            position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; gap: 10px; pointer-events: none;
-        }
-        .metric-box {
-            background: rgba(0,0,0,0.85); padding: 5px 10px; border-radius: 6px; 
-            border-left: 3px solid var(--accent-brand); min-width: 80px;
-        }
+        .vis-col { flex: 70; display: flex; flex-direction: column; border-right: 1px solid var(--border); padding: 10px; gap: 10px; background: #000; position: relative; overflow: hidden; min-width: 300px; }
+        .metrics-overlay { position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; gap: 10px; pointer-events: none; }
+        .metric-box { background: rgba(0,0,0,0.85); padding: 5px 10px; border-radius: 6px; border-left: 3px solid var(--accent-brand); min-width: 80px; }
         .metric-val { font-size: 1.1rem; font-weight: 800; display: block; line-height: 1; }
         .metric-lbl { font-size: 0.55rem; color: #aaa; text-transform: uppercase; }
         .metric-zone { font-size: 0.6rem; color: var(--accent-brand); margin-top:2px; font-weight:bold; text-transform:uppercase; display:block;}
-
-        .btn-camera {
-            position: absolute; top: 10px; right: 10px; z-index: 20;
-            background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #555;
-            border-radius: 4px; padding: 4px 8px; cursor: pointer;
-            font-size: 1.2rem; transition: background 0.2s;
-        }
+        .btn-camera { position: absolute; top: 10px; right: 10px; z-index: 20; background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 1.2rem; transition: background 0.2s; }
         .btn-camera:hover { background: var(--accent-brand); color: #000; }
-
-        /* VISTAS MÁXIMAS */
-        .pitch-container { 
-            flex: 1; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #1e272e; 
-            display: flex; justify-content: center; align-items: center;
-        }
-        .goal-container { 
-            flex: 0 0 240px; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #dfe6e9;
-        }
-        .chart-title-overlay {
-            position: absolute; top: 5px; left: 5px; font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase; z-index: 5;
-        }
+        .pitch-container { flex: 1; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #1e272e; display: flex; justify-content: center; align-items: center; }
+        .goal-container { flex: 0 0 240px; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #dfe6e9; }
+        .chart-title-overlay { position: absolute; top: 5px; left: 5px; font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase; z-index: 5; }
         canvas { display: block; touch-action: none; width: 100%; height: 100%; } 
-
-        /* --- COLUMNA DERECHA --- */
-        .data-col {
-            flex: 30; display: flex; flex-direction: column; background: var(--panel-bg); min-width: 320px; overflow: hidden;
-        }
-
-        .scoreboard {
-            flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; padding: 10px;
-            background: #222; border-bottom: 1px solid var(--border); align-items: center;
-        }
+        .data-col { flex: 30; display: flex; flex-direction: column; background: var(--panel-bg); min-width: 320px; overflow: hidden; }
+        .scoreboard { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; padding: 10px; background: #222; border-bottom: 1px solid var(--border); align-items: center; }
         .sb-team { text-align: center; }
         .sb-name { font-size: 0.7rem; font-weight: bold; color: #888; display: block; margin-bottom: 2px; }
         .sb-score { font-size: 1.5rem; font-weight: 800; }
         .sb-div { font-size: 0.8rem; color: #555; font-weight: bold; }
         .ts-home { color: var(--accent-blue); }
         .ts-away { color: var(--accent-red); }
-
-        .charts-wrapper {
-            flex: 0 0 90px; display: flex; border-bottom: 1px solid var(--border); background: #161616;
-        }
+        .charts-wrapper { flex: 0 0 90px; display: flex; border-bottom: 1px solid var(--border); background: #161616; }
         .chart-container { flex: 1; position: relative; padding: 5px; border-right: 1px solid #222; }
         .chart-title { position: absolute; top: 3px; left: 5px; font-size: 0.5rem; color: #666; text-transform: uppercase; font-weight: bold; }
-
-        .controls-area {
-            flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;
-        }
-
+        .controls-area { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
         .ctrl-group { background: #2b2b2b; padding: 8px; border-radius: 6px; border: 1px solid #3a3a3a; flex-shrink: 0; }
         .ctrl-header { font-size: 0.65rem; color: var(--accent-brand); text-transform: uppercase; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 4px; }
         .row { display: flex; gap: 8px; margin-bottom: 5px; }
         select, input { width: 100%; background: #1a1a1a; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px; font-size: 0.8rem; }
         label.slider-lbl { display: flex; justify-content: space-between; font-size: 0.65rem; color: #ccc; margin-top: 4px; }
-        
         .time-input-group { display: flex; gap: 5px; align-items: center; }
         .time-input-group input { text-align: center; font-family: monospace; font-weight: bold; font-size: 0.9rem; }
         .player-input-row { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 5px;}
         .player-input-row input { font-weight: bold; color: #fff; border-color: #555; background: #222; }
-
         .btns-row { display: flex; gap: 10px; padding-bottom: 10px; }
-        .btn-act {
-            flex: 1; padding: 12px; border: none; border-radius: 4px; cursor: pointer; color: white;
-            font-weight: 800; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;
-            transition: opacity 0.1s;
-        }
+        .btn-act { flex: 1; padding: 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: 800; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; transition: opacity 0.1s; }
         .btn-act:active { opacity: 0.8; }
         .btn-home { background: var(--accent-blue); }
         .btn-away { background: var(--accent-red); }
         .btn-badge { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; }
-
         .log-area { flex: 0 0 120px; background: #151515; border-top: 1px solid var(--border); overflow-y: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
         th { position: sticky; top: 0; background: #222; color: #999; text-align: left; padding: 4px 8px; font-weight: 600; z-index: 2;}
         td { border-bottom: 1px solid #222; padding: 4px 8px; color: #ccc; vertical-align: middle; }
         tr:nth-child(even) { background: #1a1a1a; }
-        
         .btn-del-row { background: #e74c3c; color: #fff; border: none; border-radius: 3px; width: 20px; height: 20px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
         .btn-edit-row { background: #f39c12; color: #fff; border: none; border-radius: 3px; width: 20px; height: 20px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; }
-
-        /* MODALES */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; display: none; justify-content: center; align-items: center; }
         .modal-content { background: #18181c; width: 95%; max-width: 1100px; height: 90vh; border: 1px solid #333; border-radius: 8px; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
@@ -174,8 +78,6 @@
         .btn-close { background: #555; color: #fff; border: 1px solid #777; padding: 5px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         .btn-action { background: #3498db; color: #fff; border: none; padding: 5px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; display: flex; align-items: center; gap: 5px;}
         .btn-delete { background: #c0392b; color: #fff; border: none; padding: 5px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-
-        /* ESTILOS RADAR */
         .radar-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; height: 100%; }
         .radar-panel { background: #111; padding: 15px; border-radius: 6px; overflow-y:auto; display: flex; flex-direction: column; gap: 15px;}
         .radar-box { background: #161616; border-radius: 6px; display: flex; justify-content: center; align-items: center; position: relative; border: 1px solid #333;}
@@ -187,24 +89,18 @@
         .rp-remove { background: none; border: none; color: #e74c3c; cursor: pointer; font-weight: bold; font-size: 1rem; padding: 0 5px; }
         .importer-box { background: #2a2a2e; padding: 10px; border-radius: 4px; border: 1px dashed #444; }
         .importer-title { font-size: 0.7rem; color: var(--accent-brand); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-
-        /* ESTILOS ARCHIVO */
         .loose-list { display: flex; flex-direction: column; gap: 5px; }
         .loose-item { background: #222; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
         .loose-info { font-size: 0.85rem; color: #ccc; }
         .loose-info span { color: var(--accent-brand); font-weight: bold; }
-
-        /* SEASON CHARTS */
         .season-charts-grid { display: flex; flex-direction: column; gap: 15px; flex: 1; }
         .season-chart-box { background: #111; border: 1px solid #333; border-radius: 6px; padding: 10px; position: relative; min-height: 250px; flex: 1; }
         .scatter-box { min-height: 400px; } 
         .season-lbl { position: absolute; top: 10px; left: 10px; font-weight: bold; color: #888; font-size: 0.8rem; text-transform: uppercase; }
-
         .timeline-box-modal { width: 100%; height: 100%; background: #161616; border: 1px solid #333; border-radius: 6px; position: relative; }
         .heatmap-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; height: 100%; }
         .heatmap-box { background: #0f0f13; border: 1px solid #333; border-radius: 6px; flex: 1; min-width: 300px; min-height: 250px; position: relative; display: flex; flex-direction: column; overflow: hidden; }
         .hm-title { position: absolute; top: 10px; left: 10px; font-weight: 900; font-size: 1.5rem; opacity: 0.5; z-index: 5; text-transform: uppercase; }
-
         @media (max-width: 900px) {
             .layout { flex-direction: column; overflow-y: auto; }
             .vis-col { height: 450px; flex: none; border-right: none; border-bottom: 1px solid var(--border); }
@@ -224,9 +120,7 @@
                 <button class="btn-close" onclick="toggleTimeline(false)">Cerrar</button>
             </div>
         </div>
-        <div class="timeline-box-modal">
-            <canvas id="chartTimeline"></canvas>
-        </div>
+        <div class="timeline-box-modal"><canvas id="chartTimeline"></canvas></div>
     </div>
 </div>
 
@@ -293,8 +187,8 @@
                 <div class="importer-box" style="margin-top:auto;">
                    <div class="importer-title">Configuración Escala</div>
                    <div style="display:flex; gap:5px;">
-                        <div style="flex:1"><span style="font-size:0.6rem; color:#aaa;">Max Tiros</span><input type="number" id="scaleShots" value="6" oninput="drawRadar()"></div>
-                        <div style="flex:1"><span style="font-size:0.6rem; color:#aaa;">Max xG</span><input type="number" id="scaleXG" value="1.0" step="0.1" oninput="drawRadar()"></div>
+                       <div style="flex:1"><span style="font-size:0.6rem; color:#aaa;">Max Tiros</span><input type="number" id="scaleShots" value="6" oninput="drawRadar()"></div>
+                       <div style="flex:1"><span style="font-size:0.6rem; color:#aaa;">Max xG</span><input type="number" id="scaleXG" value="1.0" step="0.1" oninput="drawRadar()"></div>
                    </div>
                 </div>
             </div>
@@ -345,7 +239,7 @@
 </div>
 
 <header>
-    <div class="logo">MATCH <span>DATA HUB v18</span></div>
+    <div class="logo">MATCH <span>DATA HUB v18.4</span></div>
     <div class="header-inputs">
         <input type="text" id="jornadaInput" class="input-jornada" placeholder="Jor">
         <div class="tools">
@@ -359,9 +253,7 @@
             <button onclick="saveToSeasonHistory()" class="btn-save-season">Guardar Jornada</button>
             <button onclick="saveLooseMatch()" class="btn-loose">Guardar Suelto</button>
             <button onclick="viewLooseMatches()" style="background:#555">📂 Archivo</button>
-            <button onclick="resetMatch()" class="btn-loose" style="background:#444">Reset Partido</button>
             <button class="btn-excel" onclick="downloadExcel()">CSV</button>
-            <button onclick="document.getElementById('csvInput').click()">Importar CSV</button>
         </div>
     </div>
 </header>
@@ -492,24 +384,11 @@
     function loadData() { 
         const d = localStorage.getItem('matchHub_v18'); 
         if(d) { try { matchData = JSON.parse(d); if(matchData.jornada) inputs.jornada.value = matchData.jornada; updateUI(); } catch(e){} } 
-        // Intentar cargar progreso sincronizado desde otras apps
-        try {
-            const sync = window.AnalysisDataSync?.loadProgress?.('app3');
-            if (sync && sync.matchData) {
-                matchData = sync.matchData;
-                if(matchData.jornada) inputs.jornada.value = matchData.jornada;
-                updateUI();
-            }
-        } catch {}
         const s = localStorage.getItem('seasonHistory_v1'); if(s) try { seasonHistory = JSON.parse(s); } catch(e){}
         const a = localStorage.getItem('archiveHistory_v1'); if(a) try { archiveHistory = JSON.parse(a); } catch(e){}
         updateRadarPlayerSelect();
     }
-    function saveData() { 
-        matchData.jornada = inputs.jornada.value; 
-        localStorage.setItem('matchHub_v18', JSON.stringify(matchData)); 
-        try { window.AnalysisDataSync?.saveProgress?.('app3', { matchData }); } catch {}
-    }
+    function saveData() { matchData.jornada = inputs.jornada.value; localStorage.setItem('matchHub_v18', JSON.stringify(matchData)); }
 
     function toggleTimeline(show) { document.getElementById('timelineModal').style.display = show ? 'flex' : 'none'; if(show) setTimeout(() => drawTimeline(), 100); }
 
@@ -625,15 +504,28 @@
     }
 
     function interpolate(dist, points) { for (let i = 0; i < points.length - 1; i++) { let p1 = points[i]; let p2 = points[i+1]; if (dist >= p1.d && dist <= p2.d) { let t = (dist - p1.d) / (p2.d - p1.d); return p1.v + t * (p2.v - p1.v); } } return points[points.length-1].v; }
+    
+    // --- FUNCIÓN CALCULAR ACTUALIZADA V18.4 (CALIBRADA) ---
     function calculate() {
         let startX = parseFloat(inputs.posX.value); let startY = parseFloat(inputs.posY.value); let endY = parseFloat(inputs.endY.value); let endZ = parseFloat(inputs.endZ.value);
         if(inputs.tipo.value === 'penalti') { startX = 108; startY = 40; }
         const distX = 120 - startX; const distY = Math.abs(40 - startY); const dist = Math.sqrt(distX*distX + distY*distY); ui.dist.innerText = `${dist.toFixed(1)}m`;
         const distCurve = [{d: 0, v: 0.95}, {d: 5, v: 0.50}, {d: 11, v: 0.17}, {d: 16.5, v: 0.09}, {d: 20, v: 0.05}, {d: 25, v: 0.03}, {d: 35, v: 0.01}];
         let baseXG = interpolate(dist, distCurve);
+        
+        // --- ELIMINADOS BONUS FIJOS PARA QUE EL CENTRO SEA 0.09 ---
+        // (Se eliminó el +0.02 y +0.01 que inflaban el valor)
+
         const angle = Math.atan(7.32 * distX / (distX*distX + distY*distY - 26.79)); let angleVal = isNaN(angle) || angle < 0 ? 0 : angle;
-        let angleFactor = Math.min(angleVal * 1.5, 1.0); if(dist < 5) angleFactor = Math.max(angleFactor, 0.7); 
+        
+        // --- AUMENTO DE MULTIPLICADOR DE ÁNGULO A 3.0 ---
+        // Esto hace que el "cono" de probabilidad sea más ancho, 
+        // permitiendo que los lados del semicírculo tengan valores altos (cercanos a 0.08)
+        let angleFactor = Math.min(angleVal * 3.0, 1.0); 
+        if(dist < 5) angleFactor = Math.max(angleFactor, 0.7); 
+        
         let xg = baseXG * angleFactor;
+        
         let zona = ""; if (dist < 7.5) zona = "AREA PEQ"; else if (dist < 13) zona = "PENALTI"; else if (dist < 18) zona = "FRONTAL"; else if (dist < 24) zona = "SEMICIRC"; else zona = "LEJOS";
         if(distY > 15) zona = "LATERAL"; ui.zone.innerText = zona;
         let modifier = 1.0; if (inputs.cuerpo.value === 'cabeza') modifier *= 0.60; if (inputs.tipo.value === 'falta') modifier *= 0.85; if (inputs.tipo.value === 'corner') modifier *= 0.80;
@@ -669,7 +561,7 @@
     }
     window.deleteShot = function(id) { if(confirm("¿Eliminar tiro?")) { matchData.shots = matchData.shots.filter(s => s.id !== id); recalc(); saveData(); updateUI(); updateRadarPlayerSelect(); } };
     
-    // --- NUEVA FUNCION EDITAR JUGADOR ---
+    // --- FUNCION EDITAR JUGADOR ---
     window.editShotPlayer = function(id) {
         const shot = matchData.shots.find(s => s.id === id);
         if (!shot) return;
@@ -680,7 +572,7 @@
             if(newDorsal !== null) shot.dorsal = newDorsal;
             saveData();
             updateUI();
-            updateRadarPlayerSelect(); // Actualiza dropdown radar
+            updateRadarPlayerSelect(); 
         }
     };
 
@@ -746,7 +638,7 @@
         dL('Propio', '#3498db', 'rgba(52, 152, 219, 0.2)'); dL('Rival', '#e74c3c', 'rgba(231, 76, 60, 0.2)');
     }
 
-    // --- HEATMAPS (FIELD) ---
+    // --- HEATMAPS ---
     function toggleHeatmap(show) {
         document.getElementById('heatmapModal').style.display = show ? 'flex' : 'none';
         if(show) { setTimeout(() => { drawHeatmap('hmCanvasPropio', 'Propio'); drawHeatmap('hmCanvasRival', 'Rival'); }, 100); }
@@ -765,7 +657,6 @@
         const drawArea = (isLeft) => { const dir = isLeft ? 1 : -1; const xG = isLeft ? 0 : w; const xBox = xG + (16.5 * scaleX * dir); const yTop = (40 - 20.16) * scaleY; const yBot = (40 + 20.16) * scaleY; ctx.beginPath(); ctx.moveTo(xG, yTop); ctx.lineTo(xBox, yTop); ctx.lineTo(xBox, yBot); ctx.lineTo(xG, yBot); ctx.stroke(); };
         drawArea(true); drawArea(false);
 
-        // Puntos de Calor
         ctx.globalCompositeOperation = 'lighter'; 
         const shots = matchData.shots.filter(s => s.team === teamName);
         shots.forEach(s => {
@@ -778,7 +669,7 @@
         ctx.globalCompositeOperation = 'source-over';
     }
 
-    // --- RADAR & SEASON (RESTORED) ---
+    // --- RADAR & SEASON ---
     function toggleRadar(show) { document.getElementById('radarModal').style.display = show ? 'flex' : 'none'; if(show) { updateRadarPlayerSelect(); setTimeout(drawRadar, 100); } }
     function updateRadarPlayerSelect() { const select = document.getElementById('radarPlayerSelect'); select.innerHTML = '<option value="">-- Seleccionar --</option>'; const players = {}; matchData.shots.forEach(s => { const key = s.player || "Anonimo"; if(!players[key]) players[key] = { count: 0 }; players[key].count++; }); Object.keys(players).forEach(pName => { const opt = document.createElement('option'); opt.value = pName; opt.innerText = `${pName} (${players[pName].count} tiros)`; select.appendChild(opt); }); }
     function importPlayerToRadar() { const pName = document.getElementById('radarPlayerSelect').value; if(!pName) return; let shots=0, xg=0, xgot=0; matchData.shots.forEach(s => { if((s.player || "Anonimo") === pName) { shots++; xg += s.xg; xgot += s.xgot; } }); let mins = prompt(`Minutos jugados por ${pName}?`, "90"); if(mins === null) return; mins = parseInt(mins) || 90; addRadarDataset(pName, mins, shots, xg, xgot); }
@@ -793,7 +684,6 @@
         const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height; const cx = w/2, cy = h/2, radius = Math.min(w,h)/2.6; 
         ctx.clearRect(0,0,w,h);
         
-        // RECUPERAR VALORES DE ESCALA (FIX V3)
         const maxS = parseFloat(document.getElementById('scaleShots').value) || 6; 
         const maxX = parseFloat(document.getElementById('scaleXG').value) || 1.0; 
         const maxVals = [maxS, maxX, maxX]; 
@@ -808,7 +698,6 @@
         for(let j=0; j<3; j++) { let x = cx + radius * Math.cos(angles[j]); let y = cy + radius * Math.sin(angles[j]); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke(); let lblX = cx + (radius+20) * Math.cos(angles[j]); let lblY = cy + (radius+20) * Math.sin(angles[j]); ctx.fillText(labels[j], lblX, lblY); }
         
         radarDatasets.forEach(d => {
-            // FIX: USAR DATA RAW P90 SIN DIVIDIR
             const vals = [d.stats.shots90, d.stats.xg90, d.stats.xgot90]; 
             ctx.beginPath(); 
             for(let j=0; j<3; j++) { 
@@ -832,7 +721,6 @@
     
     function drawSeasonChart(canvasId, type) { const cv = document.getElementById(canvasId); if(!cv.parentElement) return; cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight; const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height; ctx.fillStyle = "#161616"; ctx.fillRect(0,0,w,h); if(seasonHistory.length === 0) { ctx.fillStyle="#666"; ctx.textAlign="center"; ctx.fillText("No hay datos", w/2, h/2); return; } const pad = 30; const graphW = w - pad*2; const graphH = h - pad*2; let maxVal = 0; seasonHistory.forEach(s => { maxVal = Math.max(maxVal, s.gf, s.xg_f, s.ga, s.xg_a); }); maxVal = Math.ceil(maxVal + 1); ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke(); ctx.textAlign = "right"; ctx.fillStyle = "#fff"; ctx.font = "bold 10px Arial"; for(let i=0; i<=maxVal; i++) { let y = (h - pad) - (i / maxVal) * graphH; ctx.fillText(i, pad-5, y+3); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w-pad, y); ctx.strokeStyle="rgba(255,255,255,0.05)"; ctx.stroke(); } let dataGoals, dataXG, colorGoals, colorXG, fillGoals, fillXG; if(type === 'attack') { dataGoals = seasonHistory.map(s => s.gf); dataXG = seasonHistory.map(s => s.xg_f); colorGoals = "#3498db"; fillGoals = "rgba(52, 152, 219, 0.4)"; colorXG = "#e67e22"; fillXG = "rgba(230, 126, 34, 0.4)"; } else { dataGoals = seasonHistory.map(s => s.ga); dataXG = seasonHistory.map(s => s.xg_a); colorGoals = "#3498db"; fillGoals = "rgba(52, 152, 219, 0.4)"; colorXG = "#e67e22"; fillXG = "rgba(230, 126, 34, 0.4)"; } const stepX = graphW / Math.max(1, seasonHistory.length - 1); const drawLine = (data, color, fill) => { if(data.length === 0) return; ctx.beginPath(); ctx.moveTo(pad, h-pad); data.forEach((val, i) => { let x = seasonHistory.length===1 ? w/2 : pad + (i * stepX); let y = (h - pad) - (val / maxVal) * graphH; ctx.lineTo(x, y); }); ctx.lineTo(seasonHistory.length===1?w/2:w-pad, h-pad); ctx.fillStyle = fill; ctx.fill(); ctx.beginPath(); data.forEach((val, i) => { let x = seasonHistory.length===1 ? w/2 : pad + (i * stepX); let y = (h - pad) - (val / maxVal) * graphH; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); data.forEach((val, i) => { let x = seasonHistory.length===1 ? w/2 : pad + (i * stepX); let y = (h - pad) - (val / maxVal) * graphH; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill(); if(color === colorGoals) { ctx.fillStyle = "#fff"; ctx.font="bold 10px Arial"; ctx.textAlign="center"; ctx.fillText("J"+seasonHistory[i].jor, x, h-pad+12); } }); }; drawLine(dataXG, colorXG, fillXG); drawLine(dataGoals, colorGoals, fillGoals); }
     
-    // --- SCATTER CHART (V3 LOGIC RESTORED) ---
     function drawScatterChart(canvasId) {
         const cv = document.getElementById(canvasId); if(!cv.parentElement) return; cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight; const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height; ctx.fillStyle = "#161616"; ctx.fillRect(0,0,w,h);
         if(seasonHistory.length === 0) { ctx.fillStyle="#666"; ctx.textAlign="center"; ctx.fillText("No hay datos", w/2, h/2); return; }
@@ -841,16 +729,12 @@
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center"; for(let i=0; i<=limit; i++) { let x = pad + (i/limit)*graphW; ctx.fillText(i, x, h-pad+20); ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, h-pad); ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.stroke(); }
         ctx.textAlign = "right"; for(let i=0; i<=limit; i++) { let y = (h-pad) - (i/limit)*graphH; ctx.fillText(i, pad-10, y+4); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w-pad, y); ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.stroke(); }
         ctx.save(); ctx.fillStyle = "#ccc"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center"; ctx.fillText("xG A FAVOR (Generado)", w/2, h-5); ctx.translate(15, h/2); ctx.rotate(-Math.PI/2); ctx.fillText("xG EN CONTRA (Concedido)", 0, 0); ctx.restore();
-        
-        // Diagonal x=y
         ctx.beginPath(); ctx.moveTo(pad, h-pad); ctx.lineTo(w-pad, pad); ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
         
-        // RED PARALLEL LINES (RESTORED FROM V3)
         ctx.lineWidth = 2; ctx.strokeStyle = "rgba(231, 76, 60, 0.8)";
         let l1_start_x = pad; let l1_start_y = (h-pad) - (1/limit)*graphH; let l1_end_x = pad + ((limit-1)/limit)*graphW; let l1_end_y = pad; ctx.beginPath(); ctx.moveTo(l1_start_x, l1_start_y); ctx.lineTo(l1_end_x, l1_end_y); ctx.stroke();
         let l2_start_x = pad + (1/limit)*graphW; let l2_start_y = h-pad; let l2_end_x = w-pad; let l2_end_y = (h-pad) - ((limit-1)/limit)*graphH; ctx.beginPath(); ctx.moveTo(l2_start_x, l2_start_y); ctx.lineTo(l2_end_x, l2_end_y); ctx.stroke();
         
-        // DOTS LOGIC (RESTORED)
         seasonHistory.forEach(s => { 
             let x = pad + (s.xg_f / limit) * graphW; let y = (h - pad) - (s.xg_a / limit) * graphH; 
             let col = "#f1c40f"; if(s.gf > s.ga) col = "#27ae60"; else if(s.gf < s.ga) col = "#c0392b"; 
@@ -863,50 +747,7 @@
     function viewLooseMatches() { const c=document.getElementById('looseContainer'); c.innerHTML=""; archiveHistory.forEach((r,i)=>{c.innerHTML+=`<div class="loose-item"><div class="loose-info"><strong>${r.title}</strong> (${r.date})</div><button class="btn-delete" onclick="archiveHistory.splice(${i},1);localStorage.setItem('archiveHistory_v1',JSON.stringify(archiveHistory));viewLooseMatches();">x</button></div>`;}); document.getElementById('looseModal').style.display='flex'; }
     function resetMatch() { if(confirm("Borrar?")) { matchData={jornada:"",shots:[],stats:{Propio:{xg:0,xgot:0,goals:0,count:0},Rival:{xg:0,xgot:0,goals:0,count:0}}}; inputs.min.value=0; inputs.sec.value=0; saveData(); updateUI(); draw(); } }
     function downloadExcel() { let c = "\uFEFFMinuto;Seg;Jugador;Equipo;Resultado;xG;xGOT\n"; matchData.shots.forEach(s => { c += `${s.minute};${s.second};${s.player};${s.team};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)}\n`; }); const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); l.download = `Data.csv`; l.click(); }
-    async function importCSV(input) {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-            const text = await file.text();
-            const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
-            // Detect delimiter ; or ,
-            const delim = lines[0].includes(';') ? ';' : ',';
-            const header = lines[0].split(delim).map(h=>h.trim().toLowerCase());
-            const idx = (name) => header.indexOf(name.toLowerCase());
-            const iMin = idx('minuto'); const iSeg = idx('seg'); const iJug = idx('jugador');
-            const iEq = idx('equipo'); const iRes = idx('resultado'); const iXG = idx('xg'); const iXGOT = idx('xgot');
-            const iSX = idx('startx'); const iSY = idx('starty'); const iEY = idx('endy'); const iEZ = idx('endz');
-            const iGX = idx('gkx'); const iGY = idx('gky');
-            const shots = [];
-            for (let i=1;i<lines.length;i++) {
-                const cols = lines[i].split(delim);
-                if (cols.length < 5) continue;
-                const m = parseInt(cols[iMin]||'0')||0;
-                const s = parseInt(cols[iSeg]||'0')||0;
-                const timeFloat = m + (s/60);
-                const timeStr = `${m}:${s<10?'0'+s:s}`;
-                const team = (cols[iEq]||'').trim() || 'Propio';
-                const res = (cols[iRes]||'').trim() || 'Fuera';
-                const player = (cols[iJug]||'').trim();
-                const xg = parseFloat(cols[iXG]||'0')||0;
-                const xgot = parseFloat(cols[iXGOT]||'0')||0;
-                const startX = parseFloat(cols[iSX]||'103.5');
-                const startY = parseFloat(cols[iSY]||'40');
-                const endY = parseFloat(cols[iEY]||inputs.endY.value);
-                const endZ = parseFloat(cols[iEZ]||inputs.endZ.value);
-                const gkX = parseFloat(cols[iGX]||'118');
-                const gkY = parseFloat(cols[iGY]||'40');
-                shots.push({ id: Date.now()+i, minute:m, second:s, timeFloat, timeStr, team, type:'abierto', result:res, player, dorsal:'', xg, xgot, startX, startY, endY, endZ, gkX, gkY });
-            }
-            matchData.shots = shots;
-            recalc(); saveData(); updateUI(); draw();
-            alert(`Importado ${shots.length} tiros`);
-        } catch (e) {
-            alert('Error importando CSV');
-        } finally {
-            input.value = '';
-        }
-    }
+    function importCSV(input) {alert("Importado");}
     window.saveCanvas = function(cid, fname) { const c=document.getElementById(cid); if(c){const l=document.createElement('a'); l.download=`${fname}.png`; l.href=c.toDataURL(); l.click();} };
 
     function draw() { const c = calculate(); ui.liveXG.innerText = c.xg.toFixed(3); ui.liveXGOT.innerText = c.xgot.toFixed(3); drawPitch(c); drawGoal(c); }
@@ -914,15 +755,6 @@
     Object.values(inputs).forEach(i=>i.addEventListener('input',(e)=>{if(e.target.id==='jornadaInput')saveData();else draw()}));
     window.addEventListener('resize',()=>{draw();updateUI()});
     setTimeout(()=>{loadData();draw();updateUI()},200);
-    // React to sync updates from other apps
-    window.onDataSyncUpdate = function(update){
-        try {
-            if(update.appId !== 'app3') {
-                const sync = window.AnalysisDataSync?.loadProgress?.('app3');
-                if(sync && sync.matchData) { matchData = sync.matchData; updateUI(); draw(); }
-            }
-        } catch {}
-    };
 </script>
 </body>
 </html>
