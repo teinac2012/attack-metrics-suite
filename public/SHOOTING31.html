@@ -13,9 +13,9 @@
         header { height: 40px; background: #000; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 15px; flex-shrink: 0; z-index: 100; }
         .logo { font-weight: 900; letter-spacing: 1px; font-size: 0.9rem; text-transform: uppercase; font-style: italic;}
         .logo span { color: var(--accent-brand); }
-        .header-inputs { display: flex; gap: 10px; align-items: center; }
-        .input-jornada { background: #222; border: 1px solid #444; color: #fff; padding: 2px 8px; border-radius: 4px; width: 50px; text-align: center; font-weight: bold; font-size: 0.8rem; }
-        .tools button { background: #2d3436; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-left: 5px; white-space: nowrap; font-weight: bold; }
+        .header-inputs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
+        .input-jornada { background: #222; border: 1px solid #444; color: #fff; padding: 2px 6px; border-radius: 4px; width: 50px; text-align: center; font-weight: bold; font-size: 0.75rem; }
+        .tools button { background: #2d3436; color: #fff; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; cursor: pointer; margin-left: 4px; white-space: nowrap; font-weight: bold; padding: 5px 8px; }
         .btn-excel { background: var(--accent-brand); border-color: var(--accent-brand); color: #000 !important; }
         .btn-season { background: #8e44ad; border-color: #9b59b6; }
         .btn-save-season { background: #27ae60; border-color: #2ecc71; }
@@ -23,33 +23,33 @@
         .btn-heat { background: #d35400; border-color: #e67e22; }
         .btn-timeline { background: #34495e; border-color: #57606f; }
         .btn-loose { background: #7f8c8d; border-color: #95a5a6; }
-        .layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 40px); }
-        .vis-col { flex: 70; display: flex; flex-direction: column; border-right: 1px solid var(--border); padding: 10px; gap: 10px; background: #000; position: relative; overflow: hidden; min-width: 300px; }
-        .metrics-overlay { position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; gap: 10px; pointer-events: none; }
-        .metric-box { background: rgba(0,0,0,0.85); padding: 5px 10px; border-radius: 6px; border-left: 3px solid var(--accent-brand); min-width: 80px; }
+        .layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 40px); width: 100%; }
+        .vis-col { flex: 65; display: flex; flex-direction: column; border-right: 1px solid var(--border); padding: 10px; gap: 10px; background: #000; position: relative; overflow: hidden; min-width: 350px; }
+        .metrics-overlay { position: absolute; top: 10px; left: 10px; z-index: 10; display: flex; gap: 8px; pointer-events: none; flex-wrap: wrap; max-width: 300px; }
+        .metric-box { background: rgba(0,0,0,0.85); padding: 4px 8px; border-radius: 6px; border-left: 3px solid var(--accent-brand); min-width: 75px; }
         .metric-val { font-size: 1.1rem; font-weight: 800; display: block; line-height: 1; }
         .metric-lbl { font-size: 0.55rem; color: #aaa; text-transform: uppercase; }
         .metric-zone { font-size: 0.6rem; color: var(--accent-brand); margin-top:2px; font-weight:bold; text-transform:uppercase; display:block;}
         .btn-camera { position: absolute; top: 10px; right: 10px; z-index: 20; background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 1.2rem; transition: background 0.2s; }
         .btn-camera:hover { background: var(--accent-brand); color: #000; }
-        .pitch-container { flex: 1; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #1e272e; display: flex; justify-content: center; align-items: center; }
-        .goal-container { flex: 0 0 240px; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #dfe6e9; }
+        .pitch-container { flex: 1.2; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #1e272e; display: flex; justify-content: center; align-items: center; min-height: 250px; }
+        .goal-container { flex: 0 0 180px; position: relative; border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #dfe6e9; }
         .chart-title-overlay { position: absolute; top: 5px; left: 5px; font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase; z-index: 5; }
         canvas { display: block; touch-action: none; width: 100%; height: 100%; } 
-        .data-col { flex: 30; display: flex; flex-direction: column; background: var(--panel-bg); min-width: 320px; overflow: hidden; }
-        .scoreboard { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; padding: 10px; background: #222; border-bottom: 1px solid var(--border); align-items: center; }
+        .data-col { flex: 35; display: flex; flex-direction: column; background: var(--panel-bg); min-width: 320px; overflow: hidden; border-left: 1px solid var(--border); }
+        .scoreboard { flex: 0 0 60px; display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; padding: 8px; background: #222; border-bottom: 1px solid var(--border); align-items: center; }
         .sb-team { text-align: center; }
         .sb-name { font-size: 0.7rem; font-weight: bold; color: #888; display: block; margin-bottom: 2px; }
         .sb-score { font-size: 1.5rem; font-weight: 800; }
         .sb-div { font-size: 0.8rem; color: #555; font-weight: bold; }
         .ts-home { color: var(--accent-blue); }
         .ts-away { color: var(--accent-red); }
-        .charts-wrapper { flex: 0 0 90px; display: flex; border-bottom: 1px solid var(--border); background: #161616; }
-        .chart-container { flex: 1; position: relative; padding: 5px; border-right: 1px solid #222; }
+        .charts-wrapper { flex: 0 0 75px; display: flex; border-bottom: 1px solid var(--border); background: #161616; gap: 5px; }
+        .chart-container { flex: 1; position: relative; padding: 4px; border-right: 1px solid #222; }
         .chart-title { position: absolute; top: 3px; left: 5px; font-size: 0.5rem; color: #666; text-transform: uppercase; font-weight: bold; }
-        .controls-area { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .ctrl-group { background: #2b2b2b; padding: 8px; border-radius: 6px; border: 1px solid #3a3a3a; flex-shrink: 0; }
-        .ctrl-header { font-size: 0.65rem; color: var(--accent-brand); text-transform: uppercase; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 4px; }
+        .controls-area { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .ctrl-group { background: #2b2b2b; padding: 6px; border-radius: 6px; border: 1px solid #3a3a3a; flex-shrink: 0; }
+        .ctrl-header { font-size: 0.6rem; color: var(--accent-brand); text-transform: uppercase; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #444; padding-bottom: 3px; }
         .row { display: flex; gap: 8px; margin-bottom: 5px; }
         select, input { width: 100%; background: #1a1a1a; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px; font-size: 0.8rem; }
         label.slider-lbl { display: flex; justify-content: space-between; font-size: 0.65rem; color: #ccc; margin-top: 4px; }
@@ -63,8 +63,8 @@
         .btn-home { background: var(--accent-blue); }
         .btn-away { background: var(--accent-red); }
         .btn-badge { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; }
-        .log-area { flex: 0 0 120px; background: #151515; border-top: 1px solid var(--border); overflow-y: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+        .log-area { flex: 0 0 100px; background: #151515; border-top: 1px solid var(--border); overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.65rem; }
         th { position: sticky; top: 0; background: #222; color: #999; text-align: left; padding: 4px 8px; font-weight: 600; z-index: 2;}
         td { border-bottom: 1px solid #222; padding: 4px 8px; color: #ccc; vertical-align: middle; }
         tr:nth-child(even) { background: #1a1a1a; }
@@ -110,6 +110,102 @@
     </style>
 </head>
 <body>
+
+<div class="modal-overlay" id="passNetworkModal">
+    <div class="modal-content" style="max-width: 1200px;">
+        <div class="modal-header">
+            <div class="modal-title">RED DE PASES</div>
+            <div class="modal-tools">
+                <select id="passTeamSelect" style="flex: 0 0 150px; padding: 6px; border: 1px solid #444; background: #222; color: #fff; border-radius: 4px;">
+                    <option value="both">Ambos Equipos</option>
+                    <option value="Propio">Equipo Propio</option>
+                    <option value="Rival">Equipo Rival</option>
+                </select>
+                <button class="btn-action" onclick="saveCanvas('passNetworkCanvas', 'Red_Pases')">📷 Guardar</button>
+                <button class="btn-close" onclick="document.getElementById('passNetworkModal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+        <div style="height: 500px;"><canvas id="passNetworkCanvas"></canvas></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="fieldTiltModal">
+    <div class="modal-content" style="max-width: 1100px;">
+        <div class="modal-header">
+            <div class="modal-title">FIELD TILT (ÚLTIMO TERCIO)</div>
+            <div class="modal-tools">
+                <select id="tiltTeamSelect" style="flex: 0 0 150px; padding: 6px; border: 1px solid #444; background: #222; color: #fff; border-radius: 4px;">
+                    <option value="Propio">Equipo Propio</option>
+                    <option value="Rival">Equipo Rival</option>
+                </select>
+                <button class="btn-action" onclick="saveCanvas('fieldTiltCanvas', 'Field_Tilt')">📷 Guardar</button>
+                <button class="btn-close" onclick="document.getElementById('fieldTiltModal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+        <div style="height: 500px; display: flex; gap: 20px;">
+            <div style="flex: 1; border: 1px solid #333; border-radius: 6px;"><canvas id="fieldTiltCanvas"></canvas></div>
+            <div style="flex: 0 0 300px; background: #1a1a1a; padding: 15px; border-radius: 6px; overflow-y: auto;">
+                <div style="font-weight: bold; color: var(--accent-brand); margin-bottom: 10px;">Análisis del Tercio Ofensivo</div>
+                <div id="fieldTiltStats" style="font-size: 0.85rem; line-height: 1.6; color: #ccc;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="effectivenessModal">
+    <div class="modal-content" style="max-width: 1100px;">
+        <div class="modal-header">
+            <div class="modal-title">ZONAS DE EFECTIVIDAD</div>
+            <div class="modal-tools">
+                <select id="effTeamSelect" style="flex: 0 0 150px; padding: 6px; border: 1px solid #444; background: #222; color: #fff; border-radius: 4px;">
+                    <option value="Propio">Equipo Propio</option>
+                    <option value="Rival">Equipo Rival</option>
+                </select>
+                <button class="btn-action" onclick="saveCanvas('effectivenessCanvas', 'Zonas_Efectividad')">📷 Guardar</button>
+                <button class="btn-close" onclick="document.getElementById('effectivenessModal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+        <div style="height: 500px;"><canvas id="effectivenessCanvas"></canvas></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="builtupModal">
+    <div class="modal-content" style="max-width: 1100px;">
+        <div class="modal-header">
+            <div class="modal-title">xG BUILDUP & CHAIN</div>
+            <div class="modal-tools">
+                <button class="btn-action" onclick="downloadExcelBuiltup()">📊 Excel</button>
+                <button class="btn-action" onclick="saveCanvas('builtupCanvas', 'xG_Buildup')">📷 Gráfico</button>
+                <button class="btn-close" onclick="document.getElementById('builtupModal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+        <div style="display: flex; height: 500px; gap: 15px;">
+            <div style="flex: 1; border: 1px solid #333; border-radius: 6px;"><canvas id="builtupCanvas"></canvas></div>
+            <div style="flex: 0 0 300px; background: #1a1a1a; padding: 15px; border-radius: 6px; overflow-y: auto;">
+                <div style="font-weight: bold; color: var(--accent-brand); margin-bottom: 10px;">Resumen Buildup</div>
+                <table style="width: 100%; font-size: 0.75rem;">
+                    <tr><td>Juego Abierto:</td><td id="stats-abierto-builtup" style="text-align: right;">0.00</td></tr>
+                    <tr><td>Faltas:</td><td id="stats-falta-builtup" style="text-align: right;">0.00</td></tr>
+                    <tr><td>Córners:</td><td id="stats-corner-builtup" style="text-align: right;">0.00</td></tr>
+                    <tr><td>Pénaltis:</td><td id="stats-penalti-builtup" style="text-align: right;">0.00</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="tacticalModal">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <div class="modal-title">HUELLA TÁCTICA</div>
+            <div class="modal-tools">
+                <button class="btn-action" onclick="saveCanvas('tacticalCanvas', 'Huella_Tactica')">📷 Guardar</button>
+                <button class="btn-close" onclick="document.getElementById('tacticalModal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+        <div style="height: 500px;"><canvas id="tacticalCanvas"></canvas></div>
+    </div>
+</div>
 
 <div class="modal-overlay" id="timelineModal">
     <div class="modal-content" style="height: 600px;">
@@ -245,13 +341,18 @@
         <div class="tools">
             <input type="file" id="csvInput" style="display:none;" accept=".csv" onchange="importCSV(this)">
             
-            <button onclick="toggleTimeline(true)" class="btn-timeline">📈 Timeline</button>
-            <button onclick="toggleHeatmap(true)" class="btn-heat">🔥 Mapas Calor</button>
-            <button onclick="toggleRadar(true)" class="btn-radar">⚡ Radar</button>
+            <button onclick="toggleTimeline(true)" class="btn-timeline" title="Evolución xG">📈 Timeline</button>
+            <button onclick="toggleHeatmap(true)" class="btn-heat" title="Mapas de Calor">🔥 Mapas</button>
+            <button onclick="toggleRadar(true)" class="btn-radar" title="Comparador">⚡ Radar</button>
+            <button onclick="toggleBuiltup(true)" class="btn-brand" style="background: #16a085; border-color: #138d75;">🔗 Buildup</button>
+            <button onclick="togglePassNetwork(true)" class="btn-brand" style="background: #8e44ad; border-color: #6c3483;">🔀 Pases</button>
+            <button onclick="toggleFieldTilt(true)" class="btn-brand" style="background: #d35400; border-color: #ba4a00;">📊 Field</button>
+            <button onclick="toggleEffectiveness(true)" class="btn-brand" style="background: #c0392b; border-color: #a93226;">🎯 Efectividad</button>
+            <button onclick="toggleTactical(true)" class="btn-brand" style="background: #2980b9; border-color: #1f618d;">🗺️ Táctica</button>
             <button onclick="toggleSeasonModal(true)" class="btn-season">📊 Análisis</button>
             
-            <button onclick="saveToSeasonHistory()" class="btn-save-season">Guardar Jornada</button>
-            <button onclick="saveLooseMatch()" class="btn-loose">Guardar Suelto</button>
+            <button onclick="saveToSeasonHistory()" class="btn-save-season">Guardar</button>
+            <button onclick="saveLooseMatch()" class="btn-loose">Suelto</button>
             <button onclick="viewLooseMatches()" style="background:#555">📂 Archivo</button>
             <button class="btn-excel" onclick="downloadExcel()">CSV</button>
         </div>
@@ -746,7 +847,288 @@
     function saveLooseMatch() { const t=prompt("Nombre","Partido"); if(t){ archiveHistory.push({id:Date.now(),date:new Date().toLocaleDateString(),title:t,stats:JSON.parse(JSON.stringify(matchData.stats)),shots:JSON.parse(JSON.stringify(matchData.shots))}); localStorage.setItem('archiveHistory_v1',JSON.stringify(archiveHistory)); alert("Guardado"); } }
     function viewLooseMatches() { const c=document.getElementById('looseContainer'); c.innerHTML=""; archiveHistory.forEach((r,i)=>{c.innerHTML+=`<div class="loose-item"><div class="loose-info"><strong>${r.title}</strong> (${r.date})</div><button class="btn-delete" onclick="archiveHistory.splice(${i},1);localStorage.setItem('archiveHistory_v1',JSON.stringify(archiveHistory));viewLooseMatches();">x</button></div>`;}); document.getElementById('looseModal').style.display='flex'; }
     function resetMatch() { if(confirm("Borrar?")) { matchData={jornada:"",shots:[],stats:{Propio:{xg:0,xgot:0,goals:0,count:0},Rival:{xg:0,xgot:0,goals:0,count:0}}}; inputs.min.value=0; inputs.sec.value=0; saveData(); updateUI(); draw(); } }
-    function downloadExcel() { let c = "\uFEFFMinuto;Seg;Jugador;Equipo;Resultado;xG;xGOT\n"; matchData.shots.forEach(s => { c += `${s.minute};${s.second};${s.player};${s.team};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)}\n`; }); const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); l.download = `Data.csv`; l.click(); }
+    function downloadExcel() { 
+        let c = "\uFEFFDATOS DE TIROS\n\n";
+        c += "Minuto;Seg;Jugador;Dorsal;Equipo;Tipo;Resultado;xG;xGOT;Posición X;Posición Y;Destino Y;Destino Z\n";
+        matchData.shots.forEach(s => { 
+            c += `${s.minute};${s.second};${s.player};${s.dorsal};${s.team};${s.type};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)};${s.startX.toFixed(1)};${s.startY.toFixed(1)};${s.endY.toFixed(2)};${s.endZ.toFixed(2)}\n`; 
+        }); 
+        
+        c += "\n\nRESUMEN DE ESTADÍSTICAS\n\n";
+        c += "Equipo;Total Tiros;Goles;xG Total;xGOT Total;xG Promedio\n";
+        c += `Propio;${matchData.stats.Propio.count};${matchData.stats.Propio.goals};${matchData.stats.Propio.xg.toFixed(3)};${matchData.stats.Propio.xgot.toFixed(3)};${(matchData.stats.Propio.xg/Math.max(1,matchData.stats.Propio.count)).toFixed(3)}\n`;
+        c += `Rival;${matchData.stats.Rival.count};${matchData.stats.Rival.goals};${matchData.stats.Rival.xg.toFixed(3)};${matchData.stats.Rival.xgot.toFixed(3)};${(matchData.stats.Rival.xg/Math.max(1,matchData.stats.Rival.count)).toFixed(3)}\n`;
+        
+        c += "\n\nESTADÍSTICAS POR JUGADOR\n\n";
+        c += "Jugador;Dorsal;Equipo;Tiros;Goles;xG;xGOT;Efectividad\n";
+        const playerStats = {};
+        matchData.shots.forEach(s => {
+            const key = `${s.player||'Anonimo'}-${s.dorsal||''}`;
+            if(!playerStats[key]) playerStats[key] = { player: s.player, dorsal: s.dorsal, team: s.team, shots: 0, goals: 0, xg: 0, xgot: 0 };
+            playerStats[key].shots++;
+            playerStats[key].xg += s.xg;
+            playerStats[key].xgot += s.xgot;
+            if(s.result === 'Gol') playerStats[key].goals++;
+        });
+        Object.values(playerStats).forEach(p => {
+            c += `${p.player};${p.dorsal};${p.team};${p.shots};${p.goals};${p.xg.toFixed(3)};${p.xgot.toFixed(3)};${(p.goals > 0 ? (p.goals/p.shots*100).toFixed(1) : '0')}%\n`;
+        });
+        
+        const l = document.createElement("a"); 
+        l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); 
+        l.download = `Data_${new Date().toISOString().slice(0,10)}.csv`; 
+        l.click(); 
+    }
+    
+    // --- NUEVAS VISUALIZACIONES ---
+    
+    // BUILDUP & CHAIN
+    function toggleBuiltup(show) { document.getElementById('builtupModal').style.display = show ? 'flex' : 'none'; if(show) { setTimeout(() => drawBuiltup(), 100); } }
+    function drawBuiltup() {
+        const cv = document.getElementById('builtupCanvas'); if(!cv.parentElement) return;
+        cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+        const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+        ctx.fillStyle = "#161616"; ctx.fillRect(0,0,w,h);
+        
+        // Agrupar por tipo de jugada
+        const types = { abierto: {xg:0, count:0}, falta: {xg:0, count:0}, corner: {xg:0, count:0}, penalti: {xg:0, count:0} };
+        matchData.shots.forEach(s => { if(types[s.type]) { types[s.type].xg += s.xg; types[s.type].count++; } });
+        
+        // Actualizar tabla
+        document.getElementById('stats-abierto-builtup').innerText = (types.abierto.xg / Math.max(1,types.abierto.count)).toFixed(2);
+        document.getElementById('stats-falta-builtup').innerText = (types.falta.xg / Math.max(1,types.falta.count)).toFixed(2);
+        document.getElementById('stats-corner-builtup').innerText = (types.corner.xg / Math.max(1,types.corner.count)).toFixed(2);
+        document.getElementById('stats-penalti-builtup').innerText = (types.penalti.xg / Math.max(1,types.penalti.count)).toFixed(2);
+        
+        // Gráfico de barras
+        const data = [types.abierto, types.falta, types.corner, types.penalti];
+        const labels = ["Juego Abierto", "Faltas", "Córners", "Pénaltis"];
+        const colors = ["#3498db", "#e67e22", "#e74c3c", "#f1c40f"];
+        
+        let maxVal = Math.max(...data.map(d => d.xg), 1) * 1.2;
+        const pad = 50, barW = (w - pad*2) / 4 - 10;
+        const barH = h - 80;
+        
+        ctx.font = "12px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+        data.forEach((d, i) => {
+            const x = pad + (i * (barW + 10));
+            const val = d.count > 0 ? d.xg : 0;
+            const bh = (val / maxVal) * barH;
+            const by = (h - 40) - bh;
+            
+            ctx.fillStyle = colors[i];
+            ctx.fillRect(x, by, barW, bh);
+            ctx.fillStyle = "#fff";
+            ctx.fillText(val.toFixed(2), x + barW/2, by - 5);
+            ctx.fillText(labels[i], x + barW/2, h - 10);
+        });
+    }
+    function downloadExcelBuiltup() {
+        let c = "\uFEFFTipo;xG;Tiros;xG/Tiro\n";
+        const types = { abierto: {xg:0, count:0}, falta: {xg:0, count:0}, corner: {xg:0, count:0}, penalti: {xg:0, count:0} };
+        matchData.shots.forEach(s => { if(types[s.type]) { types[s.type].xg += s.xg; types[s.type].count++; } });
+        Object.keys(types).forEach(k => {
+            const d = types[k];
+            if(d.count > 0) c += `${k};${d.xg.toFixed(3)};${d.count};${(d.xg/d.count).toFixed(3)}\n`;
+        });
+        const l = document.createElement("a");
+        l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'}));
+        l.download = `Buildup_Analysis.csv`;
+        l.click();
+    }
+    
+    // RED DE PASES
+    function togglePassNetwork(show) { document.getElementById('passNetworkModal').style.display = show ? 'flex' : 'none'; if(show) { setTimeout(() => drawPassNetwork(), 100); } }
+    function drawPassNetwork() {
+        const cv = document.getElementById('passNetworkCanvas'); if(!cv.parentElement) return;
+        cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+        const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+        
+        ctx.fillStyle = "#1e272e"; ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
+        const scaleX = w / 120; const scaleY = h / 80;
+        ctx.strokeRect(0,0,w,h); ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+        
+        // Visualizar distribución de tiros por zona
+        const teamFilter = document.getElementById('passTeamSelect').value;
+        const shots = matchData.shots.filter(s => teamFilter === 'both' || s.team === teamFilter);
+        
+        ctx.fillStyle = "rgba(255, 200, 0, 0.8)";
+        shots.forEach(s => {
+            let x = s.startX * scaleX; let y = s.startY * scaleY;
+            ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2);
+            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        });
+        
+        // Mostrar conexiones entre zonas comunes
+        const zones = [[40, 20], [70, 30], [100, 35], [110, 40]]; // Aproximadas
+        ctx.strokeStyle = "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = 2;
+        for(let i=0; i<zones.length-1; i++) {
+            ctx.beginPath(); ctx.moveTo(zones[i][0]*scaleX, zones[i][1]*scaleY);
+            ctx.lineTo(zones[i+1][0]*scaleX, zones[i+1][1]*scaleY); ctx.stroke();
+        }
+        
+        ctx.fillStyle = "#aaa"; ctx.font = "10px Arial"; ctx.textAlign = "center";
+        ctx.fillText("Red de Pases - Densidad de Tiros", w/2, h-10);
+    }
+    
+    // FIELD TILT
+    function toggleFieldTilt(show) { document.getElementById('fieldTiltModal').style.display = show ? 'flex' : 'none'; if(show) { setTimeout(() => drawFieldTilt(), 100); } }
+    function drawFieldTilt() {
+        const cv = document.getElementById('fieldTiltCanvas'); if(!cv.parentElement) return;
+        cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+        const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+        
+        ctx.fillStyle = "#1e272e"; ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+        const scaleX = w / 120; const scaleY = h / 80;
+        ctx.strokeRect(0,0,w,h);
+        
+        // Dividir en tercios
+        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(w/3, 0); ctx.lineTo(w/3, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2*w/3, 0); ctx.lineTo(2*w/3, h); ctx.stroke();
+        
+        const team = document.getElementById('tiltTeamSelect').value;
+        const shots = matchData.shots.filter(s => s.team === team);
+        
+        // Contar tiros en tercios
+        const third1 = shots.filter(s => s.startX < 100).length;
+        const third2 = shots.filter(s => s.startX >= 100 && s.startX < 110).length;
+        const third3 = shots.filter(s => s.startX >= 110).length;
+        const total = shots.length || 1;
+        
+        // Visualizar densidad por tercio
+        const colors = ["#3498db", "#f39c12", "#e74c3c"];
+        const thirds = [third1, third2, third3];
+        const maxThird = Math.max(...thirds, 1);
+        
+        thirds.forEach((count, i) => {
+            const x = i * (w/3) + w/30;
+            const intensity = count / maxThird;
+            ctx.fillStyle = colors[i];
+            ctx.globalAlpha = intensity;
+            ctx.fillRect(i * (w/3) + 5, 5, w/3 - 10, h - 10);
+            ctx.globalAlpha = 1.0;
+            
+            ctx.fillStyle = "#fff"; ctx.font = "bold 16px Arial"; ctx.textAlign = "center";
+            ctx.fillText(count, x + w/6, h/2);
+        });
+        
+        // Actualizar estadísticas
+        const statDiv = document.getElementById('fieldTiltStats');
+        statDiv.innerHTML = `
+            <div style="margin-bottom: 10px;">
+                <strong style="color: #3498db;">Tercio Defensivo:</strong> ${third1} tiros (${(third1*100/total).toFixed(1)}%)
+            </div>
+            <div style="margin-bottom: 10px;">
+                <strong style="color: #f39c12;">Zona Media:</strong> ${third2} tiros (${(third2*100/total).toFixed(1)}%)
+            </div>
+            <div style="margin-bottom: 10px;">
+                <strong style="color: #e74c3c;">Último Tercio:</strong> ${third3} tiros (${(third3*100/total).toFixed(1)}%)
+            </div>
+            <hr style="border-color: #444; margin: 10px 0;">
+            <div><strong>Tilt Ratio:</strong> ${(third3/Math.max(third1,1)).toFixed(2)}</div>
+            <div style="font-size: 0.8rem; color: #999; margin-top: 5px;">Mayor presión en ofensiva</div>
+        `;
+    }
+    
+    // ZONAS DE EFECTIVIDAD
+    function toggleEffectiveness(show) { document.getElementById('effectivenessModal').style.display = show ? 'flex' : 'none'; if(show) { setTimeout(() => drawEffectiveness(), 100); } }
+    function drawEffectiveness() {
+        const cv = document.getElementById('effectivenessCanvas'); if(!cv.parentElement) return;
+        cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+        const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+        
+        ctx.fillStyle = "#1e272e"; ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
+        const scaleX = w / 120; const scaleY = h / 80;
+        ctx.strokeRect(0,0,w,h);
+        
+        // Zonas definidas
+        const zones = [
+            { x: 95, y: 40, r: 15, label: "Área Peq", color: "#e74c3c" },
+            { x: 105, y: 40, r: 20, label: "Penalti", color: "#f39c12" },
+            { x: 110, y: 40, r: 25, label: "Frontal", color: "#2ecc71" }
+        ];
+        
+        const team = document.getElementById('effTeamSelect').value;
+        const shots = matchData.shots.filter(s => s.team === team);
+        
+        // Contar efectividad por zona
+        zones.forEach(zone => {
+            let count = 0, xg = 0;
+            shots.forEach(s => {
+                const dist = Math.sqrt(Math.pow(s.startX - zone.x, 2) + Math.pow(s.startY - zone.y, 2));
+                if(dist < zone.r) { count++; xg += s.xg; }
+            });
+            
+            ctx.beginPath();
+            ctx.arc(zone.x * scaleX, zone.y * scaleY, zone.r * scaleX, 0, Math.PI*2);
+            ctx.fillStyle = zone.color;
+            ctx.globalAlpha = 0.2;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = zone.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            if(count > 0) {
+                ctx.fillStyle = "#fff"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center";
+                ctx.fillText(`${count}`, zone.x * scaleX, zone.y * scaleY);
+                ctx.fillStyle = "#ccc"; ctx.font = "10px Arial";
+                ctx.fillText(`${(xg/count).toFixed(2)}`, zone.x * scaleX, zone.y * scaleY + 15);
+            }
+        });
+    }
+    
+    // HUELLA TÁCTICA
+    function toggleTactical(show) { document.getElementById('tacticalModal').style.display = show ? 'flex' : 'none'; if(show) { setTimeout(() => drawTactical(), 100); } }
+    function drawTactical() {
+        const cv = document.getElementById('tacticalCanvas'); if(!cv.parentElement) return;
+        cv.width = cv.parentElement.clientWidth; cv.height = cv.parentElement.clientHeight;
+        const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+        
+        ctx.fillStyle = "#1e272e"; ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+        const scaleX = w / 120; const scaleY = h / 80;
+        ctx.strokeRect(0,0,w,h);
+        
+        // Líneas de presión
+        const shotsByX = {};
+        matchData.shots.forEach(s => {
+            const zone = Math.floor(s.startX / 10);
+            if(!shotsByX[zone]) shotsByX[zone] = [];
+            shotsByX[zone].push(s);
+        });
+        
+        // Visualizar presión por área
+        Object.keys(shotsByX).forEach(zone => {
+            const zoneX = zone * 10;
+            const count = shotsByX[zone].length;
+            const intensity = Math.min(count / 5, 1); // Max 5 tiros por zona
+            
+            ctx.fillStyle = intensity > 0.6 ? "#e74c3c" : intensity > 0.3 ? "#f39c12" : "#2ecc71";
+            ctx.globalAlpha = intensity * 0.6;
+            ctx.fillRect(zoneX * scaleX, 0, 10 * scaleX, h);
+            ctx.globalAlpha = 1;
+        });
+        
+        // Dibujar calor general
+        ctx.globalCompositeOperation = 'lighter';
+        matchData.shots.forEach(s => {
+            let grd = ctx.createRadialGradient(s.startX*scaleX, s.startY*scaleY, 2, s.startX*scaleX, s.startY*scaleY, 20*scaleX);
+            grd.addColorStop(0, "rgba(255, 255, 100, 0.5)");
+            grd.addColorStop(1, "rgba(255, 0, 0, 0)");
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, w, h);
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        
+        ctx.fillStyle = "#fff"; ctx.font = "12px Arial"; ctx.textAlign = "center";
+        ctx.fillText("Huella Táctica - Densidad de Presión Ofensiva", w/2, h-10);
+    }
+    
     function importCSV(input) {alert("Importado");}
     window.saveCanvas = function(cid, fname) { const c=document.getElementById(cid); if(c){const l=document.createElement('a'); l.download=`${fname}.png`; l.href=c.toDataURL(); l.click();} };
     function draw() { const c = calculate(); ui.liveXG.innerText = c.xg.toFixed(3); ui.liveXGOT.innerText = c.xgot.toFixed(3); drawPitch(c); drawGoal(c); }
