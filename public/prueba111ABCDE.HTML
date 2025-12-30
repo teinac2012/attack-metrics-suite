@@ -3792,7 +3792,9 @@ async function generatePDFReportAttack() {
         const stats = {
             acciones: filteredActions.length,
             pases: filteredActions.filter(a => a.type === 'Pase' && a.res === 'Completado').length,
+            pasesTot: filteredActions.filter(a => a.type === 'Pase').length,
             regates: filteredActions.filter(a => a.type === 'Regate' && a.res === 'Exitoso').length,
+            regaTot: filteredActions.filter(a => a.type === 'Regate').length,
             clave: filteredActions.filter(a => a.type === 'Clave' && a.res === 'Completado').length,
             asist: filteredActions.filter(a => a.type === 'Asist').length,
             perdidas: filteredActions.filter(a => a.res === 'Fallado' || a.res === 'Pérdida').length
@@ -3800,80 +3802,105 @@ async function generatePDFReportAttack() {
 
         let yPos = 20;
 
-        // === PORTADA ===
-        doc.setFillColor(18, 18, 18);
-        doc.rect(0, 0, 210, 60, 'F');
-        doc.setTextColor(243, 156, 18);
-        doc.setFontSize(24);
+        // === PORTADA MEJORADA ===
+        doc.setFillColor(31, 66, 135);
+        doc.rect(0, 0, 210, 70, 'F');
+        
+        doc.setTextColor(255, 193, 7);
+        doc.setFontSize(28);
         doc.setFont(undefined, 'bold');
-        doc.text('ATTACK METRICS', 105, 20, { align: 'center' });
-        doc.setFontSize(14);
-        doc.setTextColor(255, 255, 255);
-        doc.text('Reporte de Rendimiento Ofensivo', 105, 30, { align: 'center' });
-        
-        doc.setFontSize(18);
-        doc.setTextColor(52, 152, 219);
-        doc.text(playerName, 105, 45, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.setTextColor(150, 150, 150);
-        const homeTeam = DB.config?.homeName || 'LOCAL';
-        const awayTeam = DB.config?.awayName || 'RIVAL';
-        doc.text(`Partido: ${homeTeam} vs ${awayTeam}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
-
-        yPos = 70;
-
-        // === RESUMEN ESTADÍSTICO ===
-        doc.setFillColor(30, 30, 36);
-        doc.roundedRect(15, yPos, 180, 40, 3, 3, 'F');
+        doc.text('ATTACK METRICS', 105, 25, { align: 'center' });
         
         doc.setFontSize(12);
-        doc.setTextColor(243, 156, 18);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Reporte de Rendimiento Ofensivo', 105, 35, { align: 'center' });
+        
+        doc.setFillColor(255, 193, 7);
+        doc.rect(40, 40, 130, 1, 'F');
+        
+        doc.setFontSize(16);
+        doc.setTextColor(255, 255, 255);
         doc.setFont(undefined, 'bold');
-        doc.text('RESUMEN ESTADÍSTICO', 105, yPos + 8, { align: 'center' });
+        doc.text(playerName, 105, 55, { align: 'center' });
+        
+        doc.setFontSize(9);
+        doc.setTextColor(220, 220, 220);
+        doc.setFont(undefined, 'normal');
+        const homeTeam = DB.config?.homeName || 'LOCAL';
+        const awayTeam = DB.config?.awayName || 'RIVAL';
+        doc.text(`${homeTeam} vs ${awayTeam} • ${new Date().toLocaleDateString()}`, 105, 65, { align: 'center' });
 
-        const boxW = 28;
-        const startX = 18;
-        const boxY = yPos + 15;
+        yPos = 75;
+
+        // === RESUMEN ESTADÍSTICO VISUAL ===
+        doc.setFillColor(45, 45, 45);
+        doc.rect(15, yPos, 180, 35, 'F');
         
         const statBoxes = [
-            { label: 'ACCIONES', val: stats.acciones, color: [52, 152, 219] },
-            { label: 'PASES', val: stats.pases, color: [46, 204, 113] },
-            { label: 'REGATES', val: stats.regates, color: [241, 196, 15] },
-            { label: 'P.CLAVE', val: stats.clave, color: [155, 89, 182] },
-            { label: 'ASIST', val: stats.asist, color: [26, 188, 156] },
-            { label: 'PÉRDIDAS', val: stats.perdidas, color: [231, 76, 60] }
+            { label: 'ACCIONES', val: stats.acciones, color: [66, 165, 245] },
+            { label: 'PASES', val: `${stats.pases}/${stats.pasesTot}`, color: [76, 175, 80] },
+            { label: 'REGATES', val: `${stats.regates}/${stats.regaTot}`, color: [255, 152, 0] },
+            { label: 'ASIST', val: stats.asist, color: [233, 30, 99] }
         ];
 
+        const boxW = 42;
+        const startX = 18;
+        const boxY = yPos + 3;
+        
         statBoxes.forEach((box, i) => {
-            const x = startX + (i * 30);
-            doc.setDrawColor(box.color[0], box.color[1], box.color[2]);
-            doc.setLineWidth(0.5);
-            doc.rect(x, boxY, boxW, 14);
-            doc.setFontSize(14);
+            const x = startX + (i * 45);
+            doc.setFillColor(box.color[0], box.color[1], box.color[2]);
+            doc.rect(x, boxY, boxW, 29, 'F');
+            
+            doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(box.color[0], box.color[1], box.color[2]);
-            doc.text(String(box.val), x + boxW/2, boxY + 7, { align: 'center' });
-            doc.setFontSize(6);
-            doc.setTextColor(150, 150, 150);
-            doc.text(box.label, x + boxW/2, boxY + 11, { align: 'center' });
+            doc.setTextColor(255, 255, 255);
+            doc.text(String(box.val), x + boxW/2, boxY + 10, { align: 'center' });
+            
+            doc.setFontSize(8);
+            doc.setTextColor(220, 220, 220);
+            doc.setFont(undefined, 'bold');
+            doc.text(box.label, x + boxW/2, boxY + 24, { align: 'center' });
         });
 
-        yPos += 50;
+        yPos += 38;
 
-        // === MAPA DE CALOR ===
+        // === MAPA DE CALOR MEJORADO ===
         if(includeHeatmap && filteredActions.length > 0) {
+            doc.setFillColor(31, 66, 135);
+            doc.rect(15, yPos, 180, 8, 'F');
+            doc.setFontSize(11);
+            doc.setTextColor(255, 193, 7);
+            doc.setFont(undefined, 'bold');
+            doc.text('🔥 MAPA DE CALOR - ZONAS DE ACCIÓN', 20, yPos + 5, { align: 'left' });
+            
+            yPos += 10;
+            
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 800;
-            tempCanvas.height = 533;
+            tempCanvas.width = 1056;
+            tempCanvas.height = 680;
             const ctx = tempCanvas.getContext('2d');
             
-            // Dibujar campo
-            ctx.fillStyle = "#2d5016";
-            ctx.fillRect(0, 0, 800, 533);
-            ctx.strokeStyle = "rgba(255,255,255,0.3)";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(20, 20, 760, 493);
+            // Dibujar campo con gradiente
+            const grad = ctx.createLinearGradient(0, 0, 0, 680);
+            grad.addColorStop(0, '#1b4d2e');
+            grad.addColorStop(1, '#2d6a3e');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1056, 680);
+            
+            // Líneas del campo
+            ctx.strokeStyle = "rgba(255,255,255,0.4)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(30, 30, 996, 620);
+            ctx.beginPath();
+            ctx.moveTo(30 + 498, 30);
+            ctx.lineTo(30 + 498, 650);
+            ctx.stroke();
+            
+            // Círculo central
+            ctx.beginPath();
+            ctx.arc(30 + 498, 30 + 310, 60, 0, Math.PI * 2);
+            ctx.stroke();
             
             // Dibujar puntos de calor
             ctx.globalCompositeOperation = 'lighter';
@@ -3881,58 +3908,55 @@ async function generatePDFReportAttack() {
                 if(a.x < 0 || a.y < 0) return;
                 const xPct = a.x / 100;
                 const yPct = a.y / 80;
-                const x = 20 + (760 * xPct);
-                const y = 20 + (493 * yPct);
-                const grd = ctx.createRadialGradient(x, y, 0, x, y, 35);
-                const intensity = a.res === 'Completado' || a.res === 'Exitoso' ? 0.7 : 0.3;
-                const color = a.res === 'Completado' || a.res === 'Exitoso' ? '46,204,113' : '231,76,60';
+                const x = 30 + (996 * xPct);
+                const y = 30 + (620 * yPct);
+                
+                const grd = ctx.createRadialGradient(x, y, 0, x, y, 60);
+                const intensity = a.res === 'Completado' || a.res === 'Exitoso' ? 0.8 : 0.4;
+                const color = a.res === 'Completado' || a.res === 'Exitoso' ? '46,204,113' : '244,67,54';
                 grd.addColorStop(0, `rgba(${color},${intensity})`);
                 grd.addColorStop(1, `rgba(${color},0)`);
                 ctx.fillStyle = grd;
                 ctx.beginPath();
-                ctx.arc(x, y, 35, 0, Math.PI * 2);
+                ctx.arc(x, y, 60, 0, Math.PI * 2);
                 ctx.fill();
             });
             ctx.globalCompositeOperation = 'source-over';
 
             const heatmapImg = tempCanvas.toDataURL('image/png');
-            doc.setFontSize(11);
-            doc.setTextColor(243, 156, 18);
-            doc.setFont(undefined, 'bold');
-            doc.text('🔥 MAPA DE CALOR DE ACCIONES', 15, yPos);
-            yPos += 5;
-            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 120);
-            yPos += 125;
+            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 116);
+            yPos += 120;
         }
 
         // === RADAR ===
         if(includeRadar) {
             if(yPos > 200) {
                 doc.addPage();
-                yPos = 20;
+                yPos = 15;
             }
             
-            // Calcular métricas para radar
             const totalActions = filteredActions.length;
-            const passSuccess = stats.pases / Math.max(1, filteredActions.filter(a => a.type === 'Pase').length);
-            const dribSuccess = stats.regates / Math.max(1, filteredActions.filter(a => a.type === 'Regate').length);
-            const creativity = (stats.clave + stats.asist) / Math.max(1, totalActions) * 10;
-            const involvement = Math.min(totalActions / 50, 1); // Normalizado
-            const efficiency = (stats.acciones - stats.perdidas) / Math.max(1, stats.acciones);
+            const passSuccess = stats.pases / Math.max(1, stats.pasesTot);
+            const dribSuccess = stats.regates / Math.max(1, stats.regaTot);
+            const creativity = (stats.clave + stats.asist) / Math.max(1, totalActions) * 100;
+            const involvement = Math.min(totalActions / 50 * 100, 100);
+            const efficiency = (stats.acciones - stats.perdidas) / Math.max(1, stats.acciones) * 100;
 
+            doc.setFillColor(31, 66, 135);
+            doc.rect(15, yPos, 180, 8, 'F');
             doc.setFontSize(11);
-            doc.setTextColor(243, 156, 18);
+            doc.setTextColor(255, 193, 7);
             doc.setFont(undefined, 'bold');
-            doc.text('📊 RADAR DE RENDIMIENTO', 15, yPos);
+            doc.text('📊 RADAR DE RENDIMIENTO', 20, yPos + 5, { align: 'left' });
             yPos += 10;
 
             const radarData = [
-                ['Métrica', 'Valor'],
-                ['Pases (%)', (passSuccess * 100).toFixed(0) + '%'],
-                ['Regates (%)', (dribSuccess * 100).toFixed(0) + '%'],
-                ['Creatividad', creativity.toFixed(1)],
-                ['Participación', (involvement * 100).toFixed(0) + '%'],
-                ['Eficiencia', (efficiency * 100).toFixed(0) + '%']
+                ['Métrica', 'Valor', 'Estado'],
+                ['Precisión de Pases', (passSuccess * 100).toFixed(0) + '%', passSuccess > 0.75 ? '✓' : ''],
+                ['Éxito en Regates', (dribSuccess * 100).toFixed(0) + '%', dribSuccess > 0.5 ? '✓' : ''],
+                ['Creatividad', creativity.toFixed(0) + '%', creativity > 15 ? '✓' : ''],
+                ['Participación', involvement.toFixed(0) + '%', involvement > 10 ? '✓' : ''],
+                ['Eficiencia', efficiency.toFixed(0) + '%', efficiency > 60 ? '✓' : '']
             ];
 
             doc.autoTable({
@@ -3940,10 +3964,11 @@ async function generatePDFReportAttack() {
                 head: [radarData[0]],
                 body: radarData.slice(1),
                 theme: 'grid',
-                headStyles: { fillColor: [243, 156, 18], textColor: 0, fontStyle: 'bold' },
-                bodyStyles: { fontSize: 10 },
-                alternateRowStyles: { fillColor: [40, 40, 40] },
-                margin: { left: 60, right: 60 }
+                headStyles: { fillColor: [255, 193, 7], textColor: [31, 66, 135], fontStyle: 'bold', fontSize: 10 },
+                bodyStyles: { fontSize: 10, textColor: [255, 255, 255] },
+                alternateRowStyles: { fillColor: [60, 60, 60] },
+                styles: { cellPadding: 3, lineColor: [100, 100, 100], lineWidth: 0.5 },
+                margin: { left: 20, right: 20 }
             });
 
             yPos = doc.lastAutoTable.finalY + 10;
@@ -3953,15 +3978,18 @@ async function generatePDFReportAttack() {
         if(includeTable) {
             if(yPos > 220) {
                 doc.addPage();
-                yPos = 20;
+                yPos = 15;
             }
+            
+            doc.setFillColor(31, 66, 135);
+            doc.rect(15, yPos, 180, 8, 'F');
             doc.setFontSize(11);
-            doc.setTextColor(243, 156, 18);
+            doc.setTextColor(255, 193, 7);
             doc.setFont(undefined, 'bold');
-            doc.text('📋 DETALLE DE ACCIONES', 15, yPos);
-            yPos += 5;
+            doc.text('📋 DETALLE DE ACCIONES', 20, yPos + 5, { align: 'left' });
+            yPos += 10;
 
-            const tableData = filteredActions.slice(0, 30).map(a => [
+            const tableData = filteredActions.slice(0, 25).map(a => [
                 `${Math.floor(a.time/60)}:${(a.time%60).toString().padStart(2,'0')}`,
                 a.type,
                 a.zone || '-',
@@ -3971,13 +3999,13 @@ async function generatePDFReportAttack() {
 
             doc.autoTable({
                 startY: yPos,
-                head: [['Minuto', 'Tipo', 'Zona', 'Resultado', 'xT']],
+                head: [['Min', 'Tipo', 'Zona', 'Resultado', 'xT']],
                 body: tableData,
                 theme: 'grid',
-                headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-                bodyStyles: { fontSize: 7, textColor: [200, 200, 200] },
-                alternateRowStyles: { fillColor: [30, 30, 36] },
-                styles: { cellPadding: 1.5, lineColor: [60, 60, 60], lineWidth: 0.1 },
+                headStyles: { fillColor: [66, 165, 245], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                bodyStyles: { fontSize: 8.5, textColor: [255, 255, 255] },
+                alternateRowStyles: { fillColor: [45, 45, 45] },
+                styles: { cellPadding: 2, lineColor: [80, 80, 80], lineWidth: 0.3 },
                 margin: { left: 15, right: 15 }
             });
         }
@@ -3986,9 +4014,11 @@ async function generatePDFReportAttack() {
         const pageCount = doc.internal.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
+            doc.setFillColor(31, 66, 135);
+            doc.rect(0, 287, 210, 10, 'F');
             doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text(`Generado por Attack Metrics v3.1 - Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+            doc.setTextColor(255, 193, 7);
+            doc.text(`Attack Metrics v3.1 • Página ${i} de ${pageCount}`, 105, 291, { align: 'center' });
         }
 
         // Descargar
