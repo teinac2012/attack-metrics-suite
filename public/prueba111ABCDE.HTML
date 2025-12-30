@@ -3872,34 +3872,34 @@ async function generatePDFReportAttack() {
             doc.setFontSize(11);
             doc.setTextColor(255, 193, 7);
             doc.setFont(undefined, 'bold');
-            doc.text('🔥 MAPA DE CALOR - ZONAS DE ACCIÓN', 20, yPos + 5, { align: 'left' });
+            doc.text('MAPA DE CALOR - ZONAS DE ACCION', 20, yPos + 5, { align: 'left' });
             
             yPos += 10;
             
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 1056;
-            tempCanvas.height = 680;
+            tempCanvas.width = 900;
+            tempCanvas.height = 550;
             const ctx = tempCanvas.getContext('2d');
             
             // Dibujar campo con gradiente
-            const grad = ctx.createLinearGradient(0, 0, 0, 680);
+            const grad = ctx.createLinearGradient(0, 0, 0, 550);
             grad.addColorStop(0, '#1b4d2e');
             grad.addColorStop(1, '#2d6a3e');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 1056, 680);
+            ctx.fillRect(0, 0, 900, 550);
             
             // Líneas del campo
             ctx.strokeStyle = "rgba(255,255,255,0.4)";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(30, 30, 996, 620);
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(25, 25, 850, 500);
             ctx.beginPath();
-            ctx.moveTo(30 + 498, 30);
-            ctx.lineTo(30 + 498, 650);
+            ctx.moveTo(25 + 425, 25);
+            ctx.lineTo(25 + 425, 525);
             ctx.stroke();
             
             // Círculo central
             ctx.beginPath();
-            ctx.arc(30 + 498, 30 + 310, 60, 0, Math.PI * 2);
+            ctx.arc(25 + 425, 25 + 250, 50, 0, Math.PI * 2);
             ctx.stroke();
             
             // Dibujar puntos de calor
@@ -3908,24 +3908,24 @@ async function generatePDFReportAttack() {
                 if(a.x < 0 || a.y < 0) return;
                 const xPct = a.x / 100;
                 const yPct = a.y / 80;
-                const x = 30 + (996 * xPct);
-                const y = 30 + (620 * yPct);
+                const x = 25 + (850 * xPct);
+                const y = 25 + (500 * yPct);
                 
-                const grd = ctx.createRadialGradient(x, y, 0, x, y, 60);
+                const grd = ctx.createRadialGradient(x, y, 0, x, y, 50);
                 const intensity = a.res === 'Completado' || a.res === 'Exitoso' ? 0.8 : 0.4;
                 const color = a.res === 'Completado' || a.res === 'Exitoso' ? '46,204,113' : '244,67,54';
                 grd.addColorStop(0, `rgba(${color},${intensity})`);
                 grd.addColorStop(1, `rgba(${color},0)`);
                 ctx.fillStyle = grd;
                 ctx.beginPath();
-                ctx.arc(x, y, 60, 0, Math.PI * 2);
+                ctx.arc(x, y, 50, 0, Math.PI * 2);
                 ctx.fill();
             });
             ctx.globalCompositeOperation = 'source-over';
 
             const heatmapImg = tempCanvas.toDataURL('image/png');
-            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 116);
-            yPos += 120;
+            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 110);
+            yPos += 115;
         }
 
         // === RADAR ===
@@ -3947,7 +3947,7 @@ async function generatePDFReportAttack() {
             doc.setFontSize(11);
             doc.setTextColor(255, 193, 7);
             doc.setFont(undefined, 'bold');
-            doc.text('📊 RADAR DE RENDIMIENTO', 20, yPos + 5, { align: 'left' });
+            doc.text('RADAR DE RENDIMIENTO', 20, yPos + 5, { align: 'left' });
             yPos += 10;
 
             const radarData = [
@@ -3986,7 +3986,7 @@ async function generatePDFReportAttack() {
             doc.setFontSize(11);
             doc.setTextColor(255, 193, 7);
             doc.setFont(undefined, 'bold');
-            doc.text('📋 DETALLE DE ACCIONES', 20, yPos + 5, { align: 'left' });
+            doc.text('DETALLE DE ACCIONES', 20, yPos + 5, { align: 'left' });
             yPos += 10;
 
             const tableData = filteredActions.slice(0, 25).map(a => [
