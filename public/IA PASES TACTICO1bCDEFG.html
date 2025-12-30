@@ -3,22 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analista Pro v5.5: Smart Auto-Fix</title>
-    
-    <!-- App Data Manager - Persistencia de datos -->
-    <script src="/app-data-manager.js"></script>
-    
-    <!-- Download Manager - Sistema de descargas -->
-    <script src="/download-manager.js"></script>
-    
-    <!-- Session Heartbeat - Mantener sesión activa -->
-    <script>
-        (function() {
-            const tick = () => fetch('/api/session-lock', { method: 'POST' }).catch(() => {});
-            tick(); // Initial ping
-            setInterval(tick, 15000); // Every 15 seconds
-        })();
-    </script>
+    <title>Analista Pro v5.7: Player Highlight</title>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -105,11 +90,12 @@
 <div id="arrowTooltip"></div>
 
 <header>
+    <h3>Analista Pro v5.7 (Player Highlight)</h3>
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('data')">📁 Datos</button>
         <button class="tab-btn" onclick="switchTab('patterns')">🧠 Patrones</button>
         <button id="btnTabAI" class="tab-btn" onclick="switchTab('ai')" style="color: var(--ai-accent);">🤖 IA Táctica</button>
-        <button class="tab-btn" onclick="document.getElementById('videoLoader').click()" style="background:#e67e22; color:#fff;">🎥 Video</button>
+        <button class="tab-btn" disabled style="background:#999; color:#ccc; opacity:0.5; cursor:not-allowed;" title="Desactivado - En pruebas">🎥 Video</button>
     </div>
 </header>
 
@@ -173,6 +159,12 @@
         <div id="tab-ai" class="sidebar-section">
             <div class="box">
                 <h4 style="color:var(--ai-accent)">1. Clustering (Semáforo)</h4>
+                
+                <label>Jugador Objetivo</label>
+                <select id="clusterPlayerSelect" style="border:1px solid var(--ai-accent);" onchange="render()">
+                    <option value="ALL">★ Todo el Equipo (Estructura)</option>
+                </select>
+
                 <label>Grupos</label>
                 <input type="number" id="kClusters" value="5" min="2" max="15">
                 <button onclick="runKMeans()" class="btn-ai">🧩 Generar Grupos</button>
@@ -245,7 +237,6 @@
             <div class="repo-head">
                 <span id="repoStats">Filas: 0</span>
                 <button onclick="downloadCutsScript()" style="width:auto; background:#27ae60; padding:2px 8px; font-size:0.7rem;">✂️ Script</button>
-                <button onclick="saveData()" style="width:auto; background:#3498db; padding:2px 8px; font-size:0.7rem; margin-left:5px;">💾 Guardar</button>
             </div>
             <div class="table-wrap">
                 <table id="repoTable">
@@ -348,10 +339,33 @@ function getZoneCenter(name) {
     return {x:50, y:50}; 
 }
 
-async function loadFiles(e, ctx) { for(let f of e.target.files) await readFile(f,ctx); updateStats(); applyFilters(); analyzePatterns(); }
+// === NUEVO: Actualizar lista de jugadores para clustering ===
+function updateClusterPlayerList() {
+    const select = document.getElementById('clusterPlayerSelect');
+    const oldVal = select.value;
+    const players = new Set();
+    STATE.matches.forEach(m => m.actions.forEach(a => {
+        if(a.player && a.player.length > 1 && a.player !== '?') players.add(a.player);
+    }));
+    
+    select.innerHTML = '<option value="ALL">★ Todo el Equipo (Estructura)</option>';
+    Array.from(players).sort().forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p; opt.innerText = p;
+        select.appendChild(opt);
+    });
+    if(Array.from(players).includes(oldVal)) select.value = oldVal;
+}
+
+async function loadFiles(e, ctx) { 
+    for(let f of e.target.files) await readFile(f,ctx); 
+    updateStats(); 
+    applyFilters(); 
+    analyzePatterns(); 
+    updateClusterPlayerList(); 
+}
 function updateStats() { document.getElementById('fileStatus').innerText = `${STATE.matches.length} Partidos`; }
 
-// === FUNCIÓN DE LECTURA INTELIGENTE v5.5 ===
 function readFile(file, ctxType) {
     return new Promise(resolve => {
         const reader = new FileReader();
@@ -373,22 +387,15 @@ function readFile(file, ctxType) {
                     const startZone = (c['zona inicio (33%)'] || c['zona inicio'] || "").toLowerCase();
 
                     // --- AUTO-CORRECCIÓN INTELIGENTE ---
-                    // Si el usuario quiere normalizar, forzamos que Defensa = Izquierda (0-50) y Ataque = Derecha (50-100)
                     if (normalize) {
                         let needsInvert = false;
-
-                        // REGLA 1: Si el texto dice "Defensa" pero la X es ALTA (>50) -> ESTÁ AL REVÉS -> INVERTIR
                         if (startZone.includes('defensa') && x > 50) {
                             needsInvert = true;
                         }
-                        // REGLA 2: Si el texto dice "Ataque" pero la X es BAJA (<50) -> ESTÁ AL REVÉS -> INVERTIR
                         else if (startZone.includes('ataque') && x < 50) {
                             needsInvert = true;
                         }
-                        
-                        // Si no hay texto de zona, usamos el fallback de 1T/2T
                         else if (!startZone && ctxType === 'AWAY' && minute < 48) {
-                             // Asumimos que el visitante en 1T ataca de 100->0, así que invertimos si no hay data mejor
                              needsInvert = true; 
                         }
 
@@ -401,6 +408,7 @@ function readFile(file, ctxType) {
                     return {
                         id:i, uid:Math.random().toString(36),
                         posId: c['posesion id']||c['posid']||c['id']||'?', team: c['equipo']||c['team']||'?',
+                        player: c['jugador']||c['player']||c['name']||'?', // IMPORTANTE PARA CLUSTER
                         min: minute, action: c['accion']||c['action']||'', result: c['resultado']||c['result']||c['outcome']||'',
                         x: x, y: y
                     };
@@ -419,7 +427,6 @@ function resetAll() {
     updateStats(); document.getElementById('aiStatus').style.display='none'; applyFilters();
 }
 
-// === LÓGICA DE FILTROS Y TIEMPO ===
 function applyFilters() {
     const actFilter = document.getElementById('actFilter').value;
     const minD = parseFloat(document.getElementById('minDur').value) || 0;
@@ -453,7 +460,6 @@ function applyFilters() {
 
 function safeClearZones() { STATE.zones=[]; STATE.aiMode=null; STATE.markovActive=false; STATE.currentClusterIdx=-1; STATE.goalPaths=[]; document.getElementById('aiStatus').style.display='none'; tooltip.style.display='none'; applyFilters(); }
 
-// === PATRONES ===
 function analyzePatterns() {
     const min=parseInt(document.getElementById('minLen').value), cts={};
     const grp=new Map(); 
@@ -492,20 +498,46 @@ function filterByPat(seqString) {
     STATE.selectedId = null; render(); updateTable();
 }
 
-// === CLUSTERING ===
+// === CLUSTERING INDIVIDUAL Y GRUPAL (K-MEANS) ===
 function runKMeans() {
     STATE.filtered = []; STATE.selectedId = null; STATE.markovVisuals = null; STATE.markovActive = false; updateTable();
     STATE.aiMode='KMEANS'; STATE.goalPaths=[];
+    
     const k=parseInt(document.getElementById('kClusters').value);
+    const targetPlayer = document.getElementById('clusterPlayerSelect').value;
+
     let vecs=[];
     STATE.matches.forEach(m=>{
         let poss=new Map(); m.actions.forEach(a=>{ if(!poss.has(a.posId)) poss.set(a.posId,[]); poss.get(a.posId).push(a); });
         poss.forEach(acts=>{
             const result = acts[acts.length-1].result;
-            for(let i=0; i<acts.length-1; i++) if(getCategory(acts[i].action)==='PASS') vecs.push({x1:acts[i].x, y1:acts[i].y, x2:acts[i+1].x, y2:acts[i+1].y, ref:acts[i], ctx: m.context, res: result});
+            for(let i=0; i<acts.length-1; i++) {
+                const current = acts[i];
+                const next = acts[i+1];
+                const cat = getCategory(current.action);
+                
+                // === FILTRO INDIVIDUAL ===
+                let isValid = false;
+                
+                if (targetPlayer === 'ALL') {
+                    // MODO EQUIPO: Solo Pases (Estructura)
+                    if (cat === 'PASS') isValid = true;
+                } else {
+                    // MODO JUGADOR: Solo acciones de ese jugador (Pases o Conducciones)
+                    if (current.player === targetPlayer && (cat === 'PASS' || cat === 'CARRY')) {
+                        isValid = true;
+                    }
+                }
+
+                if(isValid) {
+                    vecs.push({x1:current.x, y1:current.y, x2:next.x, y2:next.y, ref:current, ctx: m.context, res: result});
+                }
+            }
         });
     });
-    if(vecs.length<k) return alert("Pocos datos");
+
+    if(vecs.length<k) return alert(`Pocos datos (${vecs.length}) para generar ${k} grupos.`);
+    
     let centroids=[]; for(let i=0;i<k;i++) centroids.push(vecs[Math.floor(Math.random()*vecs.length)]);
     let clusters=new Array(k).fill().map(()=>[]);
     for(let it=0;it<10;it++){
@@ -521,8 +553,15 @@ function runKMeans() {
             return {x1:s.x1/c.length, y1:s.y1/c.length, x2:s.x2/c.length, y2:s.y2/c.length};
         });
     }
+    
     STATE.clusters = clusters.map((c,i)=>({points:c, centroid:centroids[i], color:`hsl(${i*(360/k)},70%,50%)`}));
     const list=document.getElementById('clusterList'); list.innerHTML='';
+    
+    const h = document.createElement('div'); 
+    h.style.padding="5px"; h.style.fontSize="0.7rem"; h.style.textAlign="center"; h.style.color="#aaa";
+    h.innerText = targetPlayer === 'ALL' ? "MODO: Equipo (Solo Pases)" : `MODO: ${targetPlayer} (Pases+Cond.)`;
+    list.appendChild(h);
+
     STATE.clusters.sort((a,b)=>b.points.length-a.points.length).forEach((c,i)=>{
         const item=document.createElement('div'); item.className='pattern-item';
         item.innerHTML=`<span style="color:${c.color}">●</span> G${i+1} (${c.points.length})`;
@@ -543,7 +582,6 @@ function runKMeans() {
     render();
 }
 
-// === MARKOV CON TIEMPO ===
 function activateMarkovMode() {
     STATE.filtered = []; STATE.selectedId = null; STATE.clusters = []; STATE.currentClusterIdx = -1; updateTable();
     STATE.aiMode = 'MARKOV'; STATE.markovActive = true; STATE.markovVisuals = null; STATE.goalPaths = [];
@@ -715,20 +753,38 @@ function drawArrow(x1,y1,x2,y2,col,w,lbl) {
         ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(lbl,mx,my); 
     }
 }
+
+// === RENDERIZADO PRINCIPAL CON HIGHLIGHT DE JUGADOR ===
 function render() {
     const w=canvas.width, h=canvas.height; if(w===0) return;
     drawPitch(w,h); const X=v=>v/100*w, Y=v=>v/100*h;
     STATE.zones.forEach(z=>{ ctx.fillStyle="rgba(241,196,15,0.2)"; ctx.fillRect(X(z.xMin),Y(z.yMin),X(z.xMax-z.xMin),Y(z.yMax-z.yMin)); });
     if(drawing && !STATE.markovActive){ ctx.strokeStyle="#fff"; ctx.strokeRect(X(Math.min(start.x,curr.x)),Y(Math.min(start.y,curr.y)),X(Math.abs(curr.x-start.x)),Y(Math.abs(curr.y-start.y))); }
     
+    // Obtener jugador seleccionado para resaltar
+    const targetPlayer = document.getElementById('clusterPlayerSelect').value;
+
     if(STATE.aiMode==='KMEANS') {
         STATE.clusters.forEach((c, idx)=>{ 
             const isTarget = (STATE.currentClusterIdx === -1 || STATE.currentClusterIdx === idx);
             if(isTarget) {
                 drawArrow(X(c.centroid.x1),Y(c.centroid.y1),X(c.centroid.x2),Y(c.centroid.y2),c.color,5);
                 c.points.forEach(p => { 
+                    const isPlayerAction = (targetPlayer !== 'ALL' && p.ref.player === targetPlayer);
                     const resCol = getResultColor(p.res);
-                    ctx.fillStyle = resCol; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(X(p.x1), Y(p.y1), 2, 0, 6.28); ctx.fill();
+                    const radius = isPlayerAction ? 6 : 2; // Círculo más grande si es el jugador
+                    
+                    ctx.fillStyle = resCol; 
+                    ctx.globalAlpha = isPlayerAction ? 1.0 : 0.6; 
+                    ctx.beginPath(); 
+                    ctx.arc(X(p.x1), Y(p.y1), radius, 0, 6.28); 
+                    ctx.fill();
+                    
+                    if(isPlayerAction) {
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
                 });
                 ctx.globalAlpha = 1;
             } else {
@@ -766,15 +822,49 @@ function render() {
         STATE.filtered.forEach(p=>{
             if(p.uid===STATE.selectedId) return; ctx.globalAlpha=0.15;
             if(p.actions.length>1){ ctx.beginPath(); ctx.strokeStyle=p.context==='HOME'?"#3498db":"#e67e22"; ctx.lineWidth=1; p.actions.forEach((a,i)=>{ if(i===0)ctx.moveTo(X(a.x),Y(a.y)); else ctx.lineTo(X(a.x),Y(a.y)); }); ctx.stroke(); }
-            p.actions.forEach((a,i)=>{ ctx.fillStyle=getCol(a.action); ctx.beginPath(); ctx.arc(X(a.x),Y(a.y),2,0,6.28); ctx.fill(); });
+            
+            p.actions.forEach((a,i)=>{ 
+                const isPlayerAction = (targetPlayer !== 'ALL' && a.player === targetPlayer);
+                const r = isPlayerAction ? 5 : 2;
+                ctx.fillStyle=getCol(a.action); 
+                ctx.beginPath(); 
+                ctx.arc(X(a.x),Y(a.y),r,0,6.28); 
+                ctx.fill(); 
+                
+                if(isPlayerAction) {
+                    ctx.strokeStyle="#fff"; ctx.lineWidth=1; ctx.stroke();
+                }
+            });
         }); ctx.globalAlpha=1;
+        
         if(STATE.selectedId) {
             const p=STATE.filtered.find(x=>x.uid===STATE.selectedId);
             if(p){
                 ctx.shadowBlur=10; ctx.shadowColor="#000";
                 if(p.actions.length>1){ ctx.beginPath(); ctx.strokeStyle="#f1c40f"; ctx.lineWidth=5; p.actions.forEach((a,i)=>{ if(i===0)ctx.moveTo(X(a.x),Y(a.y)); else ctx.lineTo(X(a.x),Y(a.y)); }); ctx.stroke(); }
                 ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 12px Arial'; ctx.shadowBlur=0;
-                p.actions.forEach((a,i)=>{ const x=X(a.x), y=Y(a.y); ctx.beginPath(); ctx.arc(x,y,9,0,6.28); ctx.fillStyle="#000"; ctx.fill(); ctx.beginPath(); ctx.arc(x,y,7,0,6.28); ctx.fillStyle=getCol(a.action); ctx.fill(); ctx.fillStyle="#000"; ctx.fillText(i+1,x,y); });
+                
+                p.actions.forEach((a,i)=>{ 
+                    const x=X(a.x), y=Y(a.y); 
+                    const isPlayerAction = (targetPlayer !== 'ALL' && a.player === targetPlayer);
+
+                    ctx.beginPath(); 
+                    ctx.arc(x,y,isPlayerAction ? 12 : 9,0,6.28); 
+                    ctx.fillStyle="#000"; ctx.fill(); 
+                    
+                    ctx.beginPath(); 
+                    ctx.arc(x,y,isPlayerAction ? 10 : 7,0,6.28); 
+                    ctx.fillStyle=getCol(a.action); ctx.fill(); 
+                    
+                    // Resaltar borde del jugador seleccionado en la jugada grande
+                    if(isPlayerAction) {
+                        ctx.strokeStyle = "#f1c40f"; // Borde dorado
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle="#000"; ctx.fillText(i+1,x,y); 
+                });
             }
         }
     }
@@ -798,12 +888,7 @@ function updateTable(){
             <td>${p.posId}</td>
             <td>${p.context}</td>
             <td>${p.min}</td>
-            <td style="color:${durColor}; font-weight:bold;">
-                <input type="number" step="0.1" value="${(p.duration||0).toFixed(1)}" 
-                       style="width:50px; padding:2px; background:#333; color:${durColor}; border:1px solid ${durColor}; text-align:center; font-weight:bold;" 
-                       onclick="event.stopPropagation()"
-                       onchange="updatePossessionDuration('${p.uid}', this.value); saveData();"
-                       title="Editable: cambia la duración manualmente">s</td>
+            <td style="color:${durColor}; font-weight:bold;">${(p.duration||0).toFixed(1)}s</td>
             <td>${p.actions.length}</td>
             <td style="font-size:0.65rem;">${p.actions[0].action}...</td>
             <td>${p.result}</td>
@@ -812,30 +897,6 @@ function updateTable(){
         t.appendChild(tr);
     });
 }
-
-function updatePossessionDuration(uid, newDuration){
-    const idx = STATE.filtered.findIndex(p => p.uid === uid);
-    if(idx !== -1) {
-        STATE.filtered[idx].duration = parseFloat(newDuration);
-        // Recalcular acciones si es necesario
-        const oldEnd = STATE.filtered[idx].actions[STATE.filtered[idx].actions.length - 1].min;
-        const dur = parseFloat(newDuration);
-        const newEnd = (parseFloat(STATE.filtered[idx].min) + dur / 60).toFixed(3);
-        STATE.filtered[idx].actions[STATE.filtered[idx].actions.length - 1].min = newEnd;
-    }
-}
-
-function saveData(){
-    try {
-        if(window.AnalysisDataSync && typeof window.AnalysisDataSync.saveProgress === 'function'){
-            window.AnalysisDataSync.saveProgress('attackMetrics', { DB: STATE.filtered });
-            console.log('[IA PASES] Datos guardados en sync');
-        }
-    } catch(err){
-        console.warn('[IA PASES] Error al guardar:', err);
-    }
-}
-
 function handleVideoLoad(i){ Array.from(i.files).forEach(f=>STATE.videos.push({name:f.name,url:URL.createObjectURL(f)})); if(STATE.currentVidIdx===-1) playVideo(0); toggleVideo(true); }
 function playVideo(i){ STATE.currentVidIdx=i; document.getElementById('mainVideo').src=STATE.videos[i].url; }
 function toggleVideo(s){ document.getElementById('videoPanel').style.display=s?'block':'none'; setTimeout(fitCanvas,100); }
