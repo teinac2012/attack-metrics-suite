@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Match Data Hub - Pro Scout v18.4 (Calibrated)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <style>
         /* [ESTILOS EXACTOS - SIN CAMBIOS] */
         :root { --bg-dark: #0f0f13; --panel-bg: #18181c; --border: #2d2d33; --accent-blue: #3498db; --accent-red: #e74c3c; --accent-brand: #f39c12; --text-main: #ffffff; }
@@ -228,6 +230,49 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="reportModal">
+    <div class="modal-content" style="max-width: 500px; height: auto;">
+        <div class="modal-header">
+            <div class="modal-title">📊 GENERAR REPORTE PDF</div>
+            <button class="btn-close" onclick="closeReportModal()">Cerrar</button>
+        </div>
+        <div style="padding: 20px;">
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; margin-bottom:5px; font-size:0.85rem; color:#aaa; font-weight:bold;">TIPO DE REPORTE</label>
+                <select id="reportType" style="width:100%; background:#222; color:#fff; border:1px solid #444; padding:8px; border-radius:4px; font-size:0.9rem;" onchange="togglePlayerSelect()">
+                    <option value="team">📊 Todo el Equipo</option>
+                    <option value="player">👤 Jugador Individual</option>
+                </select>
+            </div>
+            <div id="playerSelectDiv" style="margin-bottom: 15px; display:none;">
+                <label style="display:block; margin-bottom:5px; font-size:0.85rem; color:#aaa; font-weight:bold;">SELECCIONAR JUGADOR</label>
+                <select id="reportPlayer" style="width:100%; background:#222; color:#fff; border:1px solid #444; padding:8px; border-radius:4px; font-size:0.9rem;">
+                </select>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; margin-bottom:8px; font-size:0.85rem; color:#aaa; font-weight:bold;">CONTENIDO DEL REPORTE</label>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px; background:#2a2a2a; border-radius:4px;">
+                        <input type="checkbox" id="includeHeatmap" checked style="cursor:pointer;">
+                        <span style="font-size:0.85rem;">🔥 Mapa de Calor</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px; background:#2a2a2a; border-radius:4px;">
+                        <input type="checkbox" id="includeTable" checked style="cursor:pointer;">
+                        <span style="font-size:0.85rem;">📋 Tabla de Acciones</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px; background:#2a2a2a; border-radius:4px;">
+                        <input type="checkbox" id="includePitch" checked style="cursor:pointer;">
+                        <span style="font-size:0.85rem;">⚽ Mapa de Tiros</span>
+                    </label>
+                </div>
+            </div>
+            <button onclick="generatePDFReport()" style="width:100%; padding:12px; background:#27ae60; color:#fff; border:none; border-radius:6px; font-weight:bold; font-size:1rem; cursor:pointer; margin-top:10px;">
+                ⬇️ GENERAR Y DESCARGAR PDF
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="looseModal">
     <div class="modal-content" style="max-width: 600px; height: 70vh;">
         <div class="modal-header">
@@ -253,6 +298,7 @@
             <button onclick="saveToSeasonHistory()" class="btn-save-season">Guardar Jornada</button>
             <button onclick="saveLooseMatch()" class="btn-loose">Guardar Suelto</button>
             <button onclick="viewLooseMatches()" style="background:#555">📂 Archivo</button>
+            <button onclick="openReportModal()" style="background:#8e44ad; border-color:#9b59b6">📊 Reporte PDF</button>
             <button class="btn-excel" onclick="downloadExcel()">CSV</button>
         </div>
     </div>
@@ -749,6 +795,224 @@
     function downloadExcel() { let c = "\uFEFFMinuto;Seg;Jugador;Equipo;Resultado;xG;xGOT\n"; matchData.shots.forEach(s => { c += `${s.minute};${s.second};${s.player};${s.team};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)}\n`; }); const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); l.download = `Data.csv`; l.click(); }
     function importCSV(input) {alert("Importado");}
     window.saveCanvas = function(cid, fname) { const c=document.getElementById(cid); if(c){const l=document.createElement('a'); l.download=`${fname}.png`; l.href=c.toDataURL(); l.click();} };
+
+    // === SISTEMA DE REPORTES PDF ===
+    function openReportModal() {
+        const players = {};
+        matchData.shots.forEach(s => {
+            const key = s.player || "Anónimo";
+            if(!players[key]) players[key] = { count: 0, team: s.team };
+            players[key].count++;
+        });
+        const sel = document.getElementById('reportPlayer');
+        sel.innerHTML = '';
+        Object.keys(players).sort().forEach(pName => {
+            const opt = document.createElement('option');
+            opt.value = pName;
+            opt.innerText = `${pName} (${players[pName].count} tiros - ${players[pName].team})`;
+            sel.appendChild(opt);
+        });
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+    function closeReportModal() { document.getElementById('reportModal').style.display = 'none'; }
+    function togglePlayerSelect() {
+        const type = document.getElementById('reportType').value;
+        document.getElementById('playerSelectDiv').style.display = type === 'player' ? 'block' : 'none';
+    }
+
+    async function generatePDFReport() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const type = document.getElementById('reportType').value;
+        const playerName = type === 'player' ? document.getElementById('reportPlayer').value : 'TODO EL EQUIPO';
+        const includeHeatmap = document.getElementById('includeHeatmap').checked;
+        const includeTable = document.getElementById('includeTable').checked;
+        const includePitch = document.getElementById('includePitch').checked;
+
+        // Filtrar datos
+        const filteredShots = type === 'player' 
+            ? matchData.shots.filter(s => (s.player || "Anónimo") === playerName)
+            : matchData.shots;
+
+        if(filteredShots.length === 0) {
+            alert('No hay datos para este jugador');
+            return;
+        }
+
+        // Calcular stats
+        const stats = { tiros: filteredShots.length, xg: 0, xgot: 0, goles: 0 };
+        filteredShots.forEach(s => {
+            stats.xg += s.xg;
+            stats.xgot += s.xgot;
+            if(s.result === 'Gol') stats.goles++;
+        });
+
+        let yPos = 20;
+
+        // === PORTADA ===
+        doc.setFillColor(15, 15, 19);
+        doc.rect(0, 0, 210, 60, 'F');
+        doc.setTextColor(243, 156, 18);
+        doc.setFontSize(24);
+        doc.setFont(undefined, 'bold');
+        doc.text('MATCH DATA HUB', 105, 20, { align: 'center' });
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Reporte de Rendimiento', 105, 30, { align: 'center' });
+        
+        doc.setFontSize(18);
+        doc.setTextColor(52, 152, 219);
+        doc.text(playerName, 105, 45, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Jornada: ${inputs.jornada.value || 'N/A'}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
+
+        yPos = 70;
+
+        // === RESUMEN ESTADÍSTICO ===
+        doc.setFillColor(30, 30, 36);
+        doc.roundedRect(15, yPos, 180, 35, 3, 3, 'F');
+        
+        doc.setFontSize(12);
+        doc.setTextColor(243, 156, 18);
+        doc.setFont(undefined, 'bold');
+        doc.text('RESUMEN ESTADÍSTICO', 105, yPos + 8, { align: 'center' });
+
+        const boxW = 40;
+        const startX = 25;
+        const boxY = yPos + 15;
+        
+        const statBoxes = [
+            { label: 'TIROS', val: stats.tiros, color: [52, 152, 219] },
+            { label: 'xG', val: stats.xg.toFixed(2), color: [243, 156, 18] },
+            { label: 'xGOT', val: stats.xgot.toFixed(2), color: [46, 204, 113] },
+            { label: 'GOLES', val: stats.goles, color: [231, 76, 60] }
+        ];
+
+        statBoxes.forEach((box, i) => {
+            const x = startX + (i * 42);
+            doc.setDrawColor(box.color[0], box.color[1], box.color[2]);
+            doc.setLineWidth(0.5);
+            doc.rect(x, boxY, boxW, 12);
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(box.color[0], box.color[1], box.color[2]);
+            doc.text(String(box.val), x + boxW/2, boxY + 6, { align: 'center' });
+            doc.setFontSize(7);
+            doc.setTextColor(150, 150, 150);
+            doc.text(box.label, x + boxW/2, boxY + 10, { align: 'center' });
+        });
+
+        yPos += 45;
+
+        // === MAPA DE CALOR ===
+        if(includeHeatmap && filteredShots.length > 0) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 800;
+            tempCanvas.height = 400;
+            const ctx = tempCanvas.getContext('2d');
+            
+            // Dibujar campo simplificado
+            ctx.fillStyle = "#388e3c";
+            ctx.fillRect(0, 0, 800, 400);
+            ctx.strokeStyle = "rgba(255,255,255,0.3)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(20, 20, 760, 360);
+            
+            // Dibujar puntos de calor
+            ctx.globalCompositeOperation = 'lighter';
+            filteredShots.forEach(s => {
+                const xPct = (s.startX - 85) / (120 - 85);
+                const yPct = s.startY / 80;
+                const x = 20 + (760 * (1 - xPct));
+                const y = 20 + (360 * yPct);
+                const grd = ctx.createRadialGradient(x, y, 0, x, y, 40);
+                const intensity = s.result === 'Gol' ? 0.8 : 0.4;
+                const color = s.result === 'Gol' ? '52,219,52' : '219,52,52';
+                grd.addColorStop(0, `rgba(${color},${intensity})`);
+                grd.addColorStop(1, `rgba(${color},0)`);
+                ctx.fillStyle = grd;
+                ctx.beginPath();
+                ctx.arc(x, y, 40, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalCompositeOperation = 'source-over';
+
+            const heatmapImg = tempCanvas.toDataURL('image/png');
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('🔥 MAPA DE CALOR', 15, yPos);
+            yPos += 5;
+            doc.addImage(heatmapImg, 'PNG', 15, yPos, 180, 90);
+            yPos += 95;
+        }
+
+        // === MAPA DE TIROS ===
+        if(includePitch) {
+            const pitchImg = document.getElementById('pitchCanvas').toDataURL('image/png');
+            if(yPos > 200) {
+                doc.addPage();
+                yPos = 20;
+            }
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('⚽ POSICIONES DE TIRO', 15, yPos);
+            yPos += 5;
+            doc.addImage(pitchImg, 'PNG', 15, yPos, 180, 90);
+            yPos += 95;
+        }
+
+        // === TABLA DE ACCIONES ===
+        if(includeTable) {
+            if(yPos > 200) {
+                doc.addPage();
+                yPos = 20;
+            }
+            doc.setFontSize(11);
+            doc.setTextColor(243, 156, 18);
+            doc.setFont(undefined, 'bold');
+            doc.text('📋 DETALLE DE ACCIONES', 15, yPos);
+            yPos += 5;
+
+            const tableData = filteredShots.map(s => [
+                `${s.minute}:${s.second < 10 ? '0'+s.second : s.second}`,
+                s.team,
+                s.tipo || 'Normal',
+                s.xg.toFixed(2),
+                s.xgot.toFixed(2),
+                s.result
+            ]);
+
+            doc.autoTable({
+                startY: yPos,
+                head: [['Minuto', 'Equipo', 'Tipo', 'xG', 'xGOT', 'Resultado']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                bodyStyles: { fontSize: 8, textColor: [200, 200, 200] },
+                alternateRowStyles: { fillColor: [30, 30, 36] },
+                styles: { cellPadding: 2, lineColor: [60, 60, 60], lineWidth: 0.1 },
+                margin: { left: 15, right: 15 }
+            });
+        }
+
+        // === PIE DE PÁGINA ===
+        const pageCount = doc.internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generado por Match Data Hub v18.4 - Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+        }
+
+        // Descargar
+        const fileName = `Reporte_${playerName.replace(/ /g, '_')}_J${inputs.jornada.value || 'XX'}.pdf`;
+        doc.save(fileName);
+        closeReportModal();
+    }
 
     function draw() { const c = calculate(); ui.liveXG.innerText = c.xg.toFixed(3); ui.liveXGOT.innerText = c.xgot.toFixed(3); drawPitch(c); drawGoal(c); }
 
