@@ -219,6 +219,14 @@
                 <label style="font-size:0.65rem; color:#aaa;">Duración Máx (s)</label>
                 <input type="number" id="metricsMaxDur" value="200" min="0" onchange="calculatePassMetrics()">
 
+                <label style="font-size:0.65rem; color:#aaa; margin-top:8px;">📍 Visualizar Mapa</label>
+                <select id="metricsMapMode">
+                    <option value="">Desactivado</option>
+                    <option value="heatmap">🔥 Heatmap de Pases</option>
+                    <option value="network">🕸️ Red de Pases</option>
+                </select>
+                <button onclick="visualizePassMap()" style="background:#ff6b6b; margin-top:5px;">📺 Mostrar en Cancha</button>
+
                 <button onclick="downloadMetricsExcel()" style="background:#27ae60; margin-top:8px;">📥 Exportar Excel</button>
             </div>
         </div>
@@ -907,6 +915,11 @@ function render() {
             }
         }
     }
+    
+    // Visualización de mapas de pases
+    if (STATE.aiMode === 'PASS_MAP') {
+        renderPassMap();
+    }
 }
 
 // === ACTUALIZACIÓN DE TABLA ===
@@ -1238,6 +1251,125 @@ function compareTeams() {
 // Actualizar dropdown cuando carga datos
 function updateAllMetricsSelects() {
     updateMetricsDisplay();
+}
+
+function visualizePassMap() {
+    const mode = document.getElementById('metricsMapMode').value;
+    if (!mode) {
+        STATE.aiMode = null;
+        render();
+        return;
+    }
+    
+    const team = document.getElementById('metricsTeam').value;
+    const minDur = parseFloat(document.getElementById('metricsMinDur').value) || 0;
+    const maxDur = parseFloat(document.getElementById('metricsMaxDur').value) || 200;
+    
+    // Recolectar todos los pases del equipo
+    const passData = [];
+    STATE.filtered.forEach(possession => {
+        if (possession.context !== team) return;
+        if (possession.duration < minDur || possession.duration > maxDur) return;
+        
+        possession.actions.forEach((action, idx) => {
+            if (action.action.toLowerCase().includes('pase')) {
+                const nextAction = possession.actions[idx + 1];
+                passData.push({
+                    x: action.x,
+                    y: action.y,
+                    nextX: nextAction ? nextAction.x : action.x,
+                    nextY: nextAction ? nextAction.y : action.y,
+                    completed: nextAction && nextAction.context === team,
+                    dist: nextAction ? Math.sqrt(Math.pow(nextAction.x - action.x, 2) + Math.pow(nextAction.y - action.y, 2)) : 0
+                });
+            }
+        });
+    });
+    
+    // Guardar en STATE para usar en render
+    STATE.metricsVisualization = { mode, team, passData };
+    STATE.aiMode = 'PASS_MAP';
+    render();
+}
+
+// Exrender personalizado para mapas de pases - se llama desde render() con la cancha dibujada
+function renderPassMap() {
+    if (!STATE.metricsVisualization) return;
+    
+    const { mode, team, passData } = STATE.metricsVisualization;
+    const X = (x) => (canvas.width / 105) * x;
+    const Y = (y) => (canvas.height / 68) * y;
+    
+    if (mode === 'heatmap') {
+        // Crear mapa de calor simple
+        const cellSize = 8;
+        const grid = {};
+        
+        // Contar pases por celda
+        passData.forEach(p => {
+            const cellX = Math.floor(p.x / cellSize);
+            const cellY = Math.floor(p.y / cellSize);
+            const key = `${cellX},${cellY}`;
+            grid[key] = (grid[key] || 0) + 1;
+        });
+        
+        // Encontrar máximo para normalizar
+        const maxPasses = Math.max(...Object.values(grid));
+        
+        // Dibujar heatmap
+        Object.entries(grid).forEach(([key, count]) => {
+            const [cellX, cellY] = key.split(',').map(Number);
+            const x = X(cellX * cellSize);
+            const y = Y(cellY * cellSize);
+            const w = X(cellSize) - X(0);
+            const h = Y(cellSize) - Y(0);
+            
+            // Colores del rojo (pocas) al amarillo (muchas)
+            const intensity = count / maxPasses;
+            const hue = (1 - intensity) * 0; // Rojo a amarillo
+            ctx.fillStyle = `hsl(${hue}, 100%, ${50 + intensity * 20}%)`;
+            ctx.globalAlpha = 0.5;
+            ctx.fillRect(x, y, w, h);
+            ctx.globalAlpha = 1;
+        });
+        
+        // Dibujar título
+        ctx.fillStyle = team === 'HOME' ? '#3498db' : '#e67e22';
+        ctx.font = 'bold 14px Arial';
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(`🔥 Heatmap ${team === 'HOME' ? 'LOCAL' : 'VISITANTE'}`, X(5), Y(3));
+        ctx.globalAlpha = 1;
+    }
+    else if (mode === 'network') {
+        // Red de pases: líneas conectando inicio-fin
+        ctx.strokeStyle = team === 'HOME' ? 'rgba(52, 152, 219, 0.6)' : 'rgba(230, 126, 34, 0.6)';
+        ctx.lineWidth = 1;
+        
+        passData.forEach(p => {
+            if (p.completed) {
+                ctx.beginPath();
+                ctx.moveTo(X(p.x), Y(p.y));
+                ctx.lineTo(X(p.nextX), Y(p.nextY));
+                ctx.stroke();
+            }
+        });
+        
+        // Dibujar nodos (puntos de inicio)
+        const nodeSize = 3;
+        ctx.fillStyle = team === 'HOME' ? '#3498db' : '#e67e22';
+        passData.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(X(p.x), Y(p.y), nodeSize, 0, 6.28);
+            ctx.fill();
+        });
+        
+        // Dibujar título
+        ctx.fillStyle = team === 'HOME' ? '#3498db' : '#e67e22';
+        ctx.font = 'bold 14px Arial';
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(`🕸️ Red ${team === 'HOME' ? 'LOCAL' : 'VISITANTE'} (${passData.length} pases)`, X(5), Y(3));
+        ctx.globalAlpha = 1;
+    }
 }
 </script>
 </body>
