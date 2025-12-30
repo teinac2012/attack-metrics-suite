@@ -201,6 +201,7 @@
                 </select>
 
                 <button onclick="calculatePassMetrics()" style="background:#3498db; margin-top:8px;">🔄 Calcular</button>
+                <button onclick="compareTeams()" style="background:#9b59b6; margin-top:5px;">⚖️ Comparar Equipos</button>
             </div>
 
             <div class="box">
@@ -999,6 +1000,7 @@ function calculatePassMetrics() {
     let xBuild = 0;
     let xThreat = 0;
     let passCount = 0;
+    let passLengths = [];
     
     STATE.filtered.forEach(possession => {
         if (possession.context !== team) return;
@@ -1015,22 +1017,33 @@ function calculatePassMetrics() {
             const isCompleted = nextAction && nextAction.context === team;
             if (isCompleted) completedPasses++;
             
+            // Longitud del pase
+            const passLength = nextAction ? 
+                Math.sqrt(Math.pow(nextAction.x - action.x, 2) + Math.pow(nextAction.y - action.y, 2)) : 
+                0;
+            passLengths.push(passLength);
+            
             // xBuild: probabilidad de que este pase lleve a un tiro en los próximos 5 acciones
             let hasShot = false;
+            let distToShot = 0;
             for (let i = idx + 1; i < Math.min(idx + 6, possession.actions.length); i++) {
                 if (possession.actions[i].action.toLowerCase().includes('disparo')) {
                     hasShot = true;
+                    distToShot = i - idx;
                     break;
                 }
             }
-            xBuild += hasShot ? 0.25 : 0;
+            const xBuildVal = hasShot ? (1 / (1 + distToShot * 0.15)) : 0;
+            xBuild += xBuildVal;
             
             // xThreat: basado en proximidad a la portería contraria y resultado final
             const dist = Math.sqrt(Math.pow(action.x - 105, 2) + Math.pow(action.y - 34, 2));
             let threat = Math.max(0, 1 - (dist / 120));
             
-            if (possession.result === 'GOAL') threat *= 1.5;
-            else if (possession.result === 'SHOT') threat *= 1.2;
+            // Ajustar por resultado final de la posesión
+            if (possession.result && possession.result.toLowerCase().includes('gol')) threat *= 1.8;
+            else if (possession.result && possession.result.toLowerCase().includes('disparo')) threat *= 1.3;
+            else if (!isCompleted) threat *= 0.7; // Pérdida de balón penaliza
             
             xThreat += threat;
             passCount++;
@@ -1038,11 +1051,13 @@ function calculatePassMetrics() {
             passes.push({
                 player: action.player || 'N/A',
                 minute: action.min,
-                x: action.x,
-                y: action.y,
+                x: (action.x || 0).toFixed(1),
+                y: (action.y || 0).toFixed(1),
                 completed: isCompleted ? 'Sí' : 'No',
-                xBuild: hasShot ? 0.25 : 0,
-                xThreat: threat.toFixed(3)
+                length: passLength.toFixed(1),
+                xBuild: xBuildVal.toFixed(3),
+                xThreat: threat.toFixed(3),
+                result: possession.result || 'N/A'
             });
         });
     });
@@ -1050,6 +1065,7 @@ function calculatePassMetrics() {
     const accuracy = totalPasses > 0 ? ((completedPasses / totalPasses) * 100).toFixed(1) : 0;
     const avgXBuild = passCount > 0 ? (xBuild / passCount).toFixed(3) : 0;
     const avgXThreat = passCount > 0 ? (xThreat / passCount).toFixed(3) : 0;
+    const avgLength = passCount > 0 ? (passLengths.reduce((a,b) => a+b, 0) / passCount).toFixed(1) : 0;
     
     // Mostrar resultados
     const resultsDiv = document.getElementById('metricsResults');
@@ -1058,24 +1074,26 @@ function calculatePassMetrics() {
     
     resultsDiv.innerHTML = `
         <div style="border-bottom: 1px solid #444; padding: 8px 0; margin-bottom: 8px;">
-            <strong>${teamLabel} - ${playerLabel}</strong>
+            <strong>${teamLabel}</strong><br>
+            <span style="font-size:0.7rem; color:#aaa;">${playerLabel}</span>
         </div>
         <div style="line-height:1.8;">
             <div><span style="color:#aaa;">Pases Totales:</span> <span class="st-val">${totalPasses}</span></div>
-            <div><span style="color:#aaa;">Pases Completados:</span> <span class="st-good">${completedPasses}</span></div>
+            <div><span style="color:#aaa;">Completados:</span> <span class="st-good">${completedPasses}</span></div>
             <div><span style="color:#aaa;">Precisión:</span> <span class="st-val">${accuracy}%</span></div>
+            <div style="font-size:0.65rem; color:#888; margin-left:8px;">↳ Largo promedio: ${avgLength}m</div>
             <hr style="border:none; border-top:1px solid #444; margin:8px 0;">
-            <div><span style="color:#aaa;">xBuild (Promedio):</span> <span class="st-val">${avgXBuild}</span></div>
-            <div style="font-size:0.65rem; color:#888;">↳ Probabilidad de tiro en 5 acciones</div>
-            <div><span style="color:#aaa;">xThreat (Promedio):</span> <span class="st-val">${avgXThreat}</span></div>
-            <div style="font-size:0.65rem; color:#888;">↳ Valor de amenaza esperada</div>
+            <div><span style="color:#aaa;">xBuild:</span> <span class="st-val">${avgXBuild}</span></div>
+            <div style="font-size:0.65rem; color:#888; margin-left:8px;">↳ Prob. de tiro siguiente</div>
+            <div><span style="color:#aaa;">xThreat:</span> <span class="st-val">${avgXThreat}</span></div>
+            <div style="font-size:0.65rem; color:#888; margin-left:8px;">↳ Valor amenaza esperada</div>
             <hr style="border:none; border-top:1px solid #444; margin:8px 0;">
-            <div><span style="color:#aaa;">Pases Analizados:</span> <span class="st-val">${passCount}</span></div>
+            <div style="color:#f1c40f; font-size:0.75rem;">📊 ${passCount} pases analizados</div>
         </div>
     `;
     
     // Guardar datos para exportar
-    STATE.currentMetrics = { passes, teamLabel, playerLabel, accuracy, avgXBuild, avgXThreat, totalPasses, completedPasses };
+    STATE.currentMetrics = { passes, teamLabel, playerLabel, accuracy, avgXBuild, avgXThreat, totalPasses, completedPasses, avgLength };
 }
 
 function downloadMetricsExcel() {
@@ -1095,6 +1113,7 @@ function downloadMetricsExcel() {
         ['Pases Totales', STATE.currentMetrics.totalPasses],
         ['Pases Completados', STATE.currentMetrics.completedPasses],
         ['Precisión (%)', STATE.currentMetrics.accuracy],
+        ['Largo Promedio (m)', STATE.currentMetrics.avgLength],
         ['xBuild Promedio', STATE.currentMetrics.avgXBuild],
         ['xThreat Promedio', STATE.currentMetrics.avgXThreat]
     ]);
@@ -1105,6 +1124,115 @@ function downloadMetricsExcel() {
     XLSX.utils.book_append_sheet(wb, detailed, 'Pases Detallado');
     
     XLSX.writeFile(wb, `metricas_pases_${new Date().getTime()}.xlsx`);
+}
+
+function compareTeams() {
+    const minDur = parseFloat(document.getElementById('metricsMinDur').value) || 0;
+    const maxDur = parseFloat(document.getElementById('metricsMaxDur').value) || 200;
+    
+    const metrics = { HOME: null, AWAY: null };
+    
+    for (const team of ['HOME', 'AWAY']) {
+        let totalPasses = 0;
+        let completedPasses = 0;
+        let xBuild = 0;
+        let xThreat = 0;
+        let passCount = 0;
+        let passLengths = [];
+        
+        STATE.filtered.forEach(possession => {
+            if (possession.context !== team) return;
+            if (possession.duration < minDur || possession.duration > maxDur) return;
+            
+            possession.actions.forEach((action, idx) => {
+                if (!action.action.toLowerCase().includes('pase')) return;
+                
+                totalPasses++;
+                const nextAction = possession.actions[idx + 1];
+                const isCompleted = nextAction && nextAction.context === team;
+                if (isCompleted) completedPasses++;
+                
+                const passLength = nextAction ? 
+                    Math.sqrt(Math.pow(nextAction.x - action.x, 2) + Math.pow(nextAction.y - action.y, 2)) : 
+                    0;
+                passLengths.push(passLength);
+                
+                let hasShot = false;
+                let distToShot = 0;
+                for (let i = idx + 1; i < Math.min(idx + 6, possession.actions.length); i++) {
+                    if (possession.actions[i].action.toLowerCase().includes('disparo')) {
+                        hasShot = true;
+                        distToShot = i - idx;
+                        break;
+                    }
+                }
+                xBuild += hasShot ? (1 / (1 + distToShot * 0.15)) : 0;
+                
+                const dist = Math.sqrt(Math.pow(action.x - 105, 2) + Math.pow(action.y - 34, 2));
+                let threat = Math.max(0, 1 - (dist / 120));
+                if (possession.result && possession.result.toLowerCase().includes('gol')) threat *= 1.8;
+                else if (possession.result && possession.result.toLowerCase().includes('disparo')) threat *= 1.3;
+                else if (!isCompleted) threat *= 0.7;
+                xThreat += threat;
+                passCount++;
+            });
+        });
+        
+        const accuracy = totalPasses > 0 ? ((completedPasses / totalPasses) * 100).toFixed(1) : 0;
+        const avgLength = passCount > 0 ? (passLengths.reduce((a,b) => a+b, 0) / passCount).toFixed(1) : 0;
+        metrics[team] = {
+            totalPasses,
+            completedPasses,
+            accuracy,
+            avgLength,
+            avgXBuild: passCount > 0 ? (xBuild / passCount).toFixed(3) : 0,
+            avgXThreat: passCount > 0 ? (xThreat / passCount).toFixed(3) : 0
+        };
+    }
+    
+    const homeLabel = '🏠 LOCAL';
+    const awayLabel = '✈️ VISITANTE';
+    const resultsDiv = document.getElementById('metricsResults');
+    
+    resultsDiv.innerHTML = `
+        <div style="border-bottom: 1px solid #444; padding: 8px 0; margin-bottom: 8px;">
+            <strong>⚖️ COMPARATIVA DE EQUIPOS</strong>
+        </div>
+        <table style="width:100%; font-size:0.7rem; border-collapse:collapse;">
+            <tr style="border-bottom: 1px solid #444;">
+                <td style="padding:4px; color:#aaa;">Métrica</td>
+                <td style="padding:4px; color:#3498db; text-align:center;">${homeLabel}</td>
+                <td style="padding:4px; color:#e67e22; text-align:center;">${awayLabel}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #444;">
+                <td style="padding:4px;">Pases Total</td>
+                <td style="padding:4px; text-align:center; color:#fff;">${metrics.HOME.totalPasses}</td>
+                <td style="padding:4px; text-align:center; color:#fff;">${metrics.AWAY.totalPasses}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #444;">
+                <td style="padding:4px;">Precisión %</td>
+                <td style="padding:4px; text-align:center; color:#2ecc71; font-weight:bold;">${metrics.HOME.accuracy}%</td>
+                <td style="padding:4px; text-align:center; color:#2ecc71; font-weight:bold;">${metrics.AWAY.accuracy}%</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #444;">
+                <td style="padding:4px;">Largo Prom (m)</td>
+                <td style="padding:4px; text-align:center;">${metrics.HOME.avgLength}</td>
+                <td style="padding:4px; text-align:center;">${metrics.AWAY.avgLength}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #444;">
+                <td style="padding:4px;">xBuild Prom</td>
+                <td style="padding:4px; text-align:center; color:#f1c40f;">${metrics.HOME.avgXBuild}</td>
+                <td style="padding:4px; text-align:center; color:#f1c40f;">${metrics.AWAY.avgXBuild}</td>
+            </tr>
+            <tr>
+                <td style="padding:4px;">xThreat Prom</td>
+                <td style="padding:4px; text-align:center; color:#e74c3c;">${metrics.HOME.avgXThreat}</td>
+                <td style="padding:4px; text-align:center; color:#e74c3c;">${metrics.AWAY.avgXThreat}</td>
+            </tr>
+        </table>
+    `;
+    
+    STATE.comparisonMetrics = metrics;
 }
 
 // Actualizar dropdown cuando carga datos
