@@ -3817,7 +3817,9 @@ async function generatePDFReportAttack() {
         
         doc.setFontSize(10);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Partido: ${DB.teams.home} vs ${DB.teams.away}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
+        const homeTeam = DB.config?.homeName || 'LOCAL';
+        const awayTeam = DB.config?.awayName || 'RIVAL';
+        doc.text(`Partido: ${homeTeam} vs ${awayTeam}  |  Fecha: ${new Date().toLocaleDateString()}`, 105, 52, { align: 'center' });
 
         yPos = 70;
 
@@ -3990,7 +3992,7 @@ async function generatePDFReportAttack() {
         }
 
         // Descargar
-        const fileName = `Reporte_${playerName.replace(/ /g, '_')}_${DB.teams.home}_vs_${DB.teams.away}.pdf`;
+        const fileName = `Reporte_${playerName.replace(/ /g, '_')}_${homeTeam}_vs_${awayTeam}.pdf`;
         doc.save(fileName);
         document.getElementById('modalReport').style.display = 'none';
     } catch(error) {
