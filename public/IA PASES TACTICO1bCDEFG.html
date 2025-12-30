@@ -95,6 +95,7 @@
         <button class="tab-btn active" onclick="switchTab('data')">📁 Datos</button>
         <button class="tab-btn" onclick="switchTab('patterns')">🧠 Patrones</button>
         <button id="btnTabAI" class="tab-btn" onclick="switchTab('ai')" style="color: var(--ai-accent);">🤖 IA Táctica</button>
+        <button class="tab-btn" onclick="switchTab('metrics')">📊 Métricas Pases</button>
         <button class="tab-btn" disabled style="background:#999; color:#ccc; opacity:0.5; cursor:not-allowed;" title="Desactivado - En pruebas">🎥 Video</button>
     </div>
 </header>
@@ -182,6 +183,42 @@
                 <h4 style="color:#2ecc71">3. Secuencias Zonal</h4>
                 <button onclick="detectSpatialPatterns()" class="btn-ai" style="background:#27ae60">🔍 Buscar</button>
                 <div id="spatialList" class="pattern-list"></div>
+            </div>
+        </div>
+
+        <div id="tab-metrics" class="sidebar-section">
+            <div class="box">
+                <h4>📊 Estadísticas de Pases</h4>
+                <label style="color:#3498db;">Equipo</label>
+                <select id="metricsTeam" onchange="updateMetricsDisplay()">
+                    <option value="HOME">🏠 LOCAL</option>
+                    <option value="AWAY">✈️ VISITANTE</option>
+                </select>
+                
+                <label style="color:#f1c40f;">Jugador</label>
+                <select id="metricsPlayer" onchange="updateMetricsDisplay()">
+                    <option value="">Selecciona un jugador...</option>
+                </select>
+
+                <button onclick="calculatePassMetrics()" style="background:#3498db; margin-top:8px;">🔄 Calcular</button>
+            </div>
+
+            <div class="box">
+                <h4 style="color:#2ecc71">Resultados</h4>
+                <div id="metricsResults" style="font-size:0.7rem; line-height:1.6; color:#ccc;">
+                    <div style="padding:10px; color:#666; text-align:center;">Carga datos primero</div>
+                </div>
+            </div>
+
+            <div class="box">
+                <h4>⚙️ Filtros</h4>
+                <label style="font-size:0.65rem; color:#aaa;">Duración Mín (s)</label>
+                <input type="number" id="metricsMinDur" value="0" min="0" onchange="calculatePassMetrics()">
+                
+                <label style="font-size:0.65rem; color:#aaa;">Duración Máx (s)</label>
+                <input type="number" id="metricsMaxDur" value="200" min="0" onchange="calculatePassMetrics()">
+
+                <button onclick="downloadMetricsExcel()" style="background:#27ae60; margin-top:8px;">📥 Exportar Excel</button>
             </div>
         </div>
     </div>
@@ -362,7 +399,8 @@ async function loadFiles(e, ctx) {
     updateStats(); 
     applyFilters(); 
     analyzePatterns(); 
-    updateClusterPlayerList(); 
+    updateClusterPlayerList();
+    updateAllMetricsSelects();
 }
 function updateStats() { document.getElementById('fileStatus').innerText = `${STATE.matches.length} Partidos`; }
 
@@ -919,6 +957,160 @@ async function startQueueRecording(){
     rec.stop(); document.getElementById('recordingOverlay').style.display='none';
 }
 function downloadCutsScript() { alert("Función para PC."); }
+
+// === MÉTRICAS DE PASES ===
+function updateMetricsDisplay() {
+    const team = document.getElementById('metricsTeam').value;
+    const players = new Set();
+    
+    STATE.filtered.forEach(p => {
+        if (p.context === team) {
+            p.actions.forEach(a => {
+                if (a.action.toLowerCase().includes('pase')) {
+                    players.add(a.player);
+                }
+            });
+        }
+    });
+    
+    const select = document.getElementById('metricsPlayer');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Todos los pases del equipo</option>';
+    
+    Array.from(players).sort().forEach(pl => {
+        const opt = document.createElement('option');
+        opt.value = pl;
+        opt.textContent = pl || 'Sin nombre';
+        select.appendChild(opt);
+    });
+    
+    select.value = currentVal;
+}
+
+function calculatePassMetrics() {
+    const team = document.getElementById('metricsTeam').value;
+    const player = document.getElementById('metricsPlayer').value;
+    const minDur = parseFloat(document.getElementById('metricsMinDur').value) || 0;
+    const maxDur = parseFloat(document.getElementById('metricsMaxDur').value) || 200;
+    
+    let passes = [];
+    let totalPasses = 0;
+    let completedPasses = 0;
+    let xBuild = 0;
+    let xThreat = 0;
+    let passCount = 0;
+    
+    STATE.filtered.forEach(possession => {
+        if (possession.context !== team) return;
+        if (possession.duration < minDur || possession.duration > maxDur) return;
+        
+        possession.actions.forEach((action, idx) => {
+            if (!action.action.toLowerCase().includes('pase')) return;
+            if (player && action.player !== player) return;
+            
+            totalPasses++;
+            
+            // Completado si la siguiente acción es del mismo equipo
+            const nextAction = possession.actions[idx + 1];
+            const isCompleted = nextAction && nextAction.context === team;
+            if (isCompleted) completedPasses++;
+            
+            // xBuild: probabilidad de que este pase lleve a un tiro en los próximos 5 acciones
+            let hasShot = false;
+            for (let i = idx + 1; i < Math.min(idx + 6, possession.actions.length); i++) {
+                if (possession.actions[i].action.toLowerCase().includes('disparo')) {
+                    hasShot = true;
+                    break;
+                }
+            }
+            xBuild += hasShot ? 0.25 : 0;
+            
+            // xThreat: basado en proximidad a la portería contraria y resultado final
+            const dist = Math.sqrt(Math.pow(action.x - 105, 2) + Math.pow(action.y - 34, 2));
+            let threat = Math.max(0, 1 - (dist / 120));
+            
+            if (possession.result === 'GOAL') threat *= 1.5;
+            else if (possession.result === 'SHOT') threat *= 1.2;
+            
+            xThreat += threat;
+            passCount++;
+            
+            passes.push({
+                player: action.player || 'N/A',
+                minute: action.min,
+                x: action.x,
+                y: action.y,
+                completed: isCompleted ? 'Sí' : 'No',
+                xBuild: hasShot ? 0.25 : 0,
+                xThreat: threat.toFixed(3)
+            });
+        });
+    });
+    
+    const accuracy = totalPasses > 0 ? ((completedPasses / totalPasses) * 100).toFixed(1) : 0;
+    const avgXBuild = passCount > 0 ? (xBuild / passCount).toFixed(3) : 0;
+    const avgXThreat = passCount > 0 ? (xThreat / passCount).toFixed(3) : 0;
+    
+    // Mostrar resultados
+    const resultsDiv = document.getElementById('metricsResults');
+    const playerLabel = player ? `${player}` : 'Equipo Completo';
+    const teamLabel = team === 'HOME' ? '🏠 LOCAL' : '✈️ VISITANTE';
+    
+    resultsDiv.innerHTML = `
+        <div style="border-bottom: 1px solid #444; padding: 8px 0; margin-bottom: 8px;">
+            <strong>${teamLabel} - ${playerLabel}</strong>
+        </div>
+        <div style="line-height:1.8;">
+            <div><span style="color:#aaa;">Pases Totales:</span> <span class="st-val">${totalPasses}</span></div>
+            <div><span style="color:#aaa;">Pases Completados:</span> <span class="st-good">${completedPasses}</span></div>
+            <div><span style="color:#aaa;">Precisión:</span> <span class="st-val">${accuracy}%</span></div>
+            <hr style="border:none; border-top:1px solid #444; margin:8px 0;">
+            <div><span style="color:#aaa;">xBuild (Promedio):</span> <span class="st-val">${avgXBuild}</span></div>
+            <div style="font-size:0.65rem; color:#888;">↳ Probabilidad de tiro en 5 acciones</div>
+            <div><span style="color:#aaa;">xThreat (Promedio):</span> <span class="st-val">${avgXThreat}</span></div>
+            <div style="font-size:0.65rem; color:#888;">↳ Valor de amenaza esperada</div>
+            <hr style="border:none; border-top:1px solid #444; margin:8px 0;">
+            <div><span style="color:#aaa;">Pases Analizados:</span> <span class="st-val">${passCount}</span></div>
+        </div>
+    `;
+    
+    // Guardar datos para exportar
+    STATE.currentMetrics = { passes, teamLabel, playerLabel, accuracy, avgXBuild, avgXThreat, totalPasses, completedPasses };
+}
+
+function downloadMetricsExcel() {
+    if (!STATE.currentMetrics) {
+        return alert('Calcula las métricas primero');
+    }
+    
+    const wb = XLSX.utils.book_new();
+    
+    // Hoja 1: Resumen
+    const summary = XLSX.utils.aoa_to_sheet([
+        ['RESUMEN DE PASES', STATE.currentMetrics.teamLabel],
+        [],
+        ['Métrica', 'Valor'],
+        ['Equipo', STATE.currentMetrics.teamLabel],
+        ['Jugador', STATE.currentMetrics.playerLabel],
+        ['Pases Totales', STATE.currentMetrics.totalPasses],
+        ['Pases Completados', STATE.currentMetrics.completedPasses],
+        ['Precisión (%)', STATE.currentMetrics.accuracy],
+        ['xBuild Promedio', STATE.currentMetrics.avgXBuild],
+        ['xThreat Promedio', STATE.currentMetrics.avgXThreat]
+    ]);
+    XLSX.utils.book_append_sheet(wb, summary, 'Resumen');
+    
+    // Hoja 2: Detalle de Pases
+    const detailed = XLSX.utils.json_to_sheet(STATE.currentMetrics.passes);
+    XLSX.utils.book_append_sheet(wb, detailed, 'Pases Detallado');
+    
+    XLSX.writeFile(wb, `metricas_pases_${new Date().getTime()}.xlsx`);
+}
+
+// Actualizar dropdown cuando carga datos
+function updateAllMetricsSelects() {
+    updateMetricsDisplay();
+}
 </script>
 </body>
 </html>
