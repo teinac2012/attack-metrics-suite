@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GK Elite Pro v4.3 - Fixed Buttons</title>
+    <title>GK Elite Pro v4.8 - Bubble Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* --- ESTILOS GENERALES --- */
         :root {
@@ -48,7 +49,7 @@
             padding: 4px; gap: 4px;
         }
 
-        /* CANVAS */
+        /* CANVAS CONTAINER */
         .canvas-container {
             width: 100%; border-radius: 6px; border: 1px solid #444; background: #222;
             overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
@@ -57,9 +58,13 @@
         #cntGoal { flex: 2; min-height: 160px; background: #1a1a1a; padding: 5px; }
         canvas { width: 100%; height: 100%; display: block; }
 
+        /* VISTAS */
         #viewField { display: flex; flex-direction: column; width: 100%; height: 100%; gap: 6px; }
-        #viewRadar { display: none; flex-direction: column; width: 100%; height: 100%; background: #151515; padding: 10px; overflow-y: auto;}
+        #viewRadar, #viewScatter1, #viewScatter2 { display: none; flex-direction: column; width: 100%; height: 100%; background: #151515; padding: 10px; overflow-y: auto;}
         
+        .chart-title { color: #f1c40f; text-align: center; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .chart-box { flex: 1; background: #1e1e1e; border-radius: 8px; padding: 10px; position: relative; border: 1px solid #333; min-height: 250px;}
+
         /* GRID DE PORTERIA */
         .goal-grid-container {
             display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 2px;
@@ -109,11 +114,11 @@
         .modal-title { text-align: center; color: var(--accent); font-weight: 800; margin-bottom: 10px; text-transform: uppercase; font-size: 1rem;}
         
         /* RADAR STATS */
-        .radar-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
-        .r-box { background: #222; padding: 8px 4px; text-align: center; border-radius: 6px; border: 1px solid #444; display: flex; flex-direction: column; justify-content: center;}
-        .r-val { font-size: 1.1rem; font-weight: 800; color: #fff; display: block; line-height: 1.1;}
-        .r-count { font-size: 0.7rem; color: #888; display: block; margin-top: 2px;} 
-        .r-lbl { font-size: 0.6rem; color: #aaa; text-transform: uppercase; margin-top: 2px; font-weight: 600;}
+        .radar-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; }
+        .r-box { background: #222; padding: 6px 2px; text-align: center; border-radius: 6px; border: 1px solid #444; display: flex; flex-direction: column; justify-content: center;}
+        .r-val { font-size: 0.95rem; font-weight: 800; color: #fff; display: block; line-height: 1;}
+        .r-count { font-size: 0.6rem; color: #888; display: block; margin-top: 2px;} 
+        .r-lbl { font-size: 0.5rem; color: #aaa; text-transform: uppercase; margin-top: 2px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 
         @media(max-width: 900px) { .layout { flex-direction: column; } .view-col { height: auto; min-height: 480px; } .ctrl-col { flex: 1; min-height: 0; } }
     </style>
@@ -137,9 +142,9 @@
     <div class="header-top" style="justify-content: flex-end; gap: 5px; margin-top: 2px;">
         <button class="btn-icon btn-red" onclick="app.endMatch()">🏁 FIN</button>
         <div style="width:1px; height:18px; background:#555; margin:0 2px;"></div>
-        <button class="btn-icon" onclick="app.toggleView()" style="background:#3498db; border-color:#2980b9">📊 ESTATS</button>
+        <button id="btnStats" class="btn-icon" onclick="app.cycleView()" style="background:#3498db; border-color:#2980b9; width:100px;">📊 ESTATS</button>
         <button class="btn-icon" onclick="app.downloadCSV()">💾 CSV</button>
-        <button class="btn-icon" onclick="app.clearCurrentMatch()" style="color:#e74c3c" title="Borrar solo este partido/portero">🗑️</button>
+        <button class="btn-icon" onclick="app.resetData()" style="color:#e74c3c">🗑️</button>
     </div>
 </header>
 
@@ -161,6 +166,7 @@
         </div>
 
         <div id="viewRadar">
+            <div class="chart-title">Análisis General</div>
             <div style="background:#222; padding:8px; border-radius:6px; display:flex; gap:8px; align-items:center; border:1px solid #444; margin-bottom:10px;">
                 <input type="checkbox" id="chkP90" onchange="app.renderRadar()"> 
                 <label for="chkP90" style="color:#f1c40f; font-size:0.8rem; font-weight:bold; cursor:pointer;">Ver p90 (Normalizado)</label>
@@ -170,6 +176,30 @@
             </div>
             <div id="radarStats" class="radar-stats"></div>
             <div id="compareList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; padding-top:8px; border-top:1px solid #333;"></div>
+        </div>
+
+        <div id="viewScatter1">
+            <div class="chart-title">Rendimiento (Goles Prevenidos)</div>
+            <div class="chart-box">
+                <canvas id="chartB1"></canvas>
+            </div>
+            <div style="padding:10px; font-size:0.7rem; color:#aaa;">
+                <p><b>Eje X:</b> PSxG / 90 (Volumen de dificultad recibido)</p>
+                <p><b>Eje Y:</b> Goles Prevenidos / 90 (Rendimiento)</p>
+                <p><b>Tamaño:</b> % Paradas</p>
+            </div>
+        </div>
+
+        <div id="viewScatter2">
+            <div class="chart-title">Estilo de Distribución</div>
+            <div class="chart-box">
+                <canvas id="chartB2"></canvas>
+            </div>
+            <div style="padding:10px; font-size:0.7rem; color:#aaa;">
+                <p><b>Eje X:</b> % Acierto en Largo</p>
+                <p><b>Eje Y:</b> % Acierto en Corto</p>
+                <p><b>Tamaño:</b> Volumen de Pases / 90</p>
+            </div>
         </div>
     </div>
 
@@ -192,9 +222,9 @@
         </div>
 
         <div class="panel" style="border-top:2px solid #e67e22">
-            <h4>3. Aéreo</h4>
+            <h4>3. Aéreo / Salidas</h4>
             <div class="grid-btn">
-                <button class="btn-act c-aer" onclick="app.openMenu('Aéreo','Salida')">SALIDA<small>Puños, Blocaje</small></button>
+                <button class="btn-act c-aer" onclick="app.openMenu('Aéreo','Salida')">SALIDA<small>Puños, Bajo, Alto...</small></button>
                 <button class="btn-act c-aux" onclick="app.quickReg('Aéreo','Fallo Aéreo','KO')">FALLO AÉREO</button>
             </div>
         </div>
@@ -224,10 +254,13 @@
 <script>
 const app = {
     data: { gk:1, match:'1', actions:[], gks:[{id:1,name:"Portero 1"}], friends:[], mins:{}, pitch:{ox:50,oy:15,ax:50,ay:90}, zone:'MC', modeP:'org', compare:[1] },
+    viewMode: 0, // 0:Field, 1:Radar, 2:Bubble1, 3:Bubble2
+    charts: {}, // Almacen para Chart.js instances
     db: {
         "Defensa": { "Blocaje":["Raso","Media Altura","Alto","Con caída"], "Desvío":["Mano cambiada","Mano natural","Pie","Rechace Corto","Rechace Largo"] },
-        "Aéreo": {"Salida":["Puños (1 o 2)","Blocaje Aéreo","Prolongación"]}, "Duelo":{"1 vs 1":["La Cruz","Achique","Ataque balón"]},
-        "Ofensivo":{"Distribución":["Volea","Bote pronto","Mano (Béisbol)","Mano (Rasa)","Pie (Raso)","Pie (Largo)","Apoyo"]}
+        "Aéreo": { "Salida": ["Puños (1 o 2)","Blocaje Aéreo","Prolongación", "Salida: Baja", "Salida: Media", "Salida: Alta"] }, 
+        "Duelo":{"1 vs 1":["La Cruz","Achique","Ataque balón"]},
+        "Ofensivo":{ "Distribución":[ "S. Puerta: Corto", "S. Puerta: Largo", "Volea", "Bote pronto", "Apoyo", "Pase en Juego", "Mano (Béisbol)", "Mano (Rasa)" ] }
     },
     zones: [ {id:'TL',l:'Arr Izq'},{id:'TC',l:'Arr Cen'},{id:'TR',l:'Arr Der'}, {id:'ML',l:'Med Izq'},{id:'MC',l:'Centro'},{id:'MR',l:'Med Der'}, {id:'BL',l:'Abj Izq'},{id:'BC',l:'Abj Cen'},{id:'BR',l:'Abj Der'} ],
     colors: ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'],
@@ -243,19 +276,131 @@ const app = {
         const hnd = (e) => this.handleTouch(e);
         cv.addEventListener('mousedown', hnd); cv.addEventListener('touchstart', hnd, {passive:false}); cv.addEventListener('touchmove', hnd, {passive:false});
         
-        document.getElementById('viewField').style.display = 'flex'; document.getElementById('viewRadar').style.display = 'none';
+        this.updateViewUI();
         this.updateStatsUI();
     },
 
     save: function() { localStorage.setItem('gk_v4_data_fix', JSON.stringify(this.data)); },
 
+    // --- LOGICA DE VISTAS ---
+    cycleView: function() {
+        this.viewMode = (this.viewMode + 1) % 4; // 0->1->2->3->0
+        this.updateViewUI();
+    },
+    updateViewUI: function() {
+        ['viewField','viewRadar','viewScatter1','viewScatter2'].forEach((v,i) => {
+            document.getElementById(v).style.display = (i === this.viewMode) ? 'flex' : 'none';
+        });
+        const btn = document.getElementById('btnStats');
+        if(this.viewMode===0) { btn.innerText = "📊 ESTATS"; btn.style.background = "#3498db"; this.resizeCanvas(); }
+        else if(this.viewMode===1) { btn.innerText = "🕸️ RADAR"; btn.style.background = "#9b59b6"; this.renderRadar(); }
+        else if(this.viewMode===2) { btn.innerText = "🔵 RENDIM."; btn.style.background = "#2ecc71"; this.renderScatter1(); }
+        else if(this.viewMode===3) { btn.innerText = "🟠 DISTRIB."; btn.style.background = "#e67e22"; this.renderScatter2(); }
+    },
+
+    // --- CHART.JS SCATTERS ---
+    renderScatter1: function() {
+        // Grafico 1: El Salvador (PSxG vs Goles Prevenidos)
+        const ctx = document.getElementById('chartB1').getContext('2d');
+        if(this.charts['b1']) this.charts['b1'].destroy();
+        
+        let datasets = [];
+        this.data.gks.forEach((g,i) => {
+            if(!this.data.compare.includes(g.id)) return;
+            let acts = this.data.actions.filter(a => a.gk == g.id && (a.cat=='Defensa'||a.cat=='Duelo'));
+            let mins = 0; [...new Set(acts.map(a=>a.match))].forEach(m=>mins+=(this.data.mins[g.id+'_'+m]||90)); if(mins==0)mins=90;
+            let fac = 90/mins;
+
+            let xgSum = 0, goals = 0, saves = 0, shots = 0;
+            acts.forEach(a => { xgSum+=a.xg; if(a.res=='KO') goals++; if(a.res=='OK') saves++; });
+            shots = saves + goals;
+
+            if(shots === 0) return; // Sin datos
+
+            datasets.push({
+                label: g.name,
+                data: [{
+                    x: (xgSum * fac), // PSxG p90
+                    y: ((xgSum - goals) * fac), // Goles Prevenidos p90
+                    r: (saves / shots) * 25 // Radio basado en % paradas (escalado)
+                }],
+                backgroundColor: this.colors[i%this.colors.length] + '88',
+                borderColor: this.colors[i%this.colors.length],
+            });
+        });
+
+        this.charts['b1'] = new Chart(ctx, {
+            type: 'bubble',
+            data: { datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { title: {display:true, text:'PSxG Recibido / 90 min', color:'#aaa'}, grid:{color:'#333'}, ticks:{color:'#ddd'} },
+                    y: { title: {display:true, text:'Goles Prevenidos / 90 min', color:'#aaa'}, grid:{color:'#333'}, ticks:{color:'#ddd'} }
+                },
+                plugins: { legend: {labels:{color:'#fff'}} }
+            }
+        });
+    },
+
+    renderScatter2: function() {
+        // Grafico 2: El Distribuidor (Largo vs Corto)
+        const ctx = document.getElementById('chartB2').getContext('2d');
+        if(this.charts['b2']) this.charts['b2'].destroy();
+
+        let datasets = [];
+        this.data.gks.forEach((g,i) => {
+            if(!this.data.compare.includes(g.id)) return;
+            let acts = this.data.actions.filter(a => a.gk == g.id && a.cat=='Ofensivo');
+            let mins = 0; [...new Set(acts.map(a=>a.match))].forEach(m=>mins+=(this.data.mins[g.id+'_'+m]||90)); if(mins==0)mins=90;
+            let fac = 90/mins;
+
+            let sOk=0, sTot=0, lOk=0, lTot=0;
+            // Definicion Corto vs Largo
+            const shorts = ["S. Puerta: Corto", "Pie (Raso)", "Apoyo", "Mano (Rasa)", "Pase en Juego"];
+            const longs = ["S. Puerta: Largo", "Pie (Largo)", "Volea", "Mano (Béisbol)", "Bote pronto"];
+
+            acts.forEach(a => {
+                if(shorts.includes(a.var)) { sTot++; if(a.res=='OK') sOk++; }
+                else if(longs.includes(a.var)) { lTot++; if(a.res=='OK') lOk++; }
+            });
+
+            if((sTot+lTot) === 0) return;
+
+            datasets.push({
+                label: g.name,
+                data: [{
+                    x: lTot>0 ? (lOk/lTot)*100 : 0, // % Acierto Largo
+                    y: sTot>0 ? (sOk/sTot)*100 : 0, // % Acierto Corto
+                    r: ((sTot + lTot) * fac) * 0.8 // Radio = Volumen de pases p90
+                }],
+                backgroundColor: this.colors[i%this.colors.length] + '88',
+                borderColor: this.colors[i%this.colors.length],
+            });
+        });
+
+        this.charts['b2'] = new Chart(ctx, {
+            type: 'bubble',
+            data: { datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { title: {display:true, text:'% Acierto en Largo', color:'#aaa'}, min:0, max:100, grid:{color:'#333'}, ticks:{color:'#ddd'} },
+                    y: { title: {display:true, text:'% Acierto en Corto', color:'#aaa'}, min:0, max:100, grid:{color:'#333'}, ticks:{color:'#ddd'} }
+                },
+                plugins: { legend: {labels:{color:'#fff'}} }
+            }
+        });
+    },
+
+    // --- FUNCIONES CORE (SIN CAMBIOS ESTRUCTURALES) ---
     renderGKSelect: function() {
         const s = document.getElementById('selGK'); s.innerHTML = '';
         this.data.gks.forEach(p => { let o=document.createElement('option'); o.value=p.id; o.innerText=p.name; s.appendChild(o); });
         s.value = this.data.gk; this.updateCompareUI();
     },
     addGK: function() { let n = prompt("Nombre Portero:"); if(n) { let id=Date.now(); this.data.gks.push({id:id, name:n}); this.data.gk=id; this.data.compare.push(id); this.save(); this.renderGKSelect(); this.setGK(); } },
-    setGK: function() { this.data.gk = parseInt(document.getElementById('selGK').value); if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); this.updateTable(); this.updateStatsUI(); this.updateCompareUI(); if(document.getElementById('viewRadar').style.display==='flex') this.renderRadar(); },
+    setGK: function() { this.data.gk = parseInt(document.getElementById('selGK').value); if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); this.updateTable(); this.updateStatsUI(); this.updateCompareUI(); if(this.viewMode===1) this.renderRadar(); else if(this.viewMode===2) this.renderScatter1(); else if(this.viewMode===3) this.renderScatter2();},
     
     renderMatchSelect: function() {
         const s = document.getElementById('selMatch'); s.innerHTML = '';
@@ -293,7 +438,6 @@ const app = {
         if(isXG) h += `<input id="txG" type="number" step="0.01" placeholder="xGOT (Ej: 0.35)" style="width:100%; padding:10px; background:#222; border:1px solid #f1c40f; color:#f1c40f; margin-bottom:15px; border-radius:4px; text-align:center; font-weight:bold;">`;
         h += `<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"><button onclick="app.saveAct('OK')" style="padding:16px; background:#27ae60; border:none; color:white; font-weight:800; border-radius:6px;">✅ BIEN / PARADA</button><button onclick="app.saveAct('KO')" style="padding:16px; background:#c0392b; border:none; color:white; font-weight:800; border-radius:6px;">❌ MAL / GOL</button></div>`;
         document.getElementById('mContent').innerHTML = h;
-        // FIX: Asegurar que el modal se abre si venimos de un QuickReg
         if(!document.getElementById('modal').classList.contains('open')) document.getElementById('modal').classList.add('open');
     },
     quickReg: function(cat, key, res) { this.temp = {cat:cat, key:key, var:'-', isQuick:true}; this.askRes('-'); },
@@ -363,11 +507,6 @@ const app = {
         ctx.beginPath(); ctx.arc(ax,ay,s(0.4),0,Math.PI*2); ctx.fillStyle="#3498db"; ctx.fill(); ctx.stroke(); // Portero
     },
 
-    toggleView: function() {
-        let f=document.getElementById('viewField'), r=document.getElementById('viewRadar');
-        if(f.style.display!=='none') { f.style.display='none'; r.style.display='flex'; this.renderRadar(); }
-        else { f.style.display='flex'; r.style.display='none'; setTimeout(()=>this.resizeCanvas(),50); }
-    },
     updateCompareUI: function() {
         let c = document.getElementById('compareList'); c.innerHTML='';
         this.data.gks.forEach((g,i) => {
@@ -378,43 +517,55 @@ const app = {
     },
     toggleComp: function(id) {
         if(this.data.compare.includes(id)) this.data.compare = this.data.compare.filter(c=>c!==id); else this.data.compare.push(id);
-        if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); this.renderRadar();
+        if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); 
+        this.updateViewUI();
     },
     renderRadar: function() {
         let cv=document.getElementById('cvRadar'); cv.width=cv.parentElement.clientWidth; cv.height=cv.parentElement.clientHeight;
         let ctx=cv.getContext('2d'), W=cv.width, H=cv.height, cx=W/2, cy=H/2, r=Math.min(W,H)*0.38;
         let isP90 = document.getElementById('chkP90').checked;
         
-        ctx.clearRect(0,0,W,H); ctx.strokeStyle="#444"; ctx.lineWidth=1; ctx.fillStyle="#aaa"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center";
-        let lbls=["PARADAS %","J. PIE %","J. MANO %","AÉREO %","PSxG +/-"];
-        for(let l=1;l<=4;l++){ ctx.beginPath(); for(let i=0;i<5;i++){ let a=(Math.PI*2*i)/5-Math.PI/2, d=r*(l/4); ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*d, cy+Math.sin(a)*d); } ctx.closePath(); ctx.stroke(); }
-        for(let i=0;i<5;i++){ let a=(Math.PI*2*i)/5-Math.PI/2, x=cx+Math.cos(a)*(r+20), y=cy+Math.sin(a)*(r+20); ctx.fillText(lbls[i], x, y); }
+        ctx.clearRect(0,0,W,H); ctx.strokeStyle="#444"; ctx.lineWidth=1; ctx.fillStyle="#aaa"; ctx.font="bold 8px sans-serif"; ctx.textAlign="center";
+        
+        let lbls=["PARADAS", "S. PUERTA", "J. PIE", "J. MANO", "SALIDAS", "AÉREO TÉC", "PSxG"];
+        let totalAxes = 7;
 
-        this.data.gks.forEach((g,i)=>{ if(this.data.compare.includes(g.id)) { let s=this.getStats(g.id, isP90); this.drawPoly(ctx,cx,cy,r,s.v,this.colors[i%this.colors.length], g.id==this.data.gk); } });
+        for(let l=1;l<=4;l++){ ctx.beginPath(); for(let i=0;i<totalAxes;i++){ let a=(Math.PI*2*i)/totalAxes-Math.PI/2, d=r*(l/4); ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*d, cy+Math.sin(a)*d); } ctx.closePath(); ctx.stroke(); }
+        for(let i=0;i<totalAxes;i++){ let a=(Math.PI*2*i)/totalAxes-Math.PI/2, x=cx+Math.cos(a)*(r+25), y=cy+Math.sin(a)*(r+25); ctx.fillText(lbls[i], x, y); }
+
+        this.data.gks.forEach((g,i)=>{ if(this.data.compare.includes(g.id)) { let s=this.getStats(g.id, isP90); this.drawPoly(ctx,cx,cy,r,s.v,this.colors[i%this.colors.length], g.id==this.data.gk, totalAxes); } });
 
         let ms=this.getStats(this.data.gk, isP90), f=isP90?ms.fac:1, txt=(v)=>isP90?(v*f).toFixed(2):v, u=isP90?"/90'":"";
-        // ACTUALIZACIÓN: Muestra número de acciones
         let cnt = (ok, tot) => `<span class="r-count">(${ok}/${tot})</span>`;
         
         document.getElementById('radarStats').innerHTML = `
-            <div class="r-box"><span class="r-val" style="color:#2ecc71">${Math.round(ms.v[0]*100)}%</span>${cnt(ms.r.save.o, ms.r.save.t)}<span class="r-lbl">PARADAS ${u}</span></div>
-            <div class="r-box"><span class="r-val" style="color:#3498db">${Math.round(ms.v[1]*100)}%</span>${cnt(ms.r.foot.o, ms.r.foot.t)}<span class="r-lbl">J. PIE ${u}</span></div>
-            <div class="r-box"><span class="r-val" style="color:#f39c12">${Math.round(ms.v[3]*100)}%</span>${cnt(ms.r.air.o, ms.r.air.t)}<span class="r-lbl">AÉREO ${u}</span></div>
+            <div class="r-box"><span class="r-val" style="color:#2ecc71">${Math.round(ms.v[0]*100)}%</span>${cnt(ms.r.save.o, ms.r.save.t)}<span class="r-lbl">PARADAS</span></div>
+            <div class="r-box"><span class="r-val" style="color:#3498db">${Math.round(ms.v[1]*100)}%</span>${cnt(ms.r.gk_kick.o, ms.r.gk_kick.t)}<span class="r-lbl">S. PUERTA</span></div>
+            <div class="r-box"><span class="r-val" style="color:#3498db">${Math.round(ms.v[2]*100)}%</span>${cnt(ms.r.foot.o, ms.r.foot.t)}<span class="r-lbl">J. PIE</span></div>
+            <div class="r-box"><span class="r-val" style="color:#9b59b6">${Math.round(ms.v[3]*100)}%</span>${cnt(ms.r.hand.o, ms.r.hand.t)}<span class="r-lbl">J. MANO</span></div>
+            <div class="r-box"><span class="r-val" style="color:#f39c12">${Math.round(ms.v[4]*100)}%</span>${cnt(ms.r.air_out.o, ms.r.air_out.t)}<span class="r-lbl">SALIDAS</span></div>
+            <div class="r-box"><span class="r-val" style="color:#e67e22">${Math.round(ms.v[5]*100)}%</span>${cnt(ms.r.air_tech.o, ms.r.air_tech.t)}<span class="r-lbl">AÉREO TÉC</span></div>
             <div class="r-box"><span class="r-val" style="color:${ms.psxg>=0?'#2ecc71':'#e74c3c'}">${ms.psxg>0?'+':''}${ms.psxg.toFixed(2)}</span><span class="r-lbl">PSxG ${u}</span></div>
-            <div class="r-box"><span class="r-val">${txt(ms.r.xg)}</span><span class="r-lbl">xGOT REC ${u}</span></div>
             <div class="r-box"><span class="r-val" style="color:#c0392b">${txt(ms.r.gol)}</span><span class="r-lbl">GOLES ${u}</span></div>`;
     },
     getStats: function(id, p90) {
-        let acts=this.data.actions.filter(a=>a.gk==id), s={save:{o:0,t:0},foot:{o:0,t:0},hand:{o:0,t:0},air:{o:0,t:0},xg:0,gol:0}, mins=0;
-        [...new Set(acts.map(a=>a.match))].forEach(m=>mins+=(this.data.mins[id+'_'+m]||90)); if(mins==0)mins=90;
-        acts.forEach(a=>{ if(a.cat=='Defensa'||a.cat=='Duelo'){s.save.t++;if(a.res=='OK')s.save.o++;s.xg+=a.xg;if(a.res=='KO')s.gol++;} if(a.cat=='Aéreo'){s.air.t++;if(a.res=='OK')s.air.o++;} if(a.cat=='Ofensivo'){if(a.var.includes('Pie')||a.var.includes('Volea')){s.foot.t++;if(a.res=='OK')s.foot.o++;}else{s.hand.t++;if(a.res=='OK')s.hand.o++;}} });
+        let acts=this.data.actions.filter(a=>a.gk==id);
+        let s={ save:{o:0,t:0}, gk_kick:{o:0,t:0}, foot:{o:0,t:0}, hand:{o:0,t:0}, air_out:{o:0,t:0}, air_tech:{o:0,t:0}, xg:0, gol:0 };
+        let mins=0; [...new Set(acts.map(a=>a.match))].forEach(m=>mins+=(this.data.mins[id+'_'+m]||90)); if(mins==0)mins=90;
+        
+        acts.forEach(a=>{ 
+            if(a.cat=='Defensa'||a.cat=='Duelo'){ s.save.t++; if(a.res=='OK')s.save.o++; s.xg+=a.xg; if(a.res=='KO')s.gol++; } 
+            if(a.cat=='Aéreo'){ if(a.var.includes('Salida:')){ s.air_out.t++; if(a.res=='OK')s.air_out.o++; } else { s.air_tech.t++; if(a.res=='OK')s.air_tech.o++; } } 
+            if(a.cat=='Ofensivo'){ if(a.var.includes('S. Puerta')){ s.gk_kick.t++; if(a.res=='OK')s.gk_kick.o++; } else if(a.var.includes('Mano')){ s.hand.t++; if(a.res=='OK')s.hand.o++; } else { s.foot.t++; if(a.res=='OK')s.foot.o++; } } 
+        });
+        
         let pct=(o)=>o.t>0?o.o/o.t:0, fac=90/mins, psxg=(s.xg-s.gol)*(p90?fac:1), norm=0.5+(psxg/(p90?2:5));
-        return {v:[pct(s.save),pct(s.foot),pct(s.hand),pct(s.air),Math.max(0,Math.min(1,norm))], r:s, psxg:psxg, fac:fac};
+        return { v:[pct(s.save), pct(s.gk_kick), pct(s.foot), pct(s.hand), pct(s.air_out), pct(s.air_tech), Math.max(0,Math.min(1,norm))], r:s, psxg:psxg, fac:fac };
     },
-    drawPoly: function(ctx,cx,cy,r,d,c,m){ ctx.beginPath(); for(let i=0;i<5;i++){ let a=(Math.PI*2*i)/5-Math.PI/2; ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*r*Math.max(0.1,d[i]), cy+Math.sin(a)*r*Math.max(0.1,d[i])); } ctx.closePath(); ctx.strokeStyle=c; ctx.lineWidth=m?3:1.5; ctx.stroke(); if(m){ctx.fillStyle=c+'33';ctx.fill();} },
+    drawPoly: function(ctx,cx,cy,r,d,c,m,total){ ctx.beginPath(); for(let i=0;i<total;i++){ let a=(Math.PI*2*i)/total-Math.PI/2; ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*r*Math.max(0.1,d[i]), cy+Math.sin(a)*r*Math.max(0.1,d[i])); } ctx.closePath(); ctx.strokeStyle=c; ctx.lineWidth=m?3:1.5; ctx.stroke(); if(m){ctx.fillStyle=c+'33';ctx.fill();} },
 
     endMatch: function() { if(confirm("¿Finalizar Jornada y limpiar campo?")) { if(!isNaN(this.data.match))this.data.match=parseInt(this.data.match)+1; this.data.pitch={ox:50,oy:15,ax:50,ay:90}; this.save(); location.reload(); } },
-    clearCurrentMatch: function() { if(confirm("¿Borrar solo las acciones de este partido y portero?")) { this.data.actions = this.data.actions.filter(a => !(a.gk == this.data.gk && a.match === this.data.match)); this.save(); this.updateTable(); this.updateStatsUI(); } },
+    resetData: function() { if(confirm("¿BORRAR TODOS LOS DATOS DE LA APP?")) { localStorage.removeItem('gk_v4_data_fix'); location.reload(); } },
     downloadCSV: function() {
         let c="Jornada,Min,Portero,Cat,Accion,Var,Zona,Res,xG\n";
         this.data.actions.forEach(a=>{ let gn=this.data.gks.find(g=>g.id==a.gk).name; c+=`${a.match.toString().includes('F-')?'Amistoso':a.match},${a.min},${gn},${a.cat},${a.key},${a.var},${a.zone||''},${a.res},${a.xg}\n`});
