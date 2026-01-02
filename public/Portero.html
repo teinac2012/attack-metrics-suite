@@ -127,7 +127,7 @@
 </head>
 <body>
 
-<input type="file" id="fileLoader" accept=".json" style="display:none">
+<input type="file" id="fileLoader" accept=".json,.csv" style="display:none">
 
 <header>
     <div class="header-top">
@@ -732,9 +732,23 @@ const app = {
     endMatch: function() { if(confirm("¿Finalizar Jornada y limpiar campo?")) { if(!isNaN(this.data.match))this.data.match=parseInt(this.data.match)+1; this.data.pitch={ox:50,oy:15,ax:50,ay:90}; this.save(); location.reload(); } },
     resetData: function() { if(confirm("¿BORRAR TODOS LOS DATOS DE LA APP?")) { localStorage.removeItem('gk_v4_data_fix'); location.reload(); } },
     downloadCSV: function() {
-        let c="Jornada,Min,Portero,Cat,Accion,Var,Zona,Res,xG\n";
-        this.data.actions.forEach(a=>{ let gn=this.data.gks.find(g=>g.id==a.gk).name; c+=`${a.match.toString().includes('F-')?'Amistoso':a.match},${a.min},${gn},${a.cat},${a.key},${a.var},${a.zone||''},${a.res},${a.xg}\n`});
-        let b=new Blob([c],{type:'text/csv'}); let l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download='GK_Stats.csv'; l.click();
+        let csv = "Jornada,Min,Portero,Cat,Accion,Var,Zona,Res,xG\n";
+        
+        this.data.actions.forEach(a => {
+            let gk = this.data.gks.find(g => g.id === a.gk);
+            let gkName = gk ? gk.name : "UNK";
+            let matchName = a.match.toString().includes('F-') ? 'Amistoso' : a.match;
+            csv += `${matchName},${a.min},${gkName},${a.cat},${a.key},${a.var},${a.zone || ''},${a.res},${a.xg}\n`;
+        });
+        
+        let blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        let link = document.createElement('a');
+        link.setAttribute('href', URL.createObjectURL(blob));
+        link.setAttribute('download', 'GK_Stats.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 };
 window.onload = () => app.init();
