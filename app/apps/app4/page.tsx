@@ -26,7 +26,7 @@ export default async function App4Page() {
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       <SessionHeartbeat />
       <AppsNavBar userName={session.user.name || "Usuario"} />
-      <AppContainer appUrl="/portero1AbCONPSXG.HTML" appName="Portero" appId="app4" />
+      <AppContainer appUrl="/Portero.html" appName="Portero" appId="app4" />
     </div>
   );
 }

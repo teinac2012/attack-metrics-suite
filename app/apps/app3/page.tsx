@@ -26,7 +26,7 @@ export default async function App3Page() {
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       <SessionHeartbeat />
       <AppsNavBar userName={session.user.name || "Usuario"} />
-      <AppContainer appUrl="/SHOOTING31.html" appName="Data Hub" appId="app3" />
+      <AppContainer appUrl="/DataHub.html" appName="Data Hub" appId="app3" />
     </div>
   );
 }

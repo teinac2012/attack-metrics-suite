@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analista Pro v5.7: Player Highlight</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0;
+            --pitch: #2e5c40; --lines: rgba(255,255,255,0.6);
+            --highlight: #f1c40f; --ai-accent: #9b59b6; 
+            --path-goal: #00e5ff;
+            /* COLORES */
+            --res-ok: #2ecc71; --res-bad: #e74c3c;
+            --col-pass: #00d2d3; --col-carry: #feca57; --col-shot: #ff6b6b; --col-def: #a29bfe;
+        }
+        
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 5px; border: 2px solid #1a1a1a; }
+
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        header { height: 40px; background: #000; border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; flex-shrink: 0; justify-content: space-between; z-index: 10; }
+        h3 { margin: 0; font-size: 0.9rem; color: #fff; letter-spacing: 0.5px; }
+
+        .tabs { display: flex; gap: 5px; }
+        .tab-btn { background: #333; color: #aaa; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+        .tab-btn.active { background: var(--highlight); color: #000; font-weight: bold; }
+        .tab-btn.ai-active { background: var(--ai-accent) !important; color: #fff !important; font-weight: bold; }
+
+        .main { display: flex; flex: 1; height: calc(100vh - 40px); overflow: hidden; }
+
+        .sidebar { width: 300px; background: var(--panel); border-right: 1px solid #333; padding: 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; overflow-y: auto; }
+        .sidebar-section { display: none; flex-direction: column; gap: 10px; }
+        .sidebar-section.active { display: flex; }
+
+        .box { background: #2b2b2b; padding: 10px; border-radius: 4px; border: 1px solid #444; }
+        .box h4 { margin: 0 0 8px 0; font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
+        
+        .pattern-list { max-height: 200px; overflow-y: auto; font-size: 0.7rem; margin-top: 5px; }
+        .pattern-item { padding: 8px; border-bottom: 1px solid #444; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .pattern-item:hover { background: #333; }
+        .pattern-item.active-item { background: rgba(255,255,255,0.1); border-left: 3px solid var(--highlight); }
+        .count-badge { background: #555; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; color: white;}
+
+        input, select { width: 100%; font-size: 0.7rem; margin-bottom: 5px; color: #fff; background: #333; border: 1px solid #555; padding: 4px; box-sizing: border-box;}
+        button { width: 100%; padding: 6px; background: #444; border: none; color: #fff; border-radius: 3px; cursor: pointer; font-size: 0.75rem; transition:0.2s; margin-top: 5px;}
+        button:hover { background: #555; }
+        .btn-del { background: #c0392b; }
+        .btn-ai { background: var(--ai-accent); font-weight: bold; border: 1px solid #8e44ad; }
+
+        .workspace { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; height: 100%; overflow: hidden; }
+        #videoPanel { display: none; background: #000; border-bottom: 1px solid #333; flex-shrink: 0; height: 40vh; min-height: 250px; }
+        #recordingQueuePanel { padding: 5px 10px; background: #2c3e50; border-bottom: 1px solid #333; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+        .toolbar { height: 40px; background: #222; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; flex-shrink: 0; }
+        .legend { display: flex; gap: 10px; font-size: 0.7rem; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        .map-container { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: hidden; position: relative; min-height: 200px; }
+        #pitchWrapper { position: relative; background-color: var(--pitch); border: 2px solid #fff; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+        canvas { display: block; cursor: crosshair; }
+
+        .repository { height: 30vh; background: #1a1a1a; border-top: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
+        .repo-head { padding: 6px 10px; background: #252525; font-size: 0.75rem; font-weight: bold; color: #aaa; border-bottom: 1px solid #333; display: flex; justify-content: space-between; flex-shrink: 0; align-items: center; }
+        .table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th { background: #333; color: #fff; padding: 6px; text-align: left; position: sticky; top: 0; z-index: 5; }
+        td { padding: 4px 6px; border-bottom: 1px solid #333; color: #ccc; cursor: pointer; white-space: nowrap; }
+        tr:hover { background: #333; }
+        tr.selected { background: rgba(241, 196, 15, 0.15); border-left: 4px solid var(--highlight); color: #fff; }
+        .badge { padding: 2px 4px; border-radius: 2px; font-size: 0.65rem; font-weight: bold; }
+        .b-home { background: #3498db; } .b-away { background: #e67e22; }
+        
+        .chk-row { cursor: pointer; transform: scale(1.2); }
+        #recordingOverlay { display:none; position:absolute; top:80px; left:10px; background:rgba(231, 76, 60, 0.9); color:white; padding:5px; border-radius:4px; z-index:100; font-size:0.8rem; }
+        
+        .stats-overlay { background: #000; padding: 5px 10px; border-radius: 4px; border: 1px solid #444; font-family: monospace; }
+        .st-val { color: #fff; font-weight: bold; }
+        .st-good { color: var(--res-ok); } .st-bad { color: var(--res-bad); }
+        #arrowTooltip { position: absolute; display: none; pointer-events: none; z-index: 1000; background: rgba(0, 0, 0, 0.9); border: 1px solid var(--highlight); color: white; padding: 8px; border-radius: 4px; font-size: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+<div id="arrowTooltip"></div>
+
+<header>
+    <h3>Analista Pro v5.7 (Player Highlight)</h3>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('data')">📁 Datos</button>
+        <button class="tab-btn" onclick="switchTab('patterns')">🧠 Patrones</button>
+        <button id="btnTabAI" class="tab-btn" onclick="switchTab('ai')" style="color: var(--ai-accent);">🤖 IA Táctica</button>
+        <button class="tab-btn" onclick="document.getElementById('videoLoader').click()" style="background:#e67e22; color:#fff;">🎥 Video</button>
+    </div>
+</header>
+
+<div class="main">
+    <div class="sidebar">
+        <div id="tab-data" class="sidebar-section active">
+            <div class="box">
+                <h4>1. Cargar Datos</h4>
+                <label style="color:#3498db;">🏠 LOCAL</label>
+                <input type="file" id="fileHome" multiple accept=".xlsx,.csv" onchange="loadFiles(event, 'HOME')">
+                <label style="color:#e67e22;">✈️ VISITANTE</label>
+                <input type="file" id="fileAway" multiple accept=".xlsx,.csv" onchange="loadFiles(event, 'AWAY')">
+                
+                <div style="margin-top:8px; border-top:1px solid #444; padding-top:5px; display:flex; gap:5px; align-items:center;">
+                    <input type="checkbox" id="chkNorm" checked style="width:auto; margin:0;">
+                    <label for="chkNorm" style="font-size:0.7rem; color:#f1c40f; cursor:pointer;">Auto-Corregir Dirección (➔)</label>
+                </div>
+                <div style="font-size:0.6rem; color:#aaa; margin-bottom:5px;">(Detecta zona "Defensa" y la pone a la izquierda)</div>
+
+                <div id="fileStatus" style="font-size:0.65rem; color:#aaa; margin-top:5px;">0 Partidos</div>
+                <button onclick="resetAll()" class="btn-del" style="margin-top:5px;">⚠️ REINICIAR</button>
+            </div>
+            <div class="box">
+                <h4>2. Filtrar</h4>
+                <select id="actFilter" onchange="applyFilters()">
+                    <option value="ALL">Todo</option>
+                    <option value="Pase">Pases</option>
+                    <option value="Conducción">Conducciones</option>
+                    <option value="Disparo">Disparos</option>
+                    <option value="Recup">Recuperaciones</option>
+                </select>
+            </div>
+            <div class="box">
+                <h4>⏱️ Duración (Segundos)</h4>
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <input type="number" id="minDur" placeholder="Min" value="0" style="width:45%;" onchange="applyFilters()">
+                    <span style="font-size:0.7rem; color:#888;">a</span>
+                    <input type="number" id="maxDur" placeholder="Max" value="120" style="width:45%;" onchange="applyFilters()">
+                </div>
+                <div style="font-size:0.6rem; color:#aaa; margin-top:4px;">
+                    <em>Ej: 0-5s (Contra), +20s (Posicional)</em>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-patterns" class="sidebar-section">
+            <div class="box">
+                <h4>Buscador de Rutas</h4>
+                <input type="text" id="patternSearch" placeholder="Ej: Recup -> Pase..." onkeyup="renderPatternList()">
+                <div class="pattern-list" id="patternList">
+                    <div style="padding:10px; color:#666; text-align:center;">Carga datos primero</div>
+                </div>
+            </div>
+            <div class="box">
+                <h4>Configuración</h4>
+                <input type="number" id="minLen" value="2" min="1" onchange="analyzePatterns()">
+                <button onclick="analyzePatterns()" style="margin-top:5px; background:#27ae60;">🔄 Recalcular</button>
+            </div>
+        </div>
+
+        <div id="tab-ai" class="sidebar-section">
+            <div class="box">
+                <h4 style="color:var(--ai-accent)">1. Clustering (Semáforo)</h4>
+                
+                <label>Jugador Objetivo</label>
+                <select id="clusterPlayerSelect" style="border:1px solid var(--ai-accent);" onchange="render()">
+                    <option value="ALL">★ Todo el Equipo (Estructura)</option>
+                </select>
+
+                <label>Grupos</label>
+                <input type="number" id="kClusters" value="5" min="2" max="15">
+                <button onclick="runKMeans()" class="btn-ai">🧩 Generar Grupos</button>
+                <button onclick="clearAI()" style="background:#555;">Limpiar Mapa</button>
+                <div id="clusterList" class="pattern-list"></div>
+            </div>
+
+            <div class="box">
+                <h4 style="color:#f1c40f">2. Markov + Rutas a Gol</h4>
+                <p style="font-size:0.65rem; color:#aaa;">Probabilidades y Tiempo Medio</p>
+                <button onclick="activateMarkovMode()" class="btn-ai" style="background:#f39c12">⚡ Activar Modo Visual</button>
+            </div>
+
+            <div class="box">
+                <h4 style="color:#2ecc71">3. Secuencias Zonal</h4>
+                <button onclick="detectSpatialPatterns()" class="btn-ai" style="background:#27ae60">🔍 Buscar</button>
+                <div id="spatialList" class="pattern-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div id="videoPanel">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 10px; background:#222;">
+                <span style="font-size:0.75rem; font-weight:bold; color:#f1c40f;">🎥 Reproductor</span>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <label style="color:#ccc; font-size:0.7rem;">Sync:</label>
+                    <input type="number" id="vidOffset" value="0" step="1" onchange="STATE.offset=parseFloat(this.value)" style="width:50px; text-align:center;">
+                    <button onclick="toggleVideo(false)" style="width:auto; padding:2px 8px; background:#c0392b;">Ocultar</button>
+                </div>
+            </div>
+            <div id="recordingQueuePanel">
+                <div style="font-size:0.7rem; color:#fff;"><span>Cola: </span><strong id="queueCount" style="color:#f1c40f;">0</strong></div>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="addToRecordingQueue()" style="width:auto; background:#3498db; padding:4px 8px;">➕</button>
+                    <button onclick="clearQueue()" style="width:auto; background:#555; padding:4px 8px;">🗑️</button>
+                    <button id="btnRecordQueue" onclick="startQueueRecording()" style="width:auto; background:#e74c3c; padding:4px 8px; font-weight:bold;">🔴 REC</button>
+                </div>
+            </div>
+            <div id="recordingOverlay">GRABANDO... (No cambies de pestaña)</div>
+            <div style="display:flex; height:calc(100% - 70px); width:100%;">
+                <div style="flex:3; background:#000; display:flex; justify-content:center; align-items:center;">
+                    <video id="mainVideo" controls style="height:100%; max-width:100%;" crossOrigin="anonymous"></video>
+                </div>
+                <div style="flex:1; background:#1a1a1a; display:flex; flex-direction:column; overflow-y:auto; padding:5px;">
+                    <div id="videoList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="legend">
+                <div class="legend-item"><span class="dot" style="background:var(--res-ok)"></span>Acierto</div>
+                <div class="legend-item"><span class="dot" style="background:var(--res-bad)"></span>Fallo</div>
+                <div class="legend-item"><span class="dot" style="background:var(--path-goal)"></span>Ruta a Gol</div>
+                <div class="legend-item"><span class="dot" style="background:var(--ai-accent)"></span>IA</div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <div id="aiStatus" class="stats-overlay" style="display:none;"></div>
+                <button onclick="undoZone()" style="width:auto;">↩️</button>
+                <button onclick="safeClearZones()" class="btn-del" style="width:auto;">❌</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="pitchWrapper"><canvas id="pitchCanvas"></canvas></div>
+        </div>
+
+        <div class="repository">
+            <div class="repo-head">
+                <span id="repoStats">Filas: 0</span>
+                <button onclick="downloadCutsScript()" style="width:auto; background:#27ae60; padding:2px 8px; font-size:0.7rem;">✂️ Script</button>
+            </div>
+            <div class="table-wrap">
+                <table id="repoTable">
+                    <thead>
+                        <tr>
+                            <th style="width:30px;"><input type="checkbox" onchange="toggleSelectAll(this)"></th>
+                            <th>ID</th>
+                            <th>Eq</th>
+                            <th>Min</th>
+                            <th>Dur (s)</th>
+                            <th>Accs</th>
+                            <th>Secuencia</th>
+                            <th>Res</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="videoLoader" accept="video/mp4,video/webm" multiple style="display:none" onchange="handleVideoLoad(this)">
+
+<script>
+// === ESTADO GLOBAL ===
+const STATE = { matches: [], zones: [], filtered: [], selectedId: null, patterns: [], videos: [], currentVidIdx: -1, offset: 0, selectedForCut: new Set(), clipQueue: [], aiMode: null, clusters: [], currentClusterIdx: -1, markovData: {}, markovActive: false, markovVisuals: null, currentPattern: null, goalPaths: [] };
+let videoPauseTimer = null;
+const canvas = document.getElementById('pitchCanvas');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('pitchWrapper');
+const container = document.querySelector('.map-container');
+const tooltip = document.getElementById('arrowTooltip');
+
+// === CONFIGURACIÓN REJILLA (6x5) ===
+const GRID = { cols: 6, rows: 5 };
+
+// === INICIO ===
+function switchTab(tab) {
+    document.querySelectorAll('.sidebar-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('active'); if(el.id==='btnTabAI') el.classList.remove('ai-active'); });
+    document.getElementById('tab-'+tab).classList.add('active');
+    if(tab==='ai') document.getElementById('btnTabAI').classList.add('ai-active');
+    else { STATE.aiMode=null; STATE.markovActive=false; STATE.markovVisuals=null; STATE.goalPaths=[]; STATE.currentClusterIdx=-1; render(); document.getElementById('aiStatus').style.display='none'; tooltip.style.display='none'; }
+}
+function fitCanvas() {
+    const pad=30; const availW=container.clientWidth-pad; const availH=container.clientHeight-pad;
+    const ratio=105/68; let w,h;
+    if(availW/availH > ratio) { h=availH; w=h*ratio; } else { w=availW; h=w/ratio; }
+    wrapper.style.width=`${w}px`; wrapper.style.height=`${h}px`; canvas.width=w; canvas.height=h; render();
+}
+new ResizeObserver(fitCanvas).observe(container); setTimeout(fitCanvas, 50);
+
+// === DATOS & UTILIDADES ===
+function getCategory(action) {
+    if(!action) return 'OTHER'; const a=action.toLowerCase();
+    if(a.includes('pase')||a.includes('asist')||a.includes('centro')) return 'PASS';
+    if(a.includes('disparo')||a.includes('tiro')||a.includes('gol')) return 'SHOT';
+    if(a.includes('conduc')) return 'CARRY';
+    if(a.includes('recup')||a.includes('intercep')) return 'DEF';
+    return 'OTHER';
+}
+function getCol(action) {
+    const cat=getCategory(action);
+    switch(cat){ case 'PASS':return '#00d2d3'; case 'CARRY':return '#feca57'; case 'SHOT':return '#ff6b6b'; case 'DEF':return '#a29bfe'; default:return '#dfe6e9'; }
+}
+function getResultColor(result) {
+    const r = (result||"").toLowerCase();
+    const okKeys = ['completo', 'completado', 'gol', 'goal', 'exit', 'bueno', '1', 'acierto'];
+    const koKeys = ['fallo', 'fallado', 'mal', 'error', 'incompleto', '0', 'intercep', 'no', 'perdid', 'fuera', 'blocaje', 'parada'];
+    if(okKeys.some(k=>r.includes(k))) return '#2ecc71'; 
+    if(koKeys.some(k=>r.includes(k))) return '#e74c3c'; 
+    return '#aaaaaa'; 
+}
+
+// === LÓGICA DE ZONAS 6x5 ===
+function getZoneName(x, y) {
+    const cx = Math.min(Math.floor(x / (100 / GRID.cols)), GRID.cols - 1);
+    const cy = Math.min(Math.floor(y / (100 / GRID.rows)), GRID.rows - 1);
+    const zx = ["Def.Baja", "Def.Alta", "Med.Def", "Med.Of", "Atq.Med", "Atq.Fin"];
+    const zy = ["Banda Izq", "Pasillo Izq", "Centro", "Pasillo Der", "Banda Der"];
+    if(cx === 3 && cy === 2) return "Zona 14";
+    return `${zx[cx]} ${zy[cy]}`;
+}
+
+function getZoneCenter(name) {
+    if(name === "Zona 14") {
+        const cellW = 100/GRID.cols; const cellH = 100/GRID.rows;
+        return { x: (3 * cellW) + (cellW/2), y: (2 * cellH) + (cellH/2) };
+    }
+    const zx = ["Def.Baja", "Def.Alta", "Med.Def", "Med.Of", "Atq.Med", "Atq.Fin"];
+    const zy = ["Banda Izq", "Pasillo Izq", "Centro", "Pasillo Der", "Banda Der"];
+    let c = -1, r = -1;
+    for(let i=0; i<zx.length; i++) if(name.includes(zx[i])) c=i;
+    for(let i=0; i<zy.length; i++) if(name.includes(zy[i])) r=i;
+    if(c!==-1 && r!==-1) {
+        const cellW = 100/GRID.cols; const cellH = 100/GRID.rows;
+        return { x: (c * cellW) + (cellW/2), y: (r * cellH) + (cellH/2) };
+    }
+    return {x:50, y:50}; 
+}
+
+// === NUEVO: Actualizar lista de jugadores para clustering ===
+function updateClusterPlayerList() {
+    const select = document.getElementById('clusterPlayerSelect');
+    const oldVal = select.value;
+    const players = new Set();
+    STATE.matches.forEach(m => m.actions.forEach(a => {
+        if(a.player && a.player.length > 1 && a.player !== '?') players.add(a.player);
+    }));
+    
+    select.innerHTML = '<option value="ALL">★ Todo el Equipo (Estructura)</option>';
+    Array.from(players).sort().forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p; opt.innerText = p;
+        select.appendChild(opt);
+    });
+    if(Array.from(players).includes(oldVal)) select.value = oldVal;
+}
+
+async function loadFiles(e, ctx) { 
+    for(let f of e.target.files) await readFile(f,ctx); 
+    updateStats(); 
+    applyFilters(); 
+    analyzePatterns(); 
+    updateClusterPlayerList(); 
+}
+function updateStats() { document.getElementById('fileStatus').innerText = `${STATE.matches.length} Partidos`; }
+
+function readFile(file, ctxType) {
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                const normalize = document.getElementById('chkNorm').checked;
+
+                const actions = json.map((row, i) => {
+                    const c={}; Object.keys(row).forEach(k => c[k.trim().toLowerCase()] = row[k]);
+                    
+                    let x=c['x'], y=c['y']; 
+                    if(x===""||x==null) return null;
+                    x = parseFloat(x);
+                    y = parseFloat(y);
+
+                    const minute = parseFloat(c['minuto']||c['min']||'0');
+                    const startZone = (c['zona inicio (33%)'] || c['zona inicio'] || "").toLowerCase();
+
+                    // --- AUTO-CORRECCIÓN INTELIGENTE ---
+                    if (normalize) {
+                        let needsInvert = false;
+                        if (startZone.includes('defensa') && x > 50) {
+                            needsInvert = true;
+                        }
+                        else if (startZone.includes('ataque') && x < 50) {
+                            needsInvert = true;
+                        }
+                        else if (!startZone && ctxType === 'AWAY' && minute < 48) {
+                             needsInvert = true; 
+                        }
+
+                        if (needsInvert) {
+                            x = 100 - x;
+                            y = 100 - y;
+                        }
+                    }
+
+                    return {
+                        id:i, uid:Math.random().toString(36),
+                        posId: c['posesion id']||c['posid']||c['id']||'?', team: c['equipo']||c['team']||'?',
+                        player: c['jugador']||c['player']||c['name']||'?', // IMPORTANTE PARA CLUSTER
+                        min: minute, action: c['accion']||c['action']||'', result: c['resultado']||c['result']||c['outcome']||'',
+                        x: x, y: y
+                    };
+                }).filter(x=>x);
+                STATE.matches.push({ context: ctxType, actions });
+            } catch(err) { console.error(err); alert("Error archivo: revisa formato."); } resolve();
+        }; reader.readAsArrayBuffer(file);
+    });
+}
+
+function resetAll() { 
+    if(!confirm("¿Reiniciar?")) return;
+    STATE.matches=[]; STATE.zones=[]; STATE.filtered=[]; STATE.selectedId=null; STATE.patterns=[]; STATE.clipQueue=[];
+    STATE.aiMode=null; STATE.clusters=[]; STATE.markovActive=false; STATE.currentClusterIdx=-1; STATE.goalPaths=[];
+    document.getElementById('fileHome').value=""; document.getElementById('fileAway').value="";
+    updateStats(); document.getElementById('aiStatus').style.display='none'; applyFilters();
+}
+
+function applyFilters() {
+    const actFilter = document.getElementById('actFilter').value;
+    const minD = parseFloat(document.getElementById('minDur').value) || 0;
+    const maxD = parseFloat(document.getElementById('maxDur').value) || 9999;
+
+    const grouped = new Map();
+    STATE.matches.forEach(m => {
+        m.actions.forEach(a => {
+            const k = `${m.context}_${a.posId}`;
+            if (!grouped.has(k)) grouped.set(k, { uid: k, context: m.context, ...a, actions: [] });
+            grouped.get(k).actions.push(a);
+        });
+    });
+
+    STATE.filtered = Array.from(grouped.values()).filter(p => {
+        if (actFilter !== 'ALL' && !p.actions.some(a => getCategory(a.action) === getCategory(actFilter))) return false;
+        if (STATE.zones.length > 0 && !p.actions.some(a => STATE.zones.some(z => a.x >= z.xMin && a.x <= z.xMax && a.y >= z.yMin && a.y <= z.yMax))) return false;
+
+        const tStart = parseFloat(p.actions[0].min) * 60;
+        const tEnd = parseFloat(p.actions[p.actions.length - 1].min) * 60;
+        let duration = Math.abs(tEnd - tStart);
+        if (p.actions.length === 1) duration = 1; 
+        p.duration = duration; 
+
+        if (duration < minD || duration > maxD) return false;
+        return true;
+    });
+
+    render(); updateTable();
+}
+
+function safeClearZones() { STATE.zones=[]; STATE.aiMode=null; STATE.markovActive=false; STATE.currentClusterIdx=-1; STATE.goalPaths=[]; document.getElementById('aiStatus').style.display='none'; tooltip.style.display='none'; applyFilters(); }
+
+function analyzePatterns() {
+    const min=parseInt(document.getElementById('minLen').value), cts={};
+    const grp=new Map(); 
+    STATE.matches.forEach(m=>m.actions.forEach(a=>{ const k=`${m.context}_${a.posId}`; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(a.action); }));
+    grp.forEach(as=>{ 
+        if(as.length<min) return; 
+        const s=as.map(x=>getCategory(x)).join(' -> '); 
+        cts[s]=(cts[s]||0)+1; 
+    });
+    STATE.patterns = Object.entries(cts).map(([k,v])=>({seq:k, count:v})).sort((a,b)=>b.count-a.count);
+    renderPatternList();
+}
+function renderPatternList() {
+    const div = document.getElementById('patternList'); div.innerHTML = '';
+    const search = document.getElementById('patternSearch').value.toLowerCase();
+    if(STATE.patterns.length===0) { div.innerHTML='<div style="padding:10px;text-align:center;">Sin datos</div>'; return; }
+    STATE.patterns.forEach(p => {
+        if(search && !p.seq.toLowerCase().includes(search)) return;
+        const item = document.createElement('div');
+        item.className = 'pattern-item';
+        if(p.seq === STATE.currentPattern) item.classList.add('active-item');
+        item.innerHTML = `<span>${p.seq}</span> <span class="count-badge">${p.count}</span>`;
+        item.onclick = () => filterByPat(p.seq);
+        div.appendChild(item);
+    });
+}
+function filterByPat(seqString) {
+    STATE.currentPattern = seqString; renderPatternList();
+    const grouped = new Map();
+    STATE.matches.forEach(m => m.actions.forEach(a => {
+        const k = `${m.context}_${a.posId}`;
+        if(!grouped.has(k)) grouped.set(k, { uid: k, context: m.context, ...a, actions: [] });
+        grouped.get(k).actions.push(a);
+    }));
+    STATE.filtered = Array.from(grouped.values()).filter(p => p.actions.map(a => getCategory(a.action)).join(' -> ') === seqString);
+    STATE.selectedId = null; render(); updateTable();
+}
+
+// === CLUSTERING INDIVIDUAL Y GRUPAL (K-MEANS) ===
+function runKMeans() {
+    STATE.filtered = []; STATE.selectedId = null; STATE.markovVisuals = null; STATE.markovActive = false; updateTable();
+    STATE.aiMode='KMEANS'; STATE.goalPaths=[];
+    
+    const k=parseInt(document.getElementById('kClusters').value);
+    const targetPlayer = document.getElementById('clusterPlayerSelect').value;
+
+    let vecs=[];
+    STATE.matches.forEach(m=>{
+        let poss=new Map(); m.actions.forEach(a=>{ if(!poss.has(a.posId)) poss.set(a.posId,[]); poss.get(a.posId).push(a); });
+        poss.forEach(acts=>{
+            const result = acts[acts.length-1].result;
+            for(let i=0; i<acts.length-1; i++) {
+                const current = acts[i];
+                const next = acts[i+1];
+                const cat = getCategory(current.action);
+                
+                // === FILTRO INDIVIDUAL ===
+                let isValid = false;
+                
+                if (targetPlayer === 'ALL') {
+                    // MODO EQUIPO: Solo Pases (Estructura)
+                    if (cat === 'PASS') isValid = true;
+                } else {
+                    // MODO JUGADOR: Solo acciones de ese jugador (Pases o Conducciones)
+                    if (current.player === targetPlayer && (cat === 'PASS' || cat === 'CARRY')) {
+                        isValid = true;
+                    }
+                }
+
+                if(isValid) {
+                    vecs.push({x1:current.x, y1:current.y, x2:next.x, y2:next.y, ref:current, ctx: m.context, res: result});
+                }
+            }
+        });
+    });
+
+    if(vecs.length<k) return alert(`Pocos datos (${vecs.length}) para generar ${k} grupos.`);
+    
+    let centroids=[]; for(let i=0;i<k;i++) centroids.push(vecs[Math.floor(Math.random()*vecs.length)]);
+    let clusters=new Array(k).fill().map(()=>[]);
+    for(let it=0;it<10;it++){
+        clusters=new Array(k).fill().map(()=>[]);
+        vecs.forEach(v=>{
+            let minD=Infinity, cIdx=0;
+            centroids.forEach((c,i)=>{ const d=Math.hypot(v.x1-c.x1, v.y1-c.y1, v.x2-c.x2, v.y2-c.y2); if(d<minD){minD=d;cIdx=i;} });
+            clusters[cIdx].push(v);
+        });
+        centroids=clusters.map((c,i)=>{ 
+            if(!c.length) return centroids[i]; 
+            let s={x1:0,y1:0,x2:0,y2:0}; c.forEach(v=>{s.x1+=v.x1;s.y1+=v.y1;s.x2+=v.x2;s.y2+=v.y2});
+            return {x1:s.x1/c.length, y1:s.y1/c.length, x2:s.x2/c.length, y2:s.y2/c.length};
+        });
+    }
+    
+    STATE.clusters = clusters.map((c,i)=>({points:c, centroid:centroids[i], color:`hsl(${i*(360/k)},70%,50%)`}));
+    const list=document.getElementById('clusterList'); list.innerHTML='';
+    
+    const h = document.createElement('div'); 
+    h.style.padding="5px"; h.style.fontSize="0.7rem"; h.style.textAlign="center"; h.style.color="#aaa";
+    h.innerText = targetPlayer === 'ALL' ? "MODO: Equipo (Solo Pases)" : `MODO: ${targetPlayer} (Pases+Cond.)`;
+    list.appendChild(h);
+
+    STATE.clusters.sort((a,b)=>b.points.length-a.points.length).forEach((c,i)=>{
+        const item=document.createElement('div'); item.className='pattern-item';
+        item.innerHTML=`<span style="color:${c.color}">●</span> G${i+1} (${c.points.length})`;
+        item.onclick=()=>{ 
+            document.querySelectorAll('#clusterList .pattern-item').forEach(el=>el.classList.remove('active-item'));
+            item.classList.add('active-item');
+            STATE.currentClusterIdx = i; STATE.selectedId = null; 
+            const targetIds = new Set(c.points.map(p => `${p.ctx}_${p.ref.posId}`));
+            const grouped = new Map();
+            STATE.matches.forEach(m => m.actions.forEach(a => {
+                const k = `${m.context}_${a.posId}`;
+                if(targetIds.has(k)) { if(!grouped.has(k)) grouped.set(k, { uid: k, context: m.context, ...a, actions: [] }); grouped.get(k).actions.push(a); }
+            }));
+            STATE.filtered = Array.from(grouped.values()); render(); updateTable(); 
+        };
+        list.appendChild(item);
+    });
+    render();
+}
+
+function activateMarkovMode() {
+    STATE.filtered = []; STATE.selectedId = null; STATE.clusters = []; STATE.currentClusterIdx = -1; updateTable();
+    STATE.aiMode = 'MARKOV'; STATE.markovActive = true; STATE.markovVisuals = null; STATE.goalPaths = [];
+    document.getElementById('aiStatus').style.display = 'block';
+    document.getElementById('aiStatus').innerHTML = '<span style="color:#f1c40f">Modo Markov + Tiempo:</span> Haz clic en una zona.';
+    
+    const trans = {};
+    STATE.matches.forEach(m => {
+        let poss = new Map(); m.actions.forEach(a => { if (!poss.has(a.posId)) poss.set(a.posId, []); poss.get(a.posId).push(a); });
+        poss.forEach(acts => {
+            acts.sort((a, b) => parseFloat(a.min) - parseFloat(b.min));
+            for (let i = 0; i < acts.length - 1; i++) {
+                const current = acts[i]; const next = acts[i+1];
+                const z1 = getZoneName(current.x, current.y); const z2 = getZoneName(next.x, next.y);
+                if (z1 === z2) continue;
+                const t1 = parseFloat(current.min) * 60; const t2 = parseFloat(next.min) * 60; const dt = Math.max(0.1, t2 - t1); 
+                if (!trans[z1]) trans[z1] = { total: 0, dest: {}, exs: [] }; trans[z1].total++;
+                if (!trans[z1].dest[z2]) trans[z1].dest[z2] = { count: 0, ok: 0, ko: 0, totalTime: 0 };
+                trans[z1].dest[z2].count++; trans[z1].dest[z2].totalTime += dt;
+                const res = (current.result || "").toLowerCase();
+                const okKeys = ['completo', 'completado', 'exit', 'bueno', 'bien', '1', 'gol', 'acierto'];
+                const koKeys = ['fallo', 'fallado', 'mal', 'error', 'incompleto', '0', 'intercep', 'no', 'perdid'];
+                if (okKeys.some(k => res.includes(k))) trans[z1].dest[z2].ok++;
+                else if (koKeys.some(k => res.includes(k))) trans[z1].dest[z2].ko++;
+                if (trans[z1].exs.length < 50) trans[z1].exs.push(acts);
+            }
+        });
+    });
+    STATE.markovData = trans; render();
+}
+
+function findBestPathsToGoal(startZone, depth = 4, visited = new Set()) {
+    if (depth === 0 || !STATE.markovData[startZone]) return [];
+    if (startZone.includes('Atq.Fin')) return [{ path: [startZone], prob: 1.0, estTime: 0 }];
+    if (visited.has(startZone)) return []; visited.add(startZone);
+    const transitions = STATE.markovData[startZone]; let paths = [];
+    Object.entries(transitions.dest).forEach(([nextZone, stats]) => {
+        const probTransition = stats.count / transitions.total; const avgLinkTime = stats.totalTime / stats.count;
+        if (probTransition < 0.10) return;
+        const subPaths = findBestPathsToGoal(nextZone, depth - 1, new Set(visited));
+        subPaths.forEach(sp => { paths.push({ path: [startZone, ...sp.path], prob: probTransition * sp.prob, estTime: avgLinkTime + sp.estTime }); });
+    });
+    return paths.sort((a, b) => b.prob - a.prob).slice(0, 3);
+}
+
+function handleMarkovClick(e) {
+    if (!STATE.markovData) return;
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) / r.width * 100; const my = (e.clientY - r.top) / r.height * 100;
+    const name = getZoneName(mx, my); const d = STATE.markovData[name];
+    if (d && d.total > 0) {
+        const start = getZoneCenter(name); const targets = [];
+        Object.entries(d.dest).forEach(([k, info]) => {
+            const prob = info.count / d.total; const avgTime = info.totalTime / info.count;
+            if (prob > 0.05) targets.push({ pos: getZoneCenter(k), prob: prob, avgTime: avgTime, stats: info, zoneName: k });
+        });
+        STATE.markovVisuals = { start, targets };
+        const goalRoutes = findBestPathsToGoal(name); STATE.goalPaths = goalRoutes;
+        let routeInfo = ""; if(goalRoutes.length > 0) { const best = goalRoutes[0]; routeInfo = ` | Mejor Ruta: <b>${best.estTime.toFixed(1)}s</b> (${(best.prob*100).toFixed(0)}%)`; }
+        document.getElementById('aiStatus').innerHTML = `<span class="st-val" style="color:#f1c40f">${name}</span><br>Vol: ${d.total} Accs ${routeInfo}`;
+        STATE.filtered = d.exs.map(acts => {
+            const tStart = parseFloat(acts[0].min) * 60; const tEnd = parseFloat(acts[acts.length-1].min) * 60;
+            return { uid: acts[0].uid, posId: acts[0].posId, min: acts[0].min, actions: acts, context: 'HOME', result: acts[acts.length - 1].result, duration: Math.abs(tEnd - tStart) };
+        });
+        updateTable(); render();
+    } else {
+        document.getElementById('aiStatus').innerText = `Zona ${name}: Sin datos.`; STATE.markovVisuals = null; STATE.goalPaths = []; render();
+    }
+}
+
+function detectSpatialPatterns() {
+    STATE.aiMode='SPATIAL'; STATE.markovActive=false; const counts={};
+    STATE.matches.forEach(m=>{
+        let poss=new Map(); m.actions.forEach(a=>{ if(!poss.has(a.posId)) poss.set(a.posId,[]); poss.get(a.posId).push(a); });
+        poss.forEach(acts=>{
+            if(acts.length<2) return;
+            const seq = acts.map(a=>`${getCategory(a.action)} ${getZoneName(a.x,a.y)}`);
+            for(let i=0;i<seq.length-1;i++){
+                const k=`${seq[i]} ➔ ${seq[i+1]}`;
+                if(!counts[k]) counts[k]={key:k, count:0, exs:[]};
+                counts[k].count++; if(counts[k].exs.length<20) counts[k].exs.push(acts);
+            }
+        });
+    });
+    const sorted=Object.values(counts).sort((a,b)=>b.count-a.count).slice(0,30);
+    const list=document.getElementById('spatialList'); list.innerHTML='';
+    sorted.forEach(p=>{
+        const item=document.createElement('div'); item.className='pattern-item';
+        item.innerHTML=`<span>${p.key}</span> <span class="count-badge">${p.count}</span>`;
+        item.onclick=()=>{ STATE.filtered=p.exs.map(ex=>({uid:ex[0].uid, posId:ex[0].posId, min:ex[0].min, actions:ex, context:'HOME'})); updateTable(); };
+        list.appendChild(item);
+    });
+}
+function clearAI() { STATE.aiMode=null; STATE.clusters=[]; STATE.markovActive=false; STATE.currentClusterIdx=-1; STATE.goalPaths=[]; document.getElementById('aiStatus').style.display='none'; render(); }
+
+// === RENDER & INTERACCIÓN ===
+let drawing=false, start=null, curr=null;
+function getCoords(e){ const r=canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*100, y:(e.clientY-r.top)/r.height*100}; }
+wrapper.addEventListener('mousedown', e=>{ if(STATE.markovActive) handleMarkovClick(e); else { drawing=true; start=getCoords(e); curr=start; } });
+wrapper.addEventListener('mousemove', e=>{ if(STATE.markovActive) checkArrowHover(e); if(drawing && !STATE.markovActive){ curr=getCoords(e); render(); } });
+wrapper.addEventListener('mouseup', e=>{ if(drawing && !STATE.markovActive){ drawing=false; STATE.zones.push({xMin:Math.min(start.x,curr.x),xMax:Math.max(start.x,curr.x),yMin:Math.min(start.y,curr.y),yMax:Math.max(start.y,curr.y)}); applyFilters(); } });
+wrapper.addEventListener('touchstart', e=>{ if(STATE.markovActive) { e.preventDefault(); handleMarkovClick(e.touches[0]); } else { drawing=true; start=getCoords(e.touches[0]); curr=start; } }, {passive:false});
+wrapper.addEventListener('touchmove', e=>{ e.preventDefault(); if(STATE.markovActive) checkArrowHover(e.touches[0]); else if(drawing) { curr=getCoords(e.touches[0]); render(); } }, {passive:false});
+wrapper.addEventListener('touchend', e=>{ if(drawing && !STATE.markovActive) endDraw(); });
+function endDraw() { drawing=false; STATE.zones.push({xMin:Math.min(start.x,curr.x),xMax:Math.max(start.x,curr.x),yMin:Math.min(start.y,curr.y),yMax:Math.max(start.y,curr.y)}); applyFilters(); }
+function undoZone(){ STATE.zones.pop(); applyFilters(); }
+
+function checkArrowHover(e) {
+    if (!STATE.markovVisuals) return;
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) / r.width * 100; const my = (e.clientY - r.top) / r.height * 100;
+    let hovered = null;
+    const x1 = STATE.markovVisuals.start.x; const y1 = STATE.markovVisuals.start.y;
+    STATE.markovVisuals.targets.forEach(t => {
+        const x2 = t.pos.x, y2 = t.pos.y;
+        const A = mx - x1, B = my - y1, C = x2 - x1, D = y2 - y1;
+        const dot = A * C + B * D, len_sq = C * C + D * D;
+        let param = -1; if (len_sq !== 0) param = dot / len_sq;
+        let xx, yy; if (param < 0) { xx = x1; yy = y1; } else if (param > 1) { xx = x2; yy = y2; } else { xx = x1 + param * C; yy = y1 + param * D; }
+        const dist = Math.sqrt((mx - xx) ** 2 + (my - yy) ** 2); if (dist < 3) hovered = t;
+    });
+    if (hovered) {
+        const s = hovered.stats; const total = s.count;
+        const okP = ((s.ok / total) * 100).toFixed(0); const koP = ((s.ko / total) * 100).toFixed(0);
+        const timeVal = hovered.avgTime.toFixed(1);
+        let timeColor = '#ccc'; if(hovered.avgTime < 2.0) timeColor = '#00e5ff'; else if(hovered.avgTime > 4.0) timeColor = '#e74c3c'; 
+        tooltip.style.display = 'block'; tooltip.style.left = (e.clientX + 15) + 'px'; tooltip.style.top = (e.clientY + 15) + 'px';
+        tooltip.innerHTML = `<div style="border-bottom:1px solid #555; margin-bottom:5px; padding-bottom:2px; font-weight:bold; color:#f1c40f;">➔ ${hovered.zoneName}</div><div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;"><span>Volumen:</span> <strong style="text-align:right">${total}</strong><span>Tiempo:</span> <strong style="text-align:right; color:${timeColor}">${timeVal}s</strong><span style="color:#2ecc71">Acierto:</span> <strong style="text-align:right; color:#2ecc71">${okP}%</strong><span style="color:#e74c3c">Fallo:</span> <strong style="text-align:right; color:#e74c3c">${koP}%</strong></div>`;
+        document.body.style.cursor = 'pointer';
+    } else { tooltip.style.display = 'none'; document.body.style.cursor = 'default'; }
+}
+
+function drawPitch(w, h) {
+    ctx.fillStyle = "#2e5c40"; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
+    const X = v => v / 100 * w; const Y = v => v / 100 * h;
+    const dims = { penBoxD: 15.7, penBoxH: 59.3, goalBoxD: 5.2, goalBoxH: 26.9, penSpot: 10.5, centerR: 9.15 / 68 * 100, cornerR: 1.5 };
+    ctx.strokeRect(X(0), Y(0), X(100), Y(100)); 
+    ctx.beginPath(); ctx.moveTo(X(50), Y(0)); ctx.lineTo(X(50), Y(100)); ctx.stroke(); 
+    ctx.beginPath(); ctx.arc(X(50), Y(50), Y(dims.centerR), 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(X(50), Y(50), 2, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+    const drawHalf = (isLeft) => {
+        const xStart = isLeft ? X(0) : X(100 - dims.penBoxD); ctx.strokeRect(xStart, Y((100 - dims.penBoxH) / 2), X(dims.penBoxD), Y(dims.penBoxH));
+        const xStartSmall = isLeft ? X(0) : X(100 - dims.goalBoxD); ctx.strokeRect(xStartSmall, Y((100 - dims.goalBoxH) / 2), X(dims.goalBoxD), Y(dims.goalBoxH));
+        const spotX = isLeft ? dims.penSpot : (100 - dims.penSpot);
+        ctx.beginPath(); ctx.arc(X(spotX), Y(50), 2, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+        ctx.beginPath(); const r = Y(dims.centerR); const startAng = isLeft ? -0.92 : 2.22; const endAng = isLeft ? 0.92 : 4.06; ctx.arc(X(spotX), Y(50), r, startAng, endAng); ctx.stroke();
+        const cR = Y(dims.cornerR);
+        if(isLeft) { ctx.beginPath(); ctx.arc(X(0), Y(0), cR, 0, 1.57); ctx.stroke(); ctx.beginPath(); ctx.arc(X(0), Y(100), cR, -1.57, 0); ctx.stroke(); } 
+        else { ctx.beginPath(); ctx.arc(X(100), Y(0), cR, 1.57, 3.14); ctx.stroke(); ctx.beginPath(); ctx.arc(X(100), Y(100), cR, 3.14, 4.71); ctx.stroke(); }
+    };
+    drawHalf(true); drawHalf(false);
+    if(STATE.markovActive) {
+        ctx.strokeStyle="rgba(255,255,255,0.15)"; ctx.lineWidth=1;
+        for(let i=1; i<GRID.cols; i++) { ctx.beginPath(); ctx.moveTo(X(i*(100/GRID.cols)),0); ctx.lineTo(X(i*(100/GRID.cols)),h); ctx.stroke(); }
+        for(let i=1; i<GRID.rows; i++) { ctx.beginPath(); ctx.moveTo(0,Y(i*(100/GRID.rows))); ctx.lineTo(w,Y(i*(100/GRID.rows))); ctx.stroke(); }
+    }
+}
+
+function drawArrow(x1,y1,x2,y2,col,w,lbl) {
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=w;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const ang=Math.atan2(y2-y1,x2-x1);
+    ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-15*Math.cos(ang-0.5), y2-15*Math.sin(ang-0.5)); ctx.lineTo(x2-15*Math.cos(ang+0.5), y2-15*Math.sin(ang+0.5)); ctx.fill();
+    if(lbl){ 
+        ctx.font='10px Arial'; const tw=ctx.measureText(lbl).width;
+        const mx=(x1+x2)/2, my=(y1+y2)/2;
+        ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(mx-tw/2-4, my-10, tw+8, 20); 
+        ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(lbl,mx,my); 
+    }
+}
+
+// === RENDERIZADO PRINCIPAL CON HIGHLIGHT DE JUGADOR ===
+function render() {
+    const w=canvas.width, h=canvas.height; if(w===0) return;
+    drawPitch(w,h); const X=v=>v/100*w, Y=v=>v/100*h;
+    STATE.zones.forEach(z=>{ ctx.fillStyle="rgba(241,196,15,0.2)"; ctx.fillRect(X(z.xMin),Y(z.yMin),X(z.xMax-z.xMin),Y(z.yMax-z.yMin)); });
+    if(drawing && !STATE.markovActive){ ctx.strokeStyle="#fff"; ctx.strokeRect(X(Math.min(start.x,curr.x)),Y(Math.min(start.y,curr.y)),X(Math.abs(curr.x-start.x)),Y(Math.abs(curr.y-start.y))); }
+    
+    // Obtener jugador seleccionado para resaltar
+    const targetPlayer = document.getElementById('clusterPlayerSelect').value;
+
+    if(STATE.aiMode==='KMEANS') {
+        STATE.clusters.forEach((c, idx)=>{ 
+            const isTarget = (STATE.currentClusterIdx === -1 || STATE.currentClusterIdx === idx);
+            if(isTarget) {
+                drawArrow(X(c.centroid.x1),Y(c.centroid.y1),X(c.centroid.x2),Y(c.centroid.y2),c.color,5);
+                c.points.forEach(p => { 
+                    const isPlayerAction = (targetPlayer !== 'ALL' && p.ref.player === targetPlayer);
+                    const resCol = getResultColor(p.res);
+                    const radius = isPlayerAction ? 6 : 2; // Círculo más grande si es el jugador
+                    
+                    ctx.fillStyle = resCol; 
+                    ctx.globalAlpha = isPlayerAction ? 1.0 : 0.6; 
+                    ctx.beginPath(); 
+                    ctx.arc(X(p.x1), Y(p.y1), radius, 0, 6.28); 
+                    ctx.fill();
+                    
+                    if(isPlayerAction) {
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                });
+                ctx.globalAlpha = 1;
+            } else {
+                ctx.globalAlpha = 0.1; drawArrow(X(c.centroid.x1),Y(c.centroid.y1),X(c.centroid.x2),Y(c.centroid.y2),c.color,2); ctx.globalAlpha = 1;
+            }
+        });
+    }
+
+    if(STATE.markovVisuals) {
+        const startX = X(STATE.markovVisuals.start.x); const startY = Y(STATE.markovVisuals.start.y);
+        ctx.beginPath(); ctx.arc(startX, startY, 5, 0, Math.PI * 2); ctx.fillStyle = "#f1c40f"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.stroke();
+        STATE.markovVisuals.targets.forEach(t => {
+            const thickness = 2 + (t.prob * 15); const opacity = 0.4 + (t.prob * 0.6);
+            drawArrow(startX, startY, X(t.pos.x), Y(t.pos.y), `rgba(241, 196, 15, ${opacity})`, thickness, `${(t.prob*100).toFixed(0)}%`);
+        });
+    }
+
+    if(STATE.goalPaths.length > 0) {
+        STATE.goalPaths.forEach((pathObj, idx) => {
+            const zones = pathObj.path;
+            const isMain = (idx === 0); const alpha = isMain ? 1 : 0.4; const lineWidth = isMain ? 4 : 2;
+            ctx.beginPath(); ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`; ctx.lineWidth = lineWidth;
+            if (!isMain) ctx.setLineDash([10, 10]); else ctx.setLineDash([]);
+            for (let i = 0; i < zones.length - 1; i++) {
+                const p1 = getZoneCenter(zones[i]); const p2 = getZoneCenter(zones[i + 1]);
+                if (i === 0) ctx.moveTo(X(p1.x), Y(p1.y)); else ctx.lineTo(X(p1.x), Y(p1.y));
+                ctx.lineTo(X(p2.x), Y(p2.y));
+            }
+            ctx.stroke(); ctx.setLineDash([]);
+            zones.forEach(z => { const p = getZoneCenter(z); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), isMain ? 4 : 2, 0, 6.28); ctx.fillStyle = "#00e5ff"; ctx.fill(); });
+        });
+    }
+
+    if(STATE.aiMode!=='KMEANS' || STATE.currentClusterIdx!==-1) {
+        STATE.filtered.forEach(p=>{
+            if(p.uid===STATE.selectedId) return; ctx.globalAlpha=0.15;
+            if(p.actions.length>1){ ctx.beginPath(); ctx.strokeStyle=p.context==='HOME'?"#3498db":"#e67e22"; ctx.lineWidth=1; p.actions.forEach((a,i)=>{ if(i===0)ctx.moveTo(X(a.x),Y(a.y)); else ctx.lineTo(X(a.x),Y(a.y)); }); ctx.stroke(); }
+            
+            p.actions.forEach((a,i)=>{ 
+                const isPlayerAction = (targetPlayer !== 'ALL' && a.player === targetPlayer);
+                const r = isPlayerAction ? 5 : 2;
+                ctx.fillStyle=getCol(a.action); 
+                ctx.beginPath(); 
+                ctx.arc(X(a.x),Y(a.y),r,0,6.28); 
+                ctx.fill(); 
+                
+                if(isPlayerAction) {
+                    ctx.strokeStyle="#fff"; ctx.lineWidth=1; ctx.stroke();
+                }
+            });
+        }); ctx.globalAlpha=1;
+        
+        if(STATE.selectedId) {
+            const p=STATE.filtered.find(x=>x.uid===STATE.selectedId);
+            if(p){
+                ctx.shadowBlur=10; ctx.shadowColor="#000";
+                if(p.actions.length>1){ ctx.beginPath(); ctx.strokeStyle="#f1c40f"; ctx.lineWidth=5; p.actions.forEach((a,i)=>{ if(i===0)ctx.moveTo(X(a.x),Y(a.y)); else ctx.lineTo(X(a.x),Y(a.y)); }); ctx.stroke(); }
+                ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 12px Arial'; ctx.shadowBlur=0;
+                
+                p.actions.forEach((a,i)=>{ 
+                    const x=X(a.x), y=Y(a.y); 
+                    const isPlayerAction = (targetPlayer !== 'ALL' && a.player === targetPlayer);
+
+                    ctx.beginPath(); 
+                    ctx.arc(x,y,isPlayerAction ? 12 : 9,0,6.28); 
+                    ctx.fillStyle="#000"; ctx.fill(); 
+                    
+                    ctx.beginPath(); 
+                    ctx.arc(x,y,isPlayerAction ? 10 : 7,0,6.28); 
+                    ctx.fillStyle=getCol(a.action); ctx.fill(); 
+                    
+                    // Resaltar borde del jugador seleccionado en la jugada grande
+                    if(isPlayerAction) {
+                        ctx.strokeStyle = "#f1c40f"; // Borde dorado
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle="#000"; ctx.fillText(i+1,x,y); 
+                });
+            }
+        }
+    }
+}
+
+// === ACTUALIZACIÓN DE TABLA ===
+function updateTable(){
+    const t = document.getElementById('tableBody'); t.innerHTML = '';
+    document.getElementById('repoStats').innerText = `Viendo ${Math.min(50, STATE.filtered.length)} / ${STATE.filtered.length}`;
+
+    STATE.filtered.slice(0, 50).forEach(p => {
+        const tr = document.createElement('tr');
+        if (p.uid === STATE.selectedId) tr.className = 'selected';
+        
+        let durColor = '#ccc';
+        if (p.duration < 5) durColor = '#ff6b6b'; 
+        else if (p.duration > 20) durColor = '#3498db'; 
+
+        tr.innerHTML = `
+            <td><input type="checkbox" onclick="event.stopPropagation()"></td>
+            <td>${p.posId}</td>
+            <td>${p.context}</td>
+            <td>${p.min}</td>
+            <td style="color:${durColor}; font-weight:bold;">${(p.duration||0).toFixed(1)}s</td>
+            <td>${p.actions.length}</td>
+            <td style="font-size:0.65rem;">${p.actions[0].action}...</td>
+            <td>${p.result}</td>
+        `;
+        tr.onclick = () => { STATE.selectedId = p.uid; playPossessionVideo(p); render(); updateTable(); };
+        t.appendChild(tr);
+    });
+}
+function handleVideoLoad(i){ Array.from(i.files).forEach(f=>STATE.videos.push({name:f.name,url:URL.createObjectURL(f)})); if(STATE.currentVidIdx===-1) playVideo(0); toggleVideo(true); }
+function playVideo(i){ STATE.currentVidIdx=i; document.getElementById('mainVideo').src=STATE.videos[i].url; }
+function toggleVideo(s){ document.getElementById('videoPanel').style.display=s?'block':'none'; setTimeout(fitCanvas,100); }
+function playPossessionVideo(p){
+    const v=document.getElementById('mainVideo'); const t1=parseFloat(p.actions[0].min)*60, t2=parseFloat(p.actions[p.actions.length-1].min)*60;
+    v.currentTime=t1+STATE.offset; v.play(); clearTimeout(videoPauseTimer); videoPauseTimer=setTimeout(()=>v.pause(),(t2-t1+4)*1000);
+}
+function addToRecordingQueue(){ if(STATE.selectedId) STATE.clipQueue.push(STATE.filtered.find(x=>x.uid===STATE.selectedId)); document.getElementById('queueCount').innerText=STATE.clipQueue.length; }
+function clearQueue(){ STATE.clipQueue=[]; document.getElementById('queueCount').innerText=0; }
+async function startQueueRecording(){
+    if(!STATE.clipQueue.length) return alert("Cola vacía");
+    const v=document.getElementById('mainVideo'); const rec=new MediaRecorder(v.captureStream(30),{mimeType:'video/webm;codecs=vp8',videoBitsPerSecond:4000000});
+    const ch=[]; rec.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
+    rec.onstop=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(ch)); a.download='clips.webm'; a.click(); alert("Guardado"); };
+    document.getElementById('recordingOverlay').style.display='block'; rec.start();
+    for(let p of STATE.clipQueue){
+        v.currentTime=parseFloat(p.actions[0].min)*60+STATE.offset; await new Promise(r=>setTimeout(r,1500));
+        v.play(); await new Promise(r=>setTimeout(r,(parseFloat(p.actions[p.actions.length-1].min)-parseFloat(p.actions[0].min)+4)*1000)); v.pause();
+    }
+    rec.stop(); document.getElementById('recordingOverlay').style.display='none';
+}
+function downloadCutsScript() { alert("Función para PC."); }
+</script>
+</body>
+</html>

@@ -26,7 +26,7 @@ export default async function App1Page() {
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       <SessionHeartbeat />
       <AppsNavBar userName={session.user.name || "Usuario"} />
-      <AppContainer appUrl="/IA%20PASES%20TACTICO1bCDEFG.html" appName="Analista Pro" appId="app1" />
+      <AppContainer appUrl="/AnalistaPro.html" appName="Analista Pro" appId="app1" />
     </div>
   );
 }
