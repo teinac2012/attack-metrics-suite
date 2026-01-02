@@ -326,6 +326,10 @@ const app = {
                     // Limpiar acciones existentes
                     this.data.actions = [];
                     
+                    // Inicializar arrays si no existen
+                    if (!this.data.gks) this.data.gks = [];
+                    if (!this.data.matches) this.data.matches = [];
+                    
                     // Crear sets para porteros y jornadas únicos
                     const gksSet = new Set();
                     const matchesSet = new Set();
@@ -366,21 +370,17 @@ const app = {
                         });
                     }
                     
-                    // Actualizar porteros si no existen
-                    if (this.data.gks.length === 0) {
-                        this.data.gks = Array.from(gksSet).map(name => ({
-                            id: name,
-                            name: name
-                        }));
-                    }
+                    // Actualizar porteros
+                    this.data.gks = Array.from(gksSet).map(name => ({
+                        id: name,
+                        name: name
+                    }));
                     
-                    // Actualizar jornadas si no existen
-                    if (this.data.matches.length === 0) {
-                        this.data.matches = Array.from(matchesSet).map(jornada => ({
-                            id: jornada,
-                            name: jornada
-                        }));
-                    }
+                    // Actualizar jornadas
+                    this.data.matches = Array.from(matchesSet).map(jornada => ({
+                        id: jornada,
+                        name: jornada
+                    }));
                     
                 } else {
                     // Parsear JSON
@@ -406,12 +406,12 @@ const app = {
                 }
                 
                 // Asegurar que haya un portero seleccionado
-                if (this.data.gks.length > 0 && !this.data.gk) {
+                if (this.data.gks && this.data.gks.length > 0 && !this.data.gk) {
                     this.data.gk = this.data.gks[0].id;
                 }
                 
                 // Asegurar que haya un partido seleccionado
-                if (this.data.matches.length > 0 && !this.data.match) {
+                if (this.data.matches && this.data.matches.length > 0 && !this.data.match) {
                     this.data.match = this.data.matches[0].id;
                 }
                 
