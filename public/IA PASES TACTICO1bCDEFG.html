@@ -3244,9 +3244,13 @@ function drawFlowViz(index) {
     ctx.beginPath(); ctx.arc(xPenLeft, yCenter, 2, 0, Math.PI*2); ctx.fill();
 
     // Arco del Área (Medialuna) Izquierda
-    // Dibujamos un arco desde el punto de penalti, pero solo la parte fuera del área
+    // Radio de 9.15 metros (normalizado al tamaño del campo)
+    const arcRadius = fieldW * 0.0763; // 9.15/120 aprox
+    const halfSmBoxH = smBoxH / 2;
+    // Calculamos el ángulo para que el arco no entre en el área pequeña
+    const alphaLeft = Math.asin(halfSmBoxH / arcRadius);
     ctx.beginPath();
-    ctx.arc(xPenLeft, yCenter, centerRad, -0.92, 0.92); // Ángulos ajustados para "D"
+    ctx.arc(xPenLeft, yCenter, arcRadius, Math.PI - alphaLeft, Math.PI + alphaLeft);
     ctx.stroke();
 
 
@@ -3266,8 +3270,9 @@ function drawFlowViz(index) {
     ctx.beginPath(); ctx.arc(xPenRight, yCenter, 2, 0, Math.PI*2); ctx.fill();
 
     // Arco del Área (Medialuna) Derecha
+    const alphaRight = Math.asin(halfSmBoxH / arcRadius);
     ctx.beginPath();
-    ctx.arc(xPenRight, yCenter, centerRad, Math.PI - 0.92, Math.PI + 0.92);
+    ctx.arc(xPenRight, yCenter, arcRadius, -alphaRight, alphaRight);
     ctx.stroke();
 
 
