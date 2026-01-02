@@ -561,18 +561,38 @@ const app = {
     // --- FUNCIONES CORE (SIN CAMBIOS ESTRUCTURALES) ---
     renderGKSelect: function() {
         const s = document.getElementById('selGK'); s.innerHTML = '';
-        this.data.gks.forEach(p => { let o=document.createElement('option'); o.value=p.id; o.innerText=p.name; s.appendChild(o); });
-        s.value = this.data.gk; this.updateCompareUI();
+        if (this.data.gks && this.data.gks.length > 0) {
+            this.data.gks.forEach(p => { let o=document.createElement('option'); o.value=p.id; o.innerText=p.name; s.appendChild(o); });
+            s.value = this.data.gk;
+        }
+        this.updateCompareUI();
     },
     addGK: function() { let n = prompt("Nombre Portero:"); if(n) { let id=Date.now(); this.data.gks.push({id:id, name:n}); this.data.gk=id; this.data.compare.push(id); this.save(); this.renderGKSelect(); this.setGK(); } },
-    setGK: function() { this.data.gk = parseInt(document.getElementById('selGK').value); if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); this.updateTable(); this.updateStatsUI(); this.updateCompareUI(); if(this.viewMode===1) this.renderRadar(); else if(this.viewMode===2) this.renderScatter1(); else if(this.viewMode===3) this.renderScatter2();},
+    setGK: function() { 
+        let val = document.getElementById('selGK').value;
+        this.data.gk = isNaN(val) ? val : parseInt(val);
+        if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk);
+        this.save();
+        this.updateTable(); this.updateStatsUI(); this.updateCompareUI();
+        if(this.viewMode===1) this.renderRadar(); else if(this.viewMode===2) this.renderScatter1(); else if(this.viewMode===3) this.renderScatter2();
+    },
     
     renderMatchSelect: function() {
         const s = document.getElementById('selMatch'); s.innerHTML = '';
-        let g1 = document.createElement('optgroup'); g1.label="Temporada";
-        for(let i=1; i<=38; i++) { let o=document.createElement('option'); o.value=i; o.innerText=`Jornada ${i}`; g1.appendChild(o); }
-        s.appendChild(g1);
-        if(this.data.friends.length){ let g2 = document.createElement('optgroup'); g2.label="Amistosos"; this.data.friends.forEach(f => { let o=document.createElement('option'); o.value=f.id; o.innerText=f.name; g2.appendChild(o); }); s.appendChild(g2); }
+        
+        // Si hay partidos cargados de CSV, usarlos
+        if(this.data.matches && this.data.matches.length > 0) {
+            let g = document.createElement('optgroup'); g.label="Partidos";
+            this.data.matches.forEach(m => { let o=document.createElement('option'); o.value=m.id; o.innerText=m.name; g.appendChild(o); });
+            s.appendChild(g);
+        } else {
+            // Sino, generar jornadas 1-38
+            let g1 = document.createElement('optgroup'); g1.label="Temporada";
+            for(let i=1; i<=38; i++) { let o=document.createElement('option'); o.value=i; o.innerText=`Jornada ${i}`; g1.appendChild(o); }
+            s.appendChild(g1);
+        }
+        
+        if(this.data.friends && this.data.friends.length){ let g2 = document.createElement('optgroup'); g2.label="Amistosos"; this.data.friends.forEach(f => { let o=document.createElement('option'); o.value=f.id; o.innerText=f.name; g2.appendChild(o); }); s.appendChild(g2); }
         s.value = this.data.match; this.loadMins();
     },
     addFriendly: function() { let n = prompt("Nombre Partido:"); if(n) { let id='F-'+Date.now(); this.data.friends.push({id:id, name:n}); this.data.match=id; this.save(); this.renderMatchSelect(); this.setMatch(); } },
