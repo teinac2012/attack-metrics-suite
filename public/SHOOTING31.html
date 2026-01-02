@@ -752,9 +752,58 @@
         ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
         const scaleX = w / 120; const scaleY = h / 80;
         
-        ctx.strokeRect(0,0,w,h); ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+        // Campo completo
+        ctx.strokeRect(0,0,w,h); 
+        // Línea de medio campo
+        ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+        // Círculo central
         ctx.beginPath(); ctx.arc(w/2, h/2, 9.15*scaleX, 0, Math.PI*2); ctx.stroke();
-        const drawArea = (isLeft) => { const dir = isLeft ? 1 : -1; const xG = isLeft ? 0 : w; const xBox = xG + (16.5 * scaleX * dir); const yTop = (40 - 20.16) * scaleY; const yBot = (40 + 20.16) * scaleY; ctx.beginPath(); ctx.moveTo(xG, yTop); ctx.lineTo(xBox, yTop); ctx.lineTo(xBox, yBot); ctx.lineTo(xG, yBot); ctx.stroke(); };
+        
+        // Función para dibujar las áreas con semicírculos
+        const drawArea = (isLeft) => { 
+            const dir = isLeft ? 1 : -1; 
+            const xG = isLeft ? 0 : w; 
+            const xBox = xG + (16.5 * scaleX * dir); 
+            const xSmallBox = xG + (5.5 * scaleX * dir);
+            const yTop = (40 - 20.16) * scaleY; 
+            const yBot = (40 + 20.16) * scaleY;
+            const yTopSmall = (40 - 9.16) * scaleY;
+            const yBotSmall = (40 + 9.16) * scaleY;
+            const yCenterArea = (40) * scaleY;
+            const xPenalty = xG + (11 * scaleX * dir);
+            
+            // Área grande
+            ctx.beginPath(); 
+            ctx.moveTo(xG, yTop); 
+            ctx.lineTo(xBox, yTop); 
+            ctx.lineTo(xBox, yBot); 
+            ctx.lineTo(xG, yBot); 
+            ctx.stroke();
+            
+            // Semicírculo del área grande (9.15 metros desde el punto de penalti)
+            let alphaBox = Math.asin(5.5 / 9.15);
+            ctx.beginPath();
+            if (isLeft) {
+                ctx.arc(xPenalty, yCenterArea, 9.15 * scaleX, Math.PI - alphaBox, Math.PI + alphaBox);
+            } else {
+                ctx.arc(xPenalty, yCenterArea, 9.15 * scaleX, -alphaBox, alphaBox);
+            }
+            ctx.stroke();
+            
+            // Área pequeña
+            ctx.beginPath();
+            ctx.moveTo(xG, yTopSmall);
+            ctx.lineTo(xSmallBox, yTopSmall);
+            ctx.lineTo(xSmallBox, yBotSmall);
+            ctx.lineTo(xG, yBotSmall);
+            ctx.stroke();
+            
+            // Punto de penalti
+            ctx.fillStyle = "rgba(255,255,255,0.3)";
+            ctx.beginPath();
+            ctx.arc(xPenalty, yCenterArea, 2, 0, Math.PI*2);
+            ctx.fill();
+        };
         drawArea(true); drawArea(false);
 
         ctx.globalCompositeOperation = 'lighter'; 
