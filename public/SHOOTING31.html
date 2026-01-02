@@ -258,10 +258,10 @@
             
             <button onclick="saveToSeasonHistory()" class="btn-save-season">Guardar Jornada</button>
             <button onclick="saveLooseMatch()" class="btn-loose">Guardar Suelto</button>
-            <button onclick="viewLooseMatches()" style="background:#555">📂 Archivo</button>
+            <button onclick="document.getElementById('csvInput').click()" style="background:#555">📂 Cargar CSV</button>
             
             <button onclick="resetMatch()">Reset</button>
-            <button class="btn-excel" onclick="downloadExcel()">CSV</button>
+            <button class="btn-excel" onclick="downloadExcel()">💾 CSV</button>
         </div>
     </div>
 </header>
@@ -896,7 +896,72 @@
     function viewLooseMatches() { const c=document.getElementById('looseContainer'); c.innerHTML=""; archiveHistory.forEach((r,i)=>{c.innerHTML+=`<div class="loose-item"><div class="loose-info"><strong>${r.title}</strong> (${r.date})</div><button class="btn-delete" onclick="archiveHistory.splice(${i},1);localStorage.setItem('archiveHistory_v1',JSON.stringify(archiveHistory));viewLooseMatches();">x</button></div>`;}); document.getElementById('looseModal').style.display='flex'; }
     function resetMatch() { if(confirm("Borrar?")) { matchData={jornada:"",shots:[],stats:{Propio:{xg:0,xgot:0,goals:0,count:0},Rival:{xg:0,xgot:0,goals:0,count:0}}}; inputs.min.value=0; inputs.sec.value=0; saveData(); updateUI(); draw(); } }
     function downloadExcel() { let c = "\uFEFFMinuto;Seg;Jugador;Equipo;Resultado;xG;xGOT\n"; matchData.shots.forEach(s => { c += `${s.minute};${s.second};${s.player};${s.team};${s.result};${s.xg.toFixed(3)};${s.xgot.toFixed(3)}\n`; }); const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([c], {type:'text/csv;charset=utf-8;'})); l.download = `Data.csv`; l.click(); }
-    function importCSV(input) {alert("Importado");}
+    
+    function importCSV(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const text = e.target.result;
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                if (lines.length < 2) {
+                    alert('El archivo CSV está vacío');
+                    return;
+                }
+                
+                // Limpiar datos actuales
+                matchData.shots = [];
+                matchData.stats = { Propio: {xg:0, xgot:0, goals:0, count:0}, Rival: {xg:0, xgot:0, goals:0, count:0} };
+                
+                // Procesar líneas (saltar header)
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    const parts = line.split(';');
+                    if (parts.length < 7) continue;
+                    
+                    const shot = {
+                        minute: parseInt(parts[0]) || 0,
+                        second: parseInt(parts[1]) || 0,
+                        timeFloat: (parseInt(parts[0]) || 0) + (parseInt(parts[1]) || 0) / 60,
+                        player: parts[2] || 'Desconocido',
+                        team: parts[3] || 'Propio',
+                        result: parts[4] || 'Fuera',
+                        xg: parseFloat(parts[5]) || 0,
+                        xgot: parseFloat(parts[6]) || 0,
+                        startX: 103.5,
+                        startY: 40
+                    };
+                    
+                    matchData.shots.push(shot);
+                    
+                    // Actualizar estadísticas
+                    const team = shot.team;
+                    matchData.stats[team].xg += shot.xg;
+                    matchData.stats[team].xgot += shot.xgot;
+                    matchData.stats[team].count++;
+                    if (shot.result === 'Gol') {
+                        matchData.stats[team].goals++;
+                    }
+                }
+                
+                saveData();
+                updateUI();
+                draw();
+                alert(`Cargados ${matchData.shots.length} tiros correctamente`);
+                
+            } catch (error) {
+                alert('Error al procesar el archivo CSV: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+        input.value = ''; // Limpiar input
+    }
+    
     window.saveCanvas = function(cid, fname) { const c=document.getElementById(cid); if(c){const l=document.createElement('a'); l.download=`${fname}.png`; l.href=c.toDataURL(); l.click();} };
 
     // --- FIX STARTUP ---
