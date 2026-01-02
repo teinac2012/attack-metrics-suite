@@ -1,0 +1,56 @@
+Posesion ID,Minuto,Jugador,Equipo,Accion,Resultado,X,Y,Zona Inicio
+pos_001,2.25,10-MESSI,HOME,Pase,Completo,35,50,Medio Centro
+pos_001,2.30,21-DE JONG,HOME,Conduce,Exitosa,55,45,Medio Ataque
+pos_001,2.37,21-DE JONG,HOME,Pase,Completo,68,40,Medio Ataque
+pos_001,2.42,10-MESSI,HOME,Tiro,Gol,85,35,Ataque Finalización
+pos_002,15.33,18-ALBA,HOME,Pase,Completo,45,15,Medio Centro
+pos_002,15.40,10-MESSI,HOME,Regate,Exitoso,72,40,Medio Ataque
+pos_002,15.47,10-MESSI,HOME,Pase,Completo,78,38,Medio Ataque
+pos_002,15.50,9-DEPAY,HOME,Tiro,Gol,88,52,Ataque Finalización
+pos_003,23.75,16-PEDRI,HOME,Pase,Incompleto,42,48,Medio Centro
+pos_004,35.83,5-BUSQUETS,HOME,Pase,Completo,30,45,Defensa Centro
+pos_004,35.92,16-PEDRI,HOME,Regate,Exitoso,58,42,Medio Centro
+pos_004,36.00,16-PEDRI,HOME,Pase,Completo,65,40,Medio Ataque
+pos_004,36.05,7-GRIEZMANN,HOME,Centro,Completo,82,28,Banda Lateral
+pos_004,36.08,9-DEPAY,HOME,Tiro,Fuera,95,48,Ataque Finalización
+pos_005,52.25,21-DE JONG,HOME,Pase,Completo,40,52,Medio Centro
+pos_005,52.33,10-MESSI,HOME,Regate,Exitoso,68,45,Medio Ataque
+pos_005,52.42,10-MESSI,HOME,Regate,Exitoso,75,42,Ataque Finalización
+pos_005,52.47,10-MESSI,HOME,Tiro,Gol,83,40,Ataque Finalización
+pos_006,58.17,2-DEST,HOME,Pase,Completo,28,72,Defensa Centro
+pos_006,58.27,21-DE JONG,HOME,Conduce,Exitosa,52,62,Medio Centro
+pos_006,58.37,10-MESSI,HOME,Pase,Completo,70,55,Medio Ataque
+pos_006,58.42,7-GRIEZMANN,HOME,Tiro,Parado,86,65,Ataque Finalización
+pos_007,65.50,18-ALBA,HOME,Centro,Incompleto,82,12,Banda Lateral
+pos_008,68.33,16-PEDRI,HOME,Pase,Completo,35,20,Defensa Centro
+pos_008,68.42,10-MESSI,HOME,Pase,Completo,50,28,Medio Centro
+pos_008,68.50,7-GRIEZMANN,HOME,Tiro,Fuera,80,22,Ataque Finalización
+pos_009,75.17,5-BUSQUETS,HOME,Pase,Completo,42,50,Medio Centro
+pos_009,75.25,16-PEDRI,HOME,Regate,Exitoso,68,52,Medio Ataque
+pos_009,75.33,10-MESSI,HOME,Pase,Completo,78,45,Ataque Finalización
+pos_009,75.38,9-DEPAY,HOME,Tiro,Bloqueado,90,32,Ataque Finalización
+pos_010,82.75,10-MESSI,HOME,Pase,Completo,75,48,Medio Ataque
+pos_010,82.80,9-DEPAY,HOME,Tiro,Poste,88,35,Ataque Finalización
+pos_011,12.20,5-BUSQUETS,HOME,Pase,Completo,38,48,Medio Centro
+pos_011,12.28,16-PEDRI,HOME,Conduce,Exitosa,55,50,Medio Centro
+pos_011,12.35,10-MESSI,HOME,Regate,Exitoso,70,48,Medio Ataque
+pos_011,12.42,10-MESSI,HOME,Pase,Completo,85,55,Ataque Finalización
+pos_011,12.45,2-DEST,HOME,Centro,Incompleto,92,70,Banda Lateral
+pos_012,18.50,3-PIQUE,HOME,Pase,Completo,25,55,Defensa Centro
+pos_012,18.58,21-DE JONG,HOME,Pase,Completo,45,58,Medio Centro
+pos_012,19.05,10-MESSI,HOME,Conduce,Exitosa,62,52,Medio Ataque
+pos_012,19.12,7-GRIEZMANN,HOME,Pase,Completo,78,45,Ataque Finalización
+pos_012,19.16,9-DEPAY,HOME,Tiro,Parado,88,42,Ataque Finalización
+pos_013,25.30,18-ALBA,HOME,Pase,Completo,32,18,Defensa Centro
+pos_013,25.38,5-BUSQUETS,HOME,Pase,Completo,48,25,Medio Centro
+pos_013,25.45,16-PEDRI,HOME,Regate,Exitoso,65,30,Medio Ataque
+pos_013,25.52,16-PEDRI,HOME,Pase,Completo,80,28,Ataque Finalización
+pos_013,25.56,10-MESSI,HOME,Tiro,Parado,92,35,Ataque Finalización
+pos_014,31.10,21-DE JONG,HOME,Pase,Completo,50,60,Medio Centro
+pos_014,31.18,10-MESSI,HOME,Regate,Exitoso,68,58,Medio Ataque
+pos_014,31.25,10-MESSI,HOME,Pase,Incompleto,82,52,Medio Ataque
+pos_015,45.20,5-BUSQUETS,HOME,Pase,Completo,35,50,Medio Centro
+pos_015,45.28,16-PEDRI,HOME,Pase,Completo,55,48,Medio Centro
+pos_015,45.35,21-DE JONG,HOME,Conduce,Exitosa,70,45,Medio Ataque
+pos_015,45.42,7-GRIEZMANN,HOME,Centro,Completo,88,38,Banda Lateral
+pos_015,45.45,9-DEPAY,HOME,Tiro,Fuera,96,50,Ataque Finalización

@@ -1,0 +1,32 @@
+Jornada,Min,Portero,Cat,Accion,Var,Zona,Res,xG
+1,8:36,TER STEGEN,Defensa,Blocaje,Raso,MC,OK,0.35
+1,19:16,TER STEGEN,Defensa,Blocaje,Media Altura,MC,OK,0.28
+1,25:56,TER STEGEN,Defensa,Desvío,Mano cambiada,TR,OK,0.22
+1,28:20,TER STEGEN,Defensa,Blocaje,Raso,MC,OK,0.08
+1,42:37,TER STEGEN,Defensa,Blocaje,Alto,MC,KO,0.48
+1,58:25,TER STEGEN,Defensa,Desvío,Rechace Largo,MR,OK,0.32
+1,60:50,TER STEGEN,Defensa,Blocaje,Raso,MC,OK,0.05
+1,75:23,TER STEGEN,Defensa,Blocaje,Raso,MC,OK,0.40
+1,88:35,TER STEGEN,Defensa,Desvío,Mano cambiada,BL,OK,0.38
+1,15:00,TER STEGEN,Aéreo,Salida,Puños (1 o 2),MC,OK,0.12
+1,32:00,TER STEGEN,Aéreo,Salida,Blocaje Aéreo,MC,OK,0.15
+1,68:00,TER STEGEN,Duelo,1 vs 1,Achique,MC,OK,0.28
+1,10:00,TER STEGEN,Ofensivo,Distribución,S. Puerta: Corto,MC,OK,0
+1,20:00,TER STEGEN,Ofensivo,Distribución,S. Puerta: Largo,MC,OK,0
+1,35:00,TER STEGEN,Ofensivo,Distribución,Pase en Juego,MC,OK,0
+1,50:00,TER STEGEN,Ofensivo,Distribución,Volea,MC,OK,0
+1,72:00,TER STEGEN,Ofensivo,Distribución,Apoyo,MC,OK,0
+1,2:25,COURTOIS,Defensa,Blocaje,Raso,MC,KO,0.42
+1,15:30,COURTOIS,Defensa,Blocaje,Media Altura,MC,KO,0.52
+1,36:05,COURTOIS,Defensa,Desvío,Pie,BR,OK,0.38
+1,45:45,COURTOIS,Defensa,Blocaje,Alto,TC,OK,0.18
+1,52:28,COURTOIS,Defensa,Blocaje,Raso,MC,KO,0.58
+1,68:30,COURTOIS,Defensa,Desvío,Mano natural,TL,OK,0.06
+1,82:48,COURTOIS,Defensa,Desvío,Rechace Corto,MC,OK,0.45
+1,25:00,COURTOIS,Aéreo,Salida,Salida: Alta,MC,OK,0.10
+1,55:00,COURTOIS,Aéreo,Salida,Puños (1 o 2),MC,OK,0.08
+1,38:00,COURTOIS,Duelo,1 vs 1,La Cruz,MC,OK,0.35
+1,12:00,COURTOIS,Ofensivo,Distribución,S. Puerta: Largo,MC,OK,0
+1,28:00,COURTOIS,Ofensivo,Distribución,Volea,MC,OK,0
+1,48:00,COURTOIS,Ofensivo,Distribución,Bote pronto,MC,OK,0
+1,65:00,COURTOIS,Ofensivo,Distribución,Mano (Béisbol),MC,OK,0

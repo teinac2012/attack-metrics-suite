@@ -1,0 +1,17 @@
+Minuto;Segundo;Jugador;Equipo;Resultado;xG;xGOT
+2;25;MESSI;Propio;Gol;0.42;0.78
+8;36;BENZEMA;Rival;Gol;0.35;0.62
+15;30;DEPAY;Propio;Gol;0.52;0.85
+19;16;DEPAY;Propio;Parado;0.28;0.35
+25;56;MESSI;Propio;Parado;0.22;0.38
+28;20;VALVERDE;Rival;Parado;0.08;0.15
+36;5;DEPAY;Propio;Fuera;0.38;0.12
+42;37;BENZEMA;Rival;Gol;0.48;0.82
+45;45;DEPAY;Propio;Fuera;0.18;0.08
+52;28;MESSI;Propio;Gol;0.58;0.92
+58;25;GRIEZMANN;Propio;Parado;0.32;0.45
+60;50;ASENSIO;Rival;Parado;0.05;0.08
+68;30;GRIEZMANN;Propio;Fuera;0.06;0.03
+75;23;DEPAY;Propio;Bloqueado;0.40;0.15
+82;48;DEPAY;Propio;Poste;0.45;0.55
+88;35;VINICIUS;Rival;Parado;0.38;0.52

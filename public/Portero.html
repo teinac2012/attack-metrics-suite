@@ -127,6 +127,8 @@
 </head>
 <body>
 
+<input type="file" id="fileLoader" accept=".json" style="display:none">
+
 <header>
     <div class="header-top">
         <div class="header-controls">
@@ -145,6 +147,7 @@
         <button class="btn-icon btn-red" onclick="app.endMatch()">🏁 FIN</button>
         <div style="width:1px; height:18px; background:#555; margin:0 2px;"></div>
         <button id="btnStats" class="btn-icon" onclick="app.cycleView()" style="background:#3498db; border-color:#2980b9; width:100px;">📊 ESTATS</button>
+        <button class="btn-icon btn-green" onclick="document.getElementById('fileLoader').click()">📂 CARGAR</button>
         <button class="btn-icon" onclick="app.downloadCSV()">💾 CSV</button>
         <button class="btn-icon" onclick="app.resetData()" style="color:#e74c3c">🗑️</button>
     </div>
@@ -300,7 +303,121 @@ const app = {
         cv.addEventListener('mousedown', hnd); cv.addEventListener('touchstart', hnd, {passive:false}); cv.addEventListener('touchmove', hnd, {passive:false});
         
         this.updateViewUI();
-        this.updateStatsUI();
+        this.updateStatsUI();        
+        // Setup file loader
+        document.getElementById('fileLoader').addEventListener('change', (e) => this.loadFromFile(e));
+    },
+
+    loadFromFile: function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target.result);
+                
+                // Detectar si es el formato del archivo de prueba completo
+                if (json.portero) {
+                    // Cargar desde la sección 'portero' del archivo
+                    const porteroData = json.portero;
+                    this.data.gks = porteroData.gks || this.data.gks;
+                    this.data.matches = porteroData.matches || this.data.matches;
+                    this.data.mins = porteroData.mins || this.data.mins;
+                    this.data.actions = porteroData.actions || this.data.actions;
+                    if (porteroData.compare) this.data.compare = porteroData.compare;
+                } else if (json.gks || json.actions) {
+                    // Formato directo de datos de portero
+                    if (json.gks) this.data.gks = json.gks;
+                    if (json.matches) this.data.matches = json.matches;
+                    if (json.mins) this.data.mins = json.mins;
+                    if (json.actions) this.data.actions = json.actions;
+                    if (json.compare) this.data.compare = json.compare;
+                }
+                
+                // Asegurar que haya un portero seleccionado
+                if (this.data.gks.length > 0 && !this.data.gk) {
+                    this.data.gk = this.data.gks[0].id;
+                }
+                
+                // Asegurar que haya un partido seleccionado
+                if (this.data.matches.length > 0 && !this.data.match) {
+                    this.data.match = this.data.matches[0].id;
+                }
+                
+                this.save();
+                this.renderGKSelect();
+                this.renderMatchSelect();
+                this.renderGrid();
+                this.updateTable();
+                this.updateStatsUI();
+                this.updateViewUI();
+                
+                alert('✅ Datos cargados correctamente: ' + this.data.actions.length + ' acciones');
+            } catch (err) {
+                console.error(err);
+                alert('❌ Error al cargar el archivo: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input        
+        // Setup file loader
+        document.getElementById('fileLoader').addEventListener('change', (e) => this.loadFromFile(e));
+    },
+
+    loadFromFile: function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target.result);
+                
+                // Detectar si es el formato del archivo de prueba completo
+                if (json.portero) {
+                    // Cargar desde la sección 'portero' del archivo
+                    const porteroData = json.portero;
+                    this.data.gks = porteroData.gks || this.data.gks;
+                    this.data.matches = porteroData.matches || this.data.matches;
+                    this.data.mins = porteroData.mins || this.data.mins;
+                    this.data.actions = porteroData.actions || this.data.actions;
+                    if (porteroData.compare) this.data.compare = porteroData.compare;
+                } else if (json.gks || json.actions) {
+                    // Formato directo de datos de portero
+                    if (json.gks) this.data.gks = json.gks;
+                    if (json.matches) this.data.matches = json.matches;
+                    if (json.mins) this.data.mins = json.mins;
+                    if (json.actions) this.data.actions = json.actions;
+                    if (json.compare) this.data.compare = json.compare;
+                }
+                
+                // Asegurar que haya un portero seleccionado
+                if (this.data.gks.length > 0 && !this.data.gk) {
+                    this.data.gk = this.data.gks[0].id;
+                }
+                
+                // Asegurar que haya un partido seleccionado
+                if (this.data.matches.length > 0 && !this.data.match) {
+                    this.data.match = this.data.matches[0].id;
+                }
+                
+                this.save();
+                this.renderGKSelect();
+                this.renderMatchSelect();
+                this.renderGrid();
+                this.updateTable();
+                this.updateStatsUI();
+                this.updateViewUI();
+                
+                alert('✅ Datos cargados correctamente: ' + this.data.actions.length + ' acciones');
+            } catch (err) {
+                console.error(err);
+                alert('❌ Error al cargar el archivo: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input
     },
 
     save: function() { localStorage.setItem('gk_v4_data_fix', JSON.stringify(this.data)); },
