@@ -315,81 +315,94 @@ const app = {
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
-                const json = JSON.parse(ev.target.result);
+                const content = ev.target.result;
                 
-                // Detectar si es el formato del archivo de prueba completo
-                if (json.portero) {
-                    // Cargar desde la sección 'portero' del archivo
-                    const porteroData = json.portero;
-                    this.data.gks = porteroData.gks || this.data.gks;
-                    this.data.matches = porteroData.matches || this.data.matches;
-                    this.data.mins = porteroData.mins || this.data.mins;
-                    this.data.actions = porteroData.actions || this.data.actions;
-                    if (porteroData.compare) this.data.compare = porteroData.compare;
-                } else if (json.gks || json.actions) {
-                    // Formato directo de datos de portero
-                    if (json.gks) this.data.gks = json.gks;
-                    if (json.matches) this.data.matches = json.matches;
-                    if (json.mins) this.data.mins = json.mins;
-                    if (json.actions) this.data.actions = json.actions;
-                    if (json.compare) this.data.compare = json.compare;
-                }
-                
-                // Asegurar que haya un portero seleccionado
-                if (this.data.gks.length > 0 && !this.data.gk) {
-                    this.data.gk = this.data.gks[0].id;
-                }
-                
-                // Asegurar que haya un partido seleccionado
-                if (this.data.matches.length > 0 && !this.data.match) {
-                    this.data.match = this.data.matches[0].id;
-                }
-                
-                this.save();
-                this.renderGKSelect();
-                this.renderMatchSelect();
-                this.renderGrid();
-                this.updateTable();
-                this.updateStatsUI();
-                this.updateViewUI();
-                
-                alert('✅ Datos cargados correctamente: ' + this.data.actions.length + ' acciones');
-            } catch (err) {
-                console.error(err);
-                alert('❌ Error al cargar el archivo: ' + err.message);
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = ''; // Reset input        
-        // Setup file loader
-        document.getElementById('fileLoader').addEventListener('change', (e) => this.loadFromFile(e));
-    },
-
-    loadFromFile: function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const json = JSON.parse(ev.target.result);
-                
-                // Detectar si es el formato del archivo de prueba completo
-                if (json.portero) {
-                    // Cargar desde la sección 'portero' del archivo
-                    const porteroData = json.portero;
-                    this.data.gks = porteroData.gks || this.data.gks;
-                    this.data.matches = porteroData.matches || this.data.matches;
-                    this.data.mins = porteroData.mins || this.data.mins;
-                    this.data.actions = porteroData.actions || this.data.actions;
-                    if (porteroData.compare) this.data.compare = porteroData.compare;
-                } else if (json.gks || json.actions) {
-                    // Formato directo de datos de portero
-                    if (json.gks) this.data.gks = json.gks;
-                    if (json.matches) this.data.matches = json.matches;
-                    if (json.mins) this.data.mins = json.mins;
-                    if (json.actions) this.data.actions = json.actions;
-                    if (json.compare) this.data.compare = json.compare;
+                // Detectar si es CSV (comienza con "Jornada,") o JSON
+                if (content.trim().startsWith('Jornada,') || content.trim().startsWith('Jornada;')) {
+                    // Parsear CSV
+                    const lines = content.trim().split('\n');
+                    const headers = lines[0].split(',');
+                    
+                    // Limpiar acciones existentes
+                    this.data.actions = [];
+                    
+                    // Crear sets para porteros y jornadas únicos
+                    const gksSet = new Set();
+                    const matchesSet = new Set();
+                    
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        const parts = line.split(',');
+                        if (parts.length < 9) continue;
+                        
+                        const jornada = parts[0].trim();
+                        const min = parseInt(parts[1]) || 0;
+                        const portero = parts[2].trim();
+                        const cat = parts[3].trim();
+                        const accion = parts[4].trim();
+                        const var_ = parts[5].trim();
+                        const zona = parts[6].trim();
+                        const res = parts[7].trim();
+                        const xg = parseFloat(parts[8]) || 0;
+                        
+                        // Agregar portero y jornada a los sets
+                        gksSet.add(portero);
+                        matchesSet.add(jornada);
+                        
+                        // Crear acción
+                        this.data.actions.push({
+                            id: 'a' + Date.now() + '_' + i,
+                            gk: portero,
+                            match: jornada,
+                            min: min,
+                            cat: cat,
+                            act: accion,
+                            var: var_,
+                            zone: zona,
+                            res: res,
+                            xg: xg
+                        });
+                    }
+                    
+                    // Actualizar porteros si no existen
+                    if (this.data.gks.length === 0) {
+                        this.data.gks = Array.from(gksSet).map(name => ({
+                            id: name,
+                            name: name
+                        }));
+                    }
+                    
+                    // Actualizar jornadas si no existen
+                    if (this.data.matches.length === 0) {
+                        this.data.matches = Array.from(matchesSet).map(jornada => ({
+                            id: jornada,
+                            name: jornada
+                        }));
+                    }
+                    
+                } else {
+                    // Parsear JSON
+                    const json = JSON.parse(content);
+                    
+                    // Detectar si es el formato del archivo de prueba completo
+                    if (json.portero) {
+                        // Cargar desde la sección 'portero' del archivo
+                        const porteroData = json.portero;
+                        this.data.gks = porteroData.gks || this.data.gks;
+                        this.data.matches = porteroData.matches || this.data.matches;
+                        this.data.mins = porteroData.mins || this.data.mins;
+                        this.data.actions = porteroData.actions || this.data.actions;
+                        if (porteroData.compare) this.data.compare = porteroData.compare;
+                    } else if (json.gks || json.actions) {
+                        // Formato directo de datos de portero
+                        if (json.gks) this.data.gks = json.gks;
+                        if (json.matches) this.data.matches = json.matches;
+                        if (json.mins) this.data.mins = json.mins;
+                        if (json.actions) this.data.actions = json.actions;
+                        if (json.compare) this.data.compare = json.compare;
+                    }
                 }
                 
                 // Asegurar que haya un portero seleccionado
