@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attack Scout Pro v5.0</title>
+    <title>Attack Scout Pro</title>
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/app-data-manager.js"></script>
 
     <style>
         /* --- ESTILOS GENERALES (DARK MODE) --- */
@@ -70,28 +69,11 @@
         .view-section.active { display: flex; }
 
         /* PIZZA CHART AREA */
-        .chart-wrapper { 
-            flex: 1; 
-            position: relative; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 500px; 
-            height: 70vh;
-            padding: 40px; 
-        }
-        .chart-wrapper canvas { 
-            max-width: 100% !important; 
-            max-height: 100% !important; 
-            width: auto !important; 
-            height: auto !important; 
-            min-width: 500px !important;
-            min-height: 500px !important;
-        }
+        .chart-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; min-height: 0; padding: 20px; }
         .print-btn { position: absolute; top: 0; right: 0; background: #333; color: #fff; border: 1px solid #555; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 0.8rem; z-index: 10; }
 
-        /* TABLA DE ANALISIS */
-        .analysis-panel { height: 30%; min-height: 200px; background: #1a1a1a; border-top: 1px solid #333; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+        /* TABLA DE ANÁLISIS */
+        .analysis-panel { height: 30%; background: #1a1a1a; border-top: 1px solid #333; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
         .stat-bars { display: flex; flex-direction: column; gap: 8px; }
         .stat-row { display: flex; align-items: center; font-size: 0.8rem; }
         .stat-label { width: 100px; color: #aaa; }
@@ -100,7 +82,7 @@
         .stat-val { width: 40px; text-align: right; font-weight: bold; }
         .stat-pct { width: 60px; text-align: right; color: var(--accent); font-size: 0.75rem; }
 
-        /* IMPRESION */
+        /* IMPRESIÓN */
         @media print {
             @page { size: A4; margin: 10mm; }
             body { background: #fff; color: #000; display: block; height: auto; overflow: visible; }
@@ -148,13 +130,13 @@
         </div>
 
         <div class="control-group">
-            <label>3. FILTROS DE BUSQUEDA</label>
+            <label>3. FILTROS DE BÚSQUEDA</label>
             <select id="filterPos">
                 <option value="">Todas las Posiciones</option>
             </select>
             <div class="filter-row">
-                <input type="number" id="ageMin" placeholder="Edad Min" min="15" max="45">
-                <input type="number" id="ageMax" placeholder="Edad Max" min="15" max="45">
+                <input type="number" id="ageMin" placeholder="Edad Mín" min="15" max="45">
+                <input type="number" id="ageMax" placeholder="Edad Máx" min="15" max="45">
             </div>
         </div>
 
@@ -180,7 +162,7 @@
 
             <div class="report-header">
                 <h1 id="printName">Nombre Jugador</h1>
-                <div id="printInfo">Equipo | Edad | Posicion</div>
+                <div id="printInfo">Equipo | Edad | Posición</div>
             </div>
 
             <div class="chart-wrapper">
@@ -188,7 +170,7 @@
             </div>
 
             <div class="analysis-panel">
-                <label style="color:#fff; margin-bottom:10px; display:block;">📊 ANALISIS DE RENDIMIENTO (Percentiles vs Base de Datos)</label>
+                <label style="color:#fff; margin-bottom:10px; display:block;">📊 ANÁLISIS DE RENDIMIENTO (Percentiles vs Base de Datos)</label>
                 <div id="statsBarsContainer" class="stat-bars"></div>
             </div>
 
@@ -212,13 +194,13 @@
 </div>
 
 <script>
-// --- CONFIGURACION ---
+// --- CONFIGURACIÓN ---
 const METRICS = ['xG', 'xBuild', 'xThreat', 'Creacion', 'Ataque', 'Defensa', 'Pases'];
 const METRIC_LABELS = {
-    'xG': 'Goles Esp.', 'xBuild': 'Construccion', 'xThreat': 'Amenaza (xT)',
-    'Creacion': 'Creacion', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
+    'xG': 'Goles Esp.', 'xBuild': 'Construcción', 'xThreat': 'Amenaza (xT)',
+    'Creacion': 'Creación', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
 };
-// Colores para el Pizza Chart (Uno por metrica)
+// Colores para el Pizza Chart (Uno por métrica)
 const PIZZA_COLORS = [
     'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)', 
     'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(201, 203, 207, 0.6)'
@@ -355,26 +337,26 @@ function populateUI() {
     });
 }
 
-// --- ALGORITMO Y BUSQUEDA ---
+// --- ALGORITMO Y BÚSQUEDA ---
 function findSimilars() {
     const targetId = document.getElementById('targetSelect').value;
     if(!targetId) return;
     
     const target = NORMALIZED_DB.find(p => p.id === targetId);
 
-    // 1. FILTRADO (CATEGORIA 1)
+    // 1. FILTRADO (CATEGORÍA 1)
     const fPos = document.getElementById('filterPos').value;
     const fMin = parseInt(document.getElementById('ageMin').value) || 0;
     const fMax = parseInt(document.getElementById('ageMax').value) || 100;
 
     const pool = NORMALIZED_DB.filter(p => {
-        if(p.id === targetId) return false; // Excluirse a si mismo
+        if(p.id === targetId) return false; // Excluirse a sí mismo
         if(fPos && p.pos !== fPos) return false;
         if(p.age < fMin || p.age > fMax) return false;
         return true;
     });
 
-    // 2. CALCULO DISTANCIA
+    // 2. CÁLCULO DISTANCIA
     const results = pool.map(other => {
         let sumSq = 0, sumW = 0;
         METRICS.forEach(m => {
@@ -405,7 +387,7 @@ function renderResults(list) {
         // Color por similitud
         const c = p.similarity > 90 ? '#00e676' : (p.similarity>80 ? '#f1c40f' : '#e74c3c');
         el.innerHTML = `
-            <div class="pc-info"><b>${p.name}</b><span>${p.team} | ${p.pos} | ${p.age} anos</span></div>
+            <div class="pc-info"><b>${p.name}</b><span>${p.team} | ${p.pos} | ${p.age} años</span></div>
             <div class="pc-score" style="color:${c}">${p.similarity.toFixed(1)}%</div>
         `;
         el.onclick = () => { updateProfile(NORMALIZED_DB.find(x=>x.id === document.getElementById('targetSelect').value), p); };
@@ -413,11 +395,11 @@ function renderResults(list) {
     });
 }
 
-// --- VISUALIZACIONES & ESTADISTICAS ---
+// --- VISUALIZACIONES & ESTADÍSTICAS ---
 
-// Helper: Calcular Percentil (CATEGORIA 2)
+// Helper: Calcular Percentil (CATEGORÍA 2)
 function calculatePercentil(metric, value, dataset) {
-    // Cuantos tienen un valor menor a 'value'
+    // Cuántos tienen un valor menor a 'value'
     const lowerCount = dataset.filter(p => p[metric] < value).length;
     return Math.round((lowerCount / dataset.length) * 100);
 }
@@ -439,8 +421,13 @@ function updateProfile(target, comparison) {
         borderWidth: 2
     }];
     
+    // Si hay comparación, añadimos un borde o dataset (En Pizza chart es mejor ver uno solo o superponer con cuidado)
+    // Para simplificar "Pro V5", mostraremos los datos del TARGET en Pizza, y la comparación en barras abajo.
+    // Opcional: Podríamos poner datasets[1], pero PolarArea se vuelve confuso con 2 series. 
+    // Vamos a dejar el Pizza Chart SOLO del TARGET para limpieza visual.
+    
     chartInstance = new Chart(ctx, {
-        type: 'polarArea', // CATEGORIA 3
+        type: 'polarArea', // CATEGORÍA 3
         data: { labels: METRICS.map(m => METRIC_LABELS[m]), datasets: datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -452,19 +439,19 @@ function updateProfile(target, comparison) {
         }
     });
 
-    // --- BARRAS DE PERCENTILES (CATEGORIA 2) ---
+    // --- BARRAS DE PERCENTILES (CATEGORÍA 2) ---
     const container = document.getElementById('statsBarsContainer');
     container.innerHTML = '';
 
     METRICS.forEach(m => {
         // Usamos RAW_DB para calcular percentiles reales sobre valores absolutos
         const pVal = target.raw[m];
-        const pct = calculatePercentil(m, target[m], NORMALIZED_DB); // Usamos normalized para percentil relativo rapido
+        const pct = calculatePercentil(m, target[m], NORMALIZED_DB); // Usamos normalized para percentil relativo rápido
         
         let compHTML = '';
         if(comparison) {
             const cPct = calculatePercentil(m, comparison[m], NORMALIZED_DB);
-            // Pequeno indicador para el comparado
+            // Pequeño indicador para el comparado
             compHTML = `<div style="position:absolute; top:-2px; left:${cPct}%; width:4px; height:12px; background:#fff; z-index:2; box-shadow:0 0 4px #000;" title="${comparison.name}: ${cPct}"></div>`;
         }
 
