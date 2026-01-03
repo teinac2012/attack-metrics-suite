@@ -7,6 +7,7 @@
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/app-data-manager.js"></script>
 
     <style>
         /* --- ESTILOS GENERALES (DARK MODE) --- */
@@ -208,14 +209,47 @@ const PIZZA_COLORS = [
 
 let RAW_DB = [];
 let NORMALIZED_DB = [];
+// Variables globales de datos
+let RAW_DB = [];
+let NORMALIZED_DB = [];
 let WEIGHTS = {};
 let chartInstance = null;
 let scatterInstance = null;
 let POSITIONS_FOUND = new Set();
+// Estado global para persistencia (capturado por AppDataManager)
+const STATE = {
+    rawDB: [],
+    normalizedDB: [],
+    positions: [],
+    weights: {}
+};
+
+// Función para sincronizar STATE con las variables globales
+function syncState() {
+    STATE.rawDB = RAW_DB;
+    STATE.normalizedDB = NORMALIZED_DB;
+    STATE.positions = Array.from(POSITIONS_FOUND);
+    STATE.weights = WEIGHTS;
+}
+
 
 window.onload = () => { 
     renderSliders(); 
     resetWeights(); 
+        // Restaurar datos desde STATE si el AppDataManager los cargó
+        setTimeout(() => {
+            if (STATE.rawDB && STATE.rawDB.length > 0) {
+                RAW_DB = STATE.rawDB;
+                NORMALIZED_DB = STATE.normalizedDB;
+                POSITIONS_FOUND = new Set(STATE.positions || []);
+                WEIGHTS = STATE.weights || {};
+            
+                populateUI();
+                document.getElementById('targetSelect').disabled = false;
+                document.getElementById('btnSearch').disabled = false;
+                console.log('[AttackScout] Datos restaurados desde STATE:', RAW_DB.length, 'jugadores');
+            }
+        }, 500);
     
     // Restaurar datos guardados si existen
     try {
@@ -260,8 +294,15 @@ function renderSliders() {
 function updateW(m, v) { 
     WEIGHTS[m] = parseFloat((v/100).toFixed(1)); 
     document.getElementById(`val_${m}`).innerText = WEIGHTS[m];
+    syncState();
 }
-function resetWeights() { METRICS.forEach(m => { document.getElementById(`w_${m}`).value=50; updateW(m,50); }); }
+function resetWeights() { 
+    METRICS.forEach(m => { 
+        document.getElementById(`w_${m}`).value=50; 
+        updateW(m,50); 
+    }); 
+    syncState();
+}
 
 // --- LECTURA DE DATOS ---
 async function loadDatabase() {
@@ -316,14 +357,8 @@ async function loadDatabase() {
     normalizeData();
     populateUI();
     
-    // Guardar en localStorage para persistencia
-    try {
-        localStorage.setItem('attackscout_rawdb', JSON.stringify(RAW_DB));
-        localStorage.setItem('attackscout_normalizeddb', JSON.stringify(NORMALIZED_DB));
-        localStorage.setItem('attackscout_positions', JSON.stringify(Array.from(POSITIONS_FOUND)));
-    } catch(e) {
-        console.warn('No se pudo guardar en localStorage:', e);
-    }
+    // Sincronizar con STATE para persistencia automática
+    syncState();
     
     document.getElementById('loader').style.display = 'none';
     document.getElementById('targetSelect').disabled = false;
