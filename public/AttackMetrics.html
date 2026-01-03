@@ -123,6 +123,7 @@
         #videoPanel { display: none; flex-direction: column; background: #111; border-bottom: 1px solid #333; padding: 0; flex-shrink: 0; width: 100%; height: 35%; transition: height 0.3s ease; z-index: 20; }
         .player-container { width: 100%; height: calc(100% - 28px); background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         #myVid { width: 100%; height: 100%; object-fit: contain; }
+        #ytPlayer { width: 100%; height: 100%; display:none; background:#000; }
         .vid-controls { height: 28px; display: flex; gap: 5px; align-items: center; padding: 2px 5px; background: #222; overflow-x: auto; white-space: nowrap; border-top: 1px solid #333; }
         .vid-input { font-size: 0.65rem; color: #fff; background: #333; border: 1px solid #555; padding: 2px; border-radius: 4px; flex: 1; }
         .vid-btn { background: #444; color: #fff; border: 1px solid #555; cursor: pointer; font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; }
@@ -764,6 +765,7 @@
             </div>
             <div class="player-container">
                 <video id="myVid" controls playsinline webkit-playsinline style="width:100%; height:100%; display:none; background:#000; object-fit:contain;"></video>
+                <div id="ytPlayer"></div>
             </div>
             <div class="vid-controls">
                 <span style="font-size:0.65rem; color:#aaa; margin-right:5px;">ARCHIVO:</span>
@@ -928,6 +930,9 @@ const XT_GRID = [
 ];
 const ACTION_COLORS = { 'Pase': '#3498db', 'Conducción': '#00cec9', 'Regate': '#f1c40f', 'Clave': '#9b59b6', 'Asist': '#f39c12', 'Disparo': '#e74c3c', 'Banda': '#95a5a6', 'Corner': '#fd79a8', 'Falta': '#e17055', 'Duelo Aéreo': '#d35400', 'Duelo Suelo': '#d35400', 'Recup': '#1abc9c', 'Perdida': '#e67e22', 'Intercep': '#34495e', 'Defensiva': '#8e44ad', 'Centro': '#e056fd' };
 
+// YouTube player globals
+let ytPlayer = null; let ytReady = false; let ytPoll = null;
+
 // FUNCIONES DE CÁLCULO
 function getMatrixValue(grid, x, y) {
     if (x===undefined || y===undefined || x<0) return 0;
@@ -966,7 +971,9 @@ let DB = {
             offset: 0,
             lastVideoTime: 0,
             fileName: "",
-            url: ""
+            url: "",
+            ytVideoId: "",
+            ytLastTime: 0
         }
     }
 };
@@ -986,6 +993,8 @@ let STATE = {
     videoHeight: 35,
     videoFileName: "",
     videoUrl: "",
+    youtubeVideoId: "",
+    youtubeLastTime: 0,
     resumeFromSavedTime: 0,
     
     // VARIABLES DE SUB-OPCIONES
@@ -1002,11 +1011,11 @@ function ensureStateShape() {
         DB.state = {
             invertSides: false,
             isSecondHalf: false,
-            video: { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "" }
+            video: { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "", ytVideoId: "", ytLastTime: 0 }
         };
     }
     if (!DB.state.video) {
-        DB.state.video = { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "" };
+        DB.state.video = { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "", ytVideoId: "", ytLastTime: 0 };
     }
 }
 
@@ -1021,6 +1030,8 @@ function snapshotState() {
     DB.state.video.lastVideoTime = STATE.lastVideoTime || 0;
     DB.state.video.fileName = STATE.videoFileName || "";
     DB.state.video.url = STATE.videoUrl || "";
+    DB.state.video.ytVideoId = STATE.youtubeVideoId || "";
+    DB.state.video.ytLastTime = STATE.youtubeLastTime || 0;
 }
 
 function persistState() {
@@ -1060,8 +1071,11 @@ function restoreStateFromDB() {
     STATE.lastVideoTime = Number(st.video.lastVideoTime) || 0;
     STATE.videoFileName = st.video.fileName || "";
     STATE.videoUrl = st.video.url || "";
-    if (STATE.videoUrl) STATE.videoMode = 'URL';
-    STATE.resumeFromSavedTime = STATE.lastVideoTime;
+    STATE.youtubeVideoId = st.video.ytVideoId || "";
+    STATE.youtubeLastTime = Number(st.video.ytLastTime) || 0;
+    if (STATE.youtubeVideoId) STATE.videoMode = 'YOUTUBE';
+    else if (STATE.videoUrl) STATE.videoMode = 'URL';
+    STATE.resumeFromSavedTime = STATE.videoMode === 'YOUTUBE' ? STATE.youtubeLastTime : STATE.lastVideoTime;
 
     const offsetLbl = document.getElementById('offsetVal');
     if (offsetLbl) offsetLbl.innerText = STATE.videoOffset.toFixed(1);
@@ -1074,7 +1088,11 @@ function restoreStateFromDB() {
             panel.style.height = STATE.videoHeight + '%';
         }
         const vid = document.getElementById('myVid');
-        if (vid && STATE.videoUrl) {
+        if (STATE.videoMode === 'YOUTUBE' && STATE.youtubeVideoId) {
+            ensureYouTubeAPI();
+            setTimeout(() => createYouTubePlayer(true), 150);
+            vid.style.display = 'none';
+        } else if (vid && STATE.videoUrl) {
             vid.src = STATE.videoUrl;
             vid.style.display = 'block';
             vid.onloadedmetadata = () => {
@@ -1222,6 +1240,9 @@ function restoreBackup(input) {
         const file = input.files[0];
         const reader = new FileReader();
 
+            STATE.videoUrl = "";
+            STATE.youtubeVideoId = "";
+            STATE.youtubeLastTime = 0;
         reader.onload = function(e) {
             try {
                 // Intentamos leer el JSON
@@ -1240,23 +1261,32 @@ function restoreBackup(input) {
                     // Recalculamos el tiempo total asegurando que sean números
                     const h = parseInt(DB.possession.home) || 0;
                     const a = parseInt(DB.possession.away) || 0;
-                    const o = parseInt(DB.possession.out) || 0;
-                    STATE.sec = h + a + o;
-                    
-                    // Guardamos en LocalStorage inmediatamente
-                    saveDB();
-                    
-                    // 4. Actualizamos la interfaz con un pequeño retardo para evitar bloqueos
-                    setTimeout(() => {
-                        try {
-                            setMatchState('STOP'); // Detener crono al cargar
-                            updateTeamLabels();
-                            renderUI();
-                            refreshPlayersFilter();
-                            updateDash();
-                            updateTimerDisplay();
-                            drawPitch();
-                            showToast("✅ Archivo cargado correctamente");
+        const ytId = parseYouTubeId(url);
+        if (ytId) {
+            loadYouTubeVideo(ytId, url);
+            return;
+        }
+
+        STATE.videoMode = 'URL';
+        STATE.videoUrl = url;
+        STATE.videoFileName = url.split('/').pop() || url;
+        STATE.youtubeVideoId = "";
+        STATE.youtubeLastTime = 0;
+        hideYouTubePlayer();
+        vid.src = url;
+        vid.style.display = 'block';
+
+        const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
+        vid.onloadedmetadata = () => {
+            if (resumeAt > 0 && resumeAt <= vid.duration) {
+                vid.currentTime = resumeAt;
+            }
+            STATE.resumeFromSavedTime = 0;
+        };
+        vid.ontimeupdate = () => syncVideoTime(vid.currentTime);
+        showToast("Video por URL cargado");
+        snapshotState(); saveDB();
+        drawPitch();
                         } catch (uiError) {
                             console.error(uiError);
                             alert("El archivo cargó, pero hubo un error visualizando los datos.");
@@ -1312,10 +1342,13 @@ function closeVideoMode() {
     document.getElementById('vidFile').value = ""; 
     const urlInput = document.getElementById('vidUrl');
     if (urlInput) urlInput.value = "";
+    destroyYouTubePlayer();
 
     STATE.videoMode = 'NONE';
     STATE.videoFileName = "";
     STATE.videoUrl = "";
+    STATE.youtubeVideoId = "";
+    STATE.youtubeLastTime = 0;
     STATE.lastVideoTime = 0;
     STATE.resumeFromSavedTime = 0;
     STATE.matchState = 'STOP'; 
@@ -1346,6 +1379,9 @@ function loadLocalVideo(input) {
         STATE.videoMode = 'LOCAL';
         STATE.videoFileName = input.files[0].name || "";
         STATE.videoUrl = "";
+        STATE.youtubeVideoId = "";
+        STATE.youtubeLastTime = 0;
+        hideYouTubePlayer();
         const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
         const url = URL.createObjectURL(input.files[0]);
         const vid = document.getElementById('myVid');
@@ -1372,9 +1408,18 @@ function loadVideoUrl() {
     if(!url) { showToast("Introduce una URL de video"); return; }
 
     const vid = document.getElementById('myVid');
+    const ytId = parseYouTubeId(url);
+    if (ytId) {
+        loadYouTubeVideo(ytId, url);
+        return;
+    }
+
     STATE.videoMode = 'URL';
     STATE.videoUrl = url;
     STATE.videoFileName = url.split('/').pop() || url;
+    STATE.youtubeVideoId = "";
+    STATE.youtubeLastTime = 0;
+    hideYouTubePlayer();
     vid.src = url;
     vid.style.display = 'block';
 
@@ -1389,6 +1434,129 @@ function loadVideoUrl() {
     showToast("Video por URL cargado");
     snapshotState(); saveDB();
     drawPitch();
+}
+
+// --- YOUTUBE SUPPORT ---
+function parseYouTubeId(url) {
+    if (!url) return null;
+    try {
+        const u = new URL(url);
+        if (u.hostname.includes('youtu.be')) return u.pathname.replace('/', '').split('?')[0];
+        if (u.hostname.includes('youtube.com')) {
+            if (u.searchParams.get('v')) return u.searchParams.get('v');
+            if (u.pathname.startsWith('/embed/')) return u.pathname.replace('/embed/', '').split('/')[0];
+        }
+    } catch (e) { return null; }
+    return null;
+}
+
+function ensureYouTubeAPI() {
+    if (window.YT && YT.Player) { ytReady = true; if(typeof onYouTubeIframeAPIReady === 'function') onYouTubeIframeAPIReady(); return; }
+    if (document.getElementById('yt-iframe-api')) return;
+    const tag = document.createElement('script');
+    tag.id = 'yt-iframe-api';
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+}
+
+window.onYouTubeIframeAPIReady = function() {
+    ytReady = true;
+    if (STATE.videoMode === 'YOUTUBE' && STATE.youtubeVideoId) {
+        createYouTubePlayer(true);
+    }
+};
+
+function loadYouTubeVideo(videoId, originalUrl) {
+    const vid = document.getElementById('myVid');
+    if (vid) { vid.pause(); vid.src = ''; vid.style.display = 'none'; }
+    const ytDiv = document.getElementById('ytPlayer');
+    if (ytDiv) ytDiv.style.display = 'block';
+
+    STATE.videoMode = 'YOUTUBE';
+    STATE.youtubeVideoId = videoId;
+    STATE.videoUrl = originalUrl || `https://youtu.be/${videoId}`;
+    STATE.videoFileName = STATE.videoUrl;
+    STATE.resumeFromSavedTime = STATE.youtubeLastTime || 0;
+
+    ensureYouTubeAPI();
+    if (ytReady) createYouTubePlayer(false);
+
+    showToast("YouTube listo");
+    snapshotState(); saveDB();
+    drawPitch();
+}
+
+function createYouTubePlayer(fromRestore) {
+    const container = document.getElementById('ytPlayer');
+    if (!container || !STATE.youtubeVideoId) return;
+
+    const startAt = Math.floor(STATE.resumeFromSavedTime || STATE.youtubeLastTime || 0);
+
+    if (ytPlayer) {
+        ytPlayer.loadVideoById({ videoId: STATE.youtubeVideoId, startSeconds: startAt });
+        ytPlayer.pauseVideo();
+        startYouTubePoll();
+        return;
+    }
+
+    ytPlayer = new YT.Player('ytPlayer', {
+        width: '100%', height: '100%',
+        videoId: STATE.youtubeVideoId,
+        playerVars: {
+            origin: window.location.origin,
+            rel: 0,
+            modestbranding: 1,
+            controls: 1,
+            playsinline: 1,
+            start: startAt
+        },
+        events: {
+            onReady: (e) => {
+                try { if (startAt > 0) e.target.seekTo(startAt, true); e.target.pauseVideo(); } catch (err) {}
+                startYouTubePoll();
+            },
+            onStateChange: onYouTubeStateChange
+        }
+    });
+}
+
+function onYouTubeStateChange(event) {
+    if (!window.YT) return;
+    if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+        persistYouTubeTime();
+    }
+}
+
+function startYouTubePoll() {
+    if (ytPoll) clearInterval(ytPoll);
+    ytPoll = setInterval(() => {
+        if (ytPlayer && ytPlayer.getCurrentTime) {
+            const t = ytPlayer.getCurrentTime();
+            STATE.youtubeLastTime = t || 0;
+            snapshotState();
+            if (Math.floor(t) % 5 === 0) saveDB();
+        }
+    }, 2000);
+}
+
+function persistYouTubeTime() {
+    if (ytPlayer && ytPlayer.getCurrentTime) {
+        STATE.youtubeLastTime = ytPlayer.getCurrentTime();
+        snapshotState();
+        saveDB();
+    }
+}
+
+function hideYouTubePlayer() {
+    const y = document.getElementById('ytPlayer');
+    if (y) y.style.display = 'none';
+}
+
+function destroyYouTubePlayer() {
+    if (ytPoll) { clearInterval(ytPoll); ytPoll = null; }
+    if (ytPlayer && ytPlayer.destroy) ytPlayer.destroy();
+    ytPlayer = null;
+    hideYouTubePlayer();
 }
 
 function adjustOffset(val) {
@@ -1494,6 +1662,8 @@ function hardReset() {
         STATE.resumeFromSavedTime = 0;
         STATE.videoFileName = "";
         STATE.videoUrl = "";
+        STATE.youtubeVideoId = "";
+        STATE.youtubeLastTime = 0;
         applyHalfButton({ silent: true });
         const panel = document.getElementById('videoPanel');
         if(panel) panel.style.display = 'none';
@@ -1501,6 +1671,7 @@ function hardReset() {
         if(offsetLbl) offsetLbl.innerText = '0.0';
         const urlInput = document.getElementById('vidUrl');
         if(urlInput) urlInput.value = "";
+        destroyYouTubePlayer();
         setMatchState('STOP');
         updateTimerDisplay();
         updateDash();
