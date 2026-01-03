@@ -952,7 +952,19 @@ let DB = {
     rosters: { HOME: [], AWAY: [] },
     config: { homeName: "LOCAL", awayName: "RIVAL" },
     possession: { home: 0, away: 0, out: 0 }, 
-    lastClick: {x:50, y:50}
+    lastClick: {x:50, y:50},
+    // Estado persistente entre sesiones/pestañas
+    state: {
+        invertSides: false,
+        isSecondHalf: false,
+        video: {
+            isOpen: false,
+            height: 35,
+            offset: 0,
+            lastVideoTime: 0,
+            fileName: ""
+        }
+    }
 };
 
 // --- AQUÍ ESTABA EL ERROR: AHORA ES 'let' Y TIENE LAS NUEVAS VARIABLES ---
@@ -967,6 +979,9 @@ let STATE = {
     videoMode: 'NONE', 
     lastVideoTime: 0,
     isSecondHalf: false, // false = 1er tiempo, true = 2do tiempo
+    videoHeight: 35,
+    videoFileName: "",
+    resumeFromSavedTime: 0,
     
     // VARIABLES DE SUB-OPCIONES
     subBody: null,
@@ -976,6 +991,89 @@ let STATE = {
     // --- NUEVA VARIABLE ---
     invertSides: false // false = Local empieza a la Izq, true = Local empieza a la Der
 };
+
+function ensureStateShape() {
+    if (!DB.state) {
+        DB.state = {
+            invertSides: false,
+            isSecondHalf: false,
+            video: { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "" }
+        };
+    }
+    if (!DB.state.video) {
+        DB.state.video = { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "" };
+    }
+}
+
+function snapshotState() {
+    ensureStateShape();
+    const videoPanel = document.getElementById('videoPanel');
+    DB.state.invertSides = STATE.invertSides;
+    DB.state.isSecondHalf = STATE.isSecondHalf;
+    DB.state.video.isOpen = !!(videoPanel && videoPanel.style.display === 'flex');
+    DB.state.video.height = STATE.videoHeight || 35;
+    DB.state.video.offset = STATE.videoOffset || 0;
+    DB.state.video.lastVideoTime = STATE.lastVideoTime || 0;
+    DB.state.video.fileName = STATE.videoFileName || "";
+}
+
+function persistState() {
+    snapshotState();
+    saveDB();
+}
+
+function applyHalfButton(opts={ silent: false }) {
+    const btn = document.getElementById('btnHalf');
+    if (!btn) return;
+    if (STATE.isSecondHalf) {
+        btn.innerText = "2T";
+        btn.style.background = "#e67e22";
+        btn.style.color = "#000";
+        if (!opts.silent) showToast("🔄 2º Tiempo: Campo Invertido");
+    } else {
+        btn.innerText = "1T";
+        btn.style.background = "#222";
+        btn.style.color = "#fff";
+        if (!opts.silent) showToast("1º Tiempo: Campo Normal");
+    }
+}
+
+function formatTimeLabel(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+}
+
+function restoreStateFromDB() {
+    ensureStateShape();
+    const st = DB.state;
+    STATE.invertSides = !!st.invertSides;
+    STATE.isSecondHalf = !!st.isSecondHalf;
+    STATE.videoHeight = Number(st.video.height) || 35;
+    STATE.videoOffset = Number(st.video.offset) || 0;
+    STATE.lastVideoTime = Number(st.video.lastVideoTime) || 0;
+    STATE.videoFileName = st.video.fileName || "";
+    STATE.resumeFromSavedTime = STATE.lastVideoTime;
+
+    const offsetLbl = document.getElementById('offsetVal');
+    if (offsetLbl) offsetLbl.innerText = STATE.videoOffset.toFixed(1);
+
+    // Restaurar panel de video (sin intentar cargar el archivo local)
+    if (st.video.isOpen) {
+        const panel = document.getElementById('videoPanel');
+        if (panel) {
+            panel.style.display = 'flex';
+            panel.style.height = STATE.videoHeight + '%';
+        }
+    }
+
+    applyHalfButton({ silent: true });
+
+    // Aviso suave para reanudar video manualmente
+    if (STATE.videoFileName) {
+        showToast(`Reabre "${STATE.videoFileName}" y reanuda en ${formatTimeLabel(STATE.lastVideoTime)}`);
+    }
+}
 
 function setSubOption(category, val, btn) {
     if (category === 'body') {
@@ -1007,6 +1105,7 @@ window.addEventListener("drop", function(e){e=e||event;e.preventDefault();},fals
 window.onload = () => {
     if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
     STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
+    restoreStateFromDB();
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
 };
 
@@ -1165,14 +1264,17 @@ function toggleVideoPanel() {
         closeVideoMode();
     } else {
         p.style.display = 'flex';
-        resizeVideo(35); // Default size
+        resizeVideo(STATE.videoHeight || 35);
     }
+    snapshotState(); saveDB();
     setTimeout(drawPitch, 100); 
 }
 
 function resizeVideo(percent) {
     const p = document.getElementById('videoPanel');
     p.style.height = percent + '%';
+    STATE.videoHeight = percent;
+    snapshotState(); saveDB();
     setTimeout(drawPitch, 100);
 }
 
@@ -1185,8 +1287,12 @@ function closeVideoMode() {
     document.getElementById('vidFile').value = ""; 
 
     STATE.videoMode = 'NONE';
+    STATE.videoFileName = "";
+    STATE.lastVideoTime = 0;
+    STATE.resumeFromSavedTime = 0;
     STATE.matchState = 'STOP'; 
     setMatchState('STOP'); 
+    snapshotState(); saveDB();
     
     showToast("Modo Video Cerrado. Cronómetro manual activo.");
     setTimeout(drawPitch, 100);
@@ -1195,19 +1301,8 @@ function closeVideoMode() {
 // --- FUNCIÓN BOTÓN 1T/2T ---
 function toggleHalf() {
     STATE.isSecondHalf = !STATE.isSecondHalf;
-    const btn = document.getElementById('btnHalf');
-    
-    if(STATE.isSecondHalf) {
-        btn.innerText = "2T";
-        btn.style.background = "#e67e22"; // Naranja
-        btn.style.color = "#000";
-        showToast("🔄 2º Tiempo: Campo Invertido");
-    } else {
-        btn.innerText = "1T";
-        btn.style.background = "#222"; // Negro
-        btn.style.color = "#fff";
-        showToast("1º Tiempo: Campo Normal");
-    }
+    applyHalfButton({ silent: false });
+    persistState();
     drawPitch(); 
 }
 
@@ -1221,14 +1316,22 @@ function getPos(e) {
 function loadLocalVideo(input) {
     if(input.files && input.files[0]) {
         STATE.videoMode = 'LOCAL';
-        STATE.lastVideoTime = 0; 
+        STATE.videoFileName = input.files[0].name || "";
+        const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
         const url = URL.createObjectURL(input.files[0]);
         const vid = document.getElementById('myVid');
         vid.src = url;
         vid.style.display = 'block';
         
+        vid.onloadedmetadata = () => {
+            if (resumeAt > 0 && resumeAt <= vid.duration) {
+                vid.currentTime = resumeAt;
+            }
+            STATE.resumeFromSavedTime = 0;
+        };
         vid.ontimeupdate = () => syncVideoTime(vid.currentTime);
         showToast("Video Local Cargado");
+        snapshotState(); saveDB();
         drawPitch(); 
     }
 }
@@ -1237,6 +1340,7 @@ function adjustOffset(val) {
     STATE.videoOffset += val;
     document.getElementById('offsetVal').innerText = STATE.videoOffset.toFixed(1);
     syncVideoTime(document.getElementById('myVid').currentTime);
+    persistState();
 }
 
 function syncVideoTime(currTime) {
@@ -1252,6 +1356,7 @@ function syncVideoTime(currTime) {
         }
     }
     STATE.lastVideoTime = currTime;
+    snapshotState();
     
     STATE.sec = Math.floor(gameTime);
     updateTimerDisplay();
@@ -1326,11 +1431,23 @@ function hardReset() {
         DB.actions = [];
         DB.possession = { home: 0, away: 0, out: 0 };
         STATE.sec = 0;
+        STATE.invertSides = false;
+        STATE.isSecondHalf = false;
+        STATE.videoOffset = 0;
+        STATE.videoHeight = 35;
+        STATE.lastVideoTime = 0;
+        STATE.resumeFromSavedTime = 0;
+        STATE.videoFileName = "";
+        applyHalfButton({ silent: true });
+        const panel = document.getElementById('videoPanel');
+        if(panel) panel.style.display = 'none';
+        const offsetLbl = document.getElementById('offsetVal');
+        if(offsetLbl) offsetLbl.innerText = '0.0';
         setMatchState('STOP');
         updateTimerDisplay();
         updateDash();
         drawPitch();
-        saveDB();
+        persistState();
         showToast("Partido Reiniciado");
     }
 }
@@ -1708,6 +1825,7 @@ function toggleSides() {
         ? "🔄 INVERTIDO: Local empieza a la DERECHA" 
         : "🔄 NORMAL: Local empieza a la IZQUIERDA";
     showToast(msg);
+    persistState();
 }
 
 function getXtValue(x, y) {
@@ -2698,6 +2816,80 @@ function drawAvgPos() {
         }
     });
 
+    // ============================================================
+    // --- NUEVO BLOQUE: COMPACIDAD DEL EQUIPO (SOMBREADO) ---
+    // ============================================================
+    
+    // 1. Obtener lista limpia de posiciones para el cálculo
+    let posForBlock = [];
+    Object.keys(players).forEach(pName => {
+        const p = players[pName];
+        if (p.count > 0) {
+            // Guardamos la posición X en porcentaje (0-100)
+            posForBlock.push({ x: p.x / p.count, name: pName });
+        }
+    });
+
+    // 2. Ordenar jugadores por posición en el campo (Eje X)
+    posForBlock.sort((a, b) => a.x - b.x);
+
+    let defLineX = 0, attLineX = 0;
+    
+    // Solo calculamos si hay suficientes jugadores (mínimo 3)
+    if (posForBlock.length > 2) {
+        if (currentAvgTeam === 'HOME') {
+            // LOCAL (Ataca de Izq -> Der): Ignoramos al primero (portero)
+            defLineX = posForBlock[1].x; 
+            // Línea de Ataque: El último jugador
+            attLineX = posForBlock[posForBlock.length - 1].x;
+        } else {
+            // RIVAL (Ataca de Der -> Izq): Ignoramos al último (portero)
+            defLineX = posForBlock[posForBlock.length - 2].x;
+            // Línea de Ataque: El primer jugador (el más a la izquierda)
+            attLineX = posForBlock[0].x;
+        }
+    }
+
+    // 3. Dibujar el Bloque
+    if (Math.abs(attLineX - defLineX) > 0) {
+        // Convertimos porcentaje a pixeles de pantalla
+        const screenDefX = (defLineX / 100) * w;
+        const screenAttX = (attLineX / 100) * w;
+        
+        // Calcular inicio y ancho del rectángulo
+        const xStart = Math.min(screenDefX, screenAttX);
+        const widthBlock = Math.abs(screenAttX - screenDefX);
+
+        ctx.save();
+        // Color: Azul transparente para Local, Rojo para Rival
+        ctx.fillStyle = currentAvgTeam === 'HOME' ? "rgba(52, 152, 219, 0.15)" : "rgba(231, 76, 60, 0.15)";
+        
+        // Dibujamos el rectángulo respetando los márgenes verticales (mY)
+        ctx.fillRect(xStart, mY, widthBlock, h - (mY * 2)); 
+
+        // Líneas punteadas verticales
+        ctx.strokeStyle = currentAvgTeam === 'HOME' ? "rgba(52, 152, 219, 0.5)" : "rgba(231, 76, 60, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        
+        // Línea Defensiva
+        ctx.beginPath(); ctx.moveTo(screenDefX, mY); ctx.lineTo(screenDefX, h - mY); ctx.stroke();
+        // Línea de Ataque
+        ctx.beginPath(); ctx.moveTo(screenAttX, mY); ctx.lineTo(screenAttX, h - mY); ctx.stroke();
+
+        // Texto con los metros
+        const meters = Math.abs((attLineX - defLineX) * 1.05).toFixed(1); 
+        ctx.fillStyle = "#fff"; 
+        ctx.font = "bold 11px monospace"; 
+        ctx.textAlign = "center";
+        
+        // Etiqueta de metros en la parte inferior del bloque
+        ctx.fillText(`↔ ${meters}m`, xStart + widthBlock/2, h - mY - 10);
+        
+        ctx.restore();
+    }
+    // ============================================================
+
     // Calcular matriz de pases
     passMatrix = {}; 
     for(let i=0; i < teamActs.length - 1; i++) {
@@ -2765,7 +2957,6 @@ function drawAvgPos() {
                 ctx.beginPath(); ctx.moveTo(fromPos.x, fromPos.y); ctx.lineTo(endX, endY); ctx.stroke();
 
                 // --- CABEZA DE FLECHA MÁS GRANDE ---
-                // Se ha aumentado la base de 6 a 14 para mayor visibilidad
                 const headLen = 14 + (width * 1.0); 
                 
                 ctx.beginPath();
@@ -3244,15 +3435,9 @@ function drawFlowViz(index) {
     ctx.beginPath(); ctx.arc(xPenLeft, yCenter, 2, 0, Math.PI*2); ctx.fill();
 
     // Arco del Área (Medialuna) Izquierda
-    // Radio de 9.15 metros desde el punto de penalti
-    const arcRadius = fieldW * 0.0763; // 9.15/120 aprox
-    // Calculamos el ángulo: el arco debe quedar fuera del área grande hacia la derecha
-    // La distancia horizontal desde el punto de penalti hasta el borde del área es boxW - penSpotDist
-    const distToBox = boxW - penSpotDist;
-    const alphaLeft = Math.acos(distToBox / arcRadius);
+    // Dibujamos un arco desde el punto de penalti, pero solo la parte fuera del área
     ctx.beginPath();
-    // Arco hacia la derecha (0°), desde -alpha hasta +alpha
-    ctx.arc(xPenLeft, yCenter, arcRadius, -alphaLeft, alphaLeft);
+    ctx.arc(xPenLeft, yCenter, centerRad, -0.92, 0.92); // Ángulos ajustados para "D"
     ctx.stroke();
 
 
@@ -3272,10 +3457,8 @@ function drawFlowViz(index) {
     ctx.beginPath(); ctx.arc(xPenRight, yCenter, 2, 0, Math.PI*2); ctx.fill();
 
     // Arco del Área (Medialuna) Derecha
-    const alphaRight = Math.acos(distToBox / arcRadius);
     ctx.beginPath();
-    // Arco hacia la izquierda (180°), desde PI-alpha hasta PI+alpha
-    ctx.arc(xPenRight, yCenter, arcRadius, Math.PI - alphaRight, Math.PI + alphaRight);
+    ctx.arc(xPenRight, yCenter, centerRad, Math.PI - 0.92, Math.PI + 0.92);
     ctx.stroke();
 
 
