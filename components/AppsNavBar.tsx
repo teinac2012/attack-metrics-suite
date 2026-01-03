@@ -38,6 +38,13 @@ const apps: App[] = [
     href: "/apps/app4",
     icon: "🧤",
     description: "Análisis especializado de porteros"
+  },
+  {
+    id: 5,
+    name: "Attack Scout",
+    href: "/apps/app5",
+    icon: "🍕",
+    description: "Comparativa de perfiles y percentiles"
   }
 ];
 

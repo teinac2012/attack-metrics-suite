@@ -11,6 +11,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="/app-data-manager.js"></script>
 
     <style>
         :root {
@@ -1240,9 +1241,6 @@ function restoreBackup(input) {
         const file = input.files[0];
         const reader = new FileReader();
 
-            STATE.videoUrl = "";
-            STATE.youtubeVideoId = "";
-            STATE.youtubeLastTime = 0;
         reader.onload = function(e) {
             try {
                 // Intentamos leer el JSON
@@ -1261,32 +1259,29 @@ function restoreBackup(input) {
                     // Recalculamos el tiempo total asegurando que sean números
                     const h = parseInt(DB.possession.home) || 0;
                     const a = parseInt(DB.possession.away) || 0;
-        const ytId = parseYouTubeId(url);
-        if (ytId) {
-            loadYouTubeVideo(ytId, url);
-            return;
-        }
+                    const o = parseInt(DB.possession.out) || 0;
+                    totalPossessionTime = h + a + o;
 
-        STATE.videoMode = 'URL';
-        STATE.videoUrl = url;
-        STATE.videoFileName = url.split('/').pop() || url;
-        STATE.youtubeVideoId = "";
-        STATE.youtubeLastTime = 0;
-        hideYouTubePlayer();
-        vid.src = url;
-        vid.style.display = 'block';
+                    // 4. Restauramos UI en un timeout para dar tiempo a que el DOM esté listo
+                    setTimeout(function() {
+                        try {
+                            redrawRosters();
+                            filterAndDrawField();
+                            updatePossessionBar();
+                            
+                            // Actualizar nombres de equipos en UI
+                            const nameLocal = document.getElementById('nombreLocal');
+                            const nameVisit = document.getElementById('nombreVisitante');
+                            if(nameLocal) nameLocal.textContent = DB.config.homeName;
+                            if(nameVisit) nameVisit.textContent = DB.config.awayName;
 
-        const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
-        vid.onloadedmetadata = () => {
-            if (resumeAt > 0 && resumeAt <= vid.duration) {
-                vid.currentTime = resumeAt;
-            }
-            STATE.resumeFromSavedTime = 0;
-        };
-        vid.ontimeupdate = () => syncVideoTime(vid.currentTime);
-        showToast("Video por URL cargado");
-        snapshotState(); saveDB();
-        drawPitch();
+                            // Si había un archivo de video guardado y state persistido, considerar restaurar
+                            if(loadedDB.state && loadedDB.state.videoMode && loadedDB.state.videoMode !== 'NONE') {
+                                // Aquí podríamos intentar restaurar el video, pero por ahora solo cargamos los datos
+                                console.log("Backup contenía referencia a video:", loadedDB.state.videoFileName);
+                            }
+
+                            alert("✅ Archivo restaurado exitosamente");
                         } catch (uiError) {
                             console.error(uiError);
                             alert("El archivo cargó, pero hubo un error visualizando los datos.");
