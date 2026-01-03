@@ -769,6 +769,9 @@
                 <span style="font-size:0.65rem; color:#aaa; margin-right:5px;">ARCHIVO:</span>
                 <input type="file" id="vidFile" accept="video/*" class="vid-input" onchange="loadLocalVideo(this)">
                 <span style="color:#666; margin:0 5px;">|</span>
+                <input type="text" id="vidUrl" class="vid-input" placeholder="https://...mp4" style="max-width:220px;" value="">
+                <button class="vid-btn" onclick="loadVideoUrl()">URL ▶</button>
+                <span style="color:#666; margin:0 5px;">|</span>
                 <span style="font-size:0.65rem; color:#aaa;">Offset:</span>
                 <button class="vid-btn" onclick="adjustOffset(-1)">-1s</button>
                 <button class="vid-btn" onclick="adjustOffset(-0.5)">-0.5</button>
@@ -962,7 +965,8 @@ let DB = {
             height: 35,
             offset: 0,
             lastVideoTime: 0,
-            fileName: ""
+            fileName: "",
+            url: ""
         }
     }
 };
@@ -981,6 +985,7 @@ let STATE = {
     isSecondHalf: false, // false = 1er tiempo, true = 2do tiempo
     videoHeight: 35,
     videoFileName: "",
+    videoUrl: "",
     resumeFromSavedTime: 0,
     
     // VARIABLES DE SUB-OPCIONES
@@ -997,11 +1002,11 @@ function ensureStateShape() {
         DB.state = {
             invertSides: false,
             isSecondHalf: false,
-            video: { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "" }
+            video: { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "" }
         };
     }
     if (!DB.state.video) {
-        DB.state.video = { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "" };
+        DB.state.video = { isOpen: false, height: 35, offset: 0, lastVideoTime: 0, fileName: "", url: "" };
     }
 }
 
@@ -1015,6 +1020,7 @@ function snapshotState() {
     DB.state.video.offset = STATE.videoOffset || 0;
     DB.state.video.lastVideoTime = STATE.lastVideoTime || 0;
     DB.state.video.fileName = STATE.videoFileName || "";
+    DB.state.video.url = STATE.videoUrl || "";
 }
 
 function persistState() {
@@ -1053,6 +1059,8 @@ function restoreStateFromDB() {
     STATE.videoOffset = Number(st.video.offset) || 0;
     STATE.lastVideoTime = Number(st.video.lastVideoTime) || 0;
     STATE.videoFileName = st.video.fileName || "";
+    STATE.videoUrl = st.video.url || "";
+    if (STATE.videoUrl) STATE.videoMode = 'URL';
     STATE.resumeFromSavedTime = STATE.lastVideoTime;
 
     const offsetLbl = document.getElementById('offsetVal');
@@ -1065,6 +1073,23 @@ function restoreStateFromDB() {
             panel.style.display = 'flex';
             panel.style.height = STATE.videoHeight + '%';
         }
+        const vid = document.getElementById('myVid');
+        if (vid && STATE.videoUrl) {
+            vid.src = STATE.videoUrl;
+            vid.style.display = 'block';
+            vid.onloadedmetadata = () => {
+                const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
+                if (resumeAt > 0 && resumeAt <= vid.duration) {
+                    vid.currentTime = resumeAt;
+                }
+                STATE.resumeFromSavedTime = 0;
+            };
+        }
+    }
+
+    const urlInput = document.getElementById('vidUrl');
+    if (urlInput && STATE.videoUrl) {
+        urlInput.value = STATE.videoUrl;
     }
 
     applyHalfButton({ silent: true });
@@ -1285,9 +1310,12 @@ function closeVideoMode() {
     vid.style.display = 'none';
     vid.src = "";
     document.getElementById('vidFile').value = ""; 
+    const urlInput = document.getElementById('vidUrl');
+    if (urlInput) urlInput.value = "";
 
     STATE.videoMode = 'NONE';
     STATE.videoFileName = "";
+    STATE.videoUrl = "";
     STATE.lastVideoTime = 0;
     STATE.resumeFromSavedTime = 0;
     STATE.matchState = 'STOP'; 
@@ -1317,6 +1345,7 @@ function loadLocalVideo(input) {
     if(input.files && input.files[0]) {
         STATE.videoMode = 'LOCAL';
         STATE.videoFileName = input.files[0].name || "";
+        STATE.videoUrl = "";
         const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
         const url = URL.createObjectURL(input.files[0]);
         const vid = document.getElementById('myVid');
@@ -1334,6 +1363,32 @@ function loadLocalVideo(input) {
         snapshotState(); saveDB();
         drawPitch(); 
     }
+}
+
+function loadVideoUrl() {
+    const input = document.getElementById('vidUrl');
+    if(!input) return;
+    const url = (input.value || '').trim();
+    if(!url) { showToast("Introduce una URL de video"); return; }
+
+    const vid = document.getElementById('myVid');
+    STATE.videoMode = 'URL';
+    STATE.videoUrl = url;
+    STATE.videoFileName = url.split('/').pop() || url;
+    vid.src = url;
+    vid.style.display = 'block';
+
+    const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
+    vid.onloadedmetadata = () => {
+        if (resumeAt > 0 && resumeAt <= vid.duration) {
+            vid.currentTime = resumeAt;
+        }
+        STATE.resumeFromSavedTime = 0;
+    };
+    vid.ontimeupdate = () => syncVideoTime(vid.currentTime);
+    showToast("Video por URL cargado");
+    snapshotState(); saveDB();
+    drawPitch();
 }
 
 function adjustOffset(val) {
@@ -1438,11 +1493,14 @@ function hardReset() {
         STATE.lastVideoTime = 0;
         STATE.resumeFromSavedTime = 0;
         STATE.videoFileName = "";
+        STATE.videoUrl = "";
         applyHalfButton({ silent: true });
         const panel = document.getElementById('videoPanel');
         if(panel) panel.style.display = 'none';
         const offsetLbl = document.getElementById('offsetVal');
         if(offsetLbl) offsetLbl.innerText = '0.0';
+        const urlInput = document.getElementById('vidUrl');
+        if(urlInput) urlInput.value = "";
         setMatchState('STOP');
         updateTimerDisplay();
         updateDash();
