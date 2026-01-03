@@ -1076,12 +1076,22 @@ function restoreStateFromDB() {
     STATE.youtubeLastTime = Number(st.video.ytLastTime) || 0;
     if (STATE.youtubeVideoId) STATE.videoMode = 'YOUTUBE';
     else if (STATE.videoUrl) STATE.videoMode = 'URL';
+    else STATE.videoMode = 'NONE';
     STATE.resumeFromSavedTime = STATE.videoMode === 'YOUTUBE' ? STATE.youtubeLastTime : STATE.lastVideoTime;
 
     const offsetLbl = document.getElementById('offsetVal');
     if (offsetLbl) offsetLbl.innerText = STATE.videoOffset.toFixed(1);
 
-    // Restaurar panel de video (sin intentar cargar el archivo local)
+    // Restaurar URL input field SIEMPRE si hay URL guardada
+    setTimeout(() => {
+        const urlInput = document.getElementById('vidUrl');
+        if (urlInput && STATE.videoUrl) {
+            urlInput.value = STATE.videoUrl;
+            console.log('[Restore] URL input populated:', STATE.videoUrl);
+        }
+    }, 100);
+
+    // Restaurar panel de video si estaba abierto
     if (st.video.isOpen) {
         const panel = document.getElementById('videoPanel');
         if (panel) {
@@ -1090,12 +1100,20 @@ function restoreStateFromDB() {
         }
         const vid = document.getElementById('myVid');
         if (STATE.videoMode === 'YOUTUBE' && STATE.youtubeVideoId) {
+            console.log('[Restore] Loading YouTube video:', STATE.youtubeVideoId);
+            hideYouTubePlayer();
             ensureYouTubeAPI();
-            setTimeout(() => createYouTubePlayer(true), 150);
-            vid.style.display = 'none';
+            setTimeout(() => {
+                const ytDiv = document.getElementById('ytPlayer');
+                if (ytDiv) ytDiv.style.display = 'block';
+                createYouTubePlayer(true);
+            }, 300);
+            if (vid) vid.style.display = 'none';
         } else if (vid && STATE.videoUrl) {
+            console.log('[Restore] Loading URL video:', STATE.videoUrl);
             vid.src = STATE.videoUrl;
             vid.style.display = 'block';
+            hideYouTubePlayer();
             vid.onloadedmetadata = () => {
                 const resumeAt = STATE.resumeFromSavedTime || STATE.lastVideoTime || 0;
                 if (resumeAt > 0 && resumeAt <= vid.duration) {
@@ -1104,11 +1122,6 @@ function restoreStateFromDB() {
                 STATE.resumeFromSavedTime = 0;
             };
         }
-    }
-
-    const urlInput = document.getElementById('vidUrl');
-    if (urlInput && STATE.videoUrl) {
-        urlInput.value = STATE.videoUrl;
     }
 
     applyHalfButton({ silent: true });
@@ -1529,9 +1542,9 @@ function startYouTubePoll() {
             const t = ytPlayer.getCurrentTime();
             STATE.youtubeLastTime = t || 0;
             snapshotState();
-            if (Math.floor(t) % 5 === 0) saveDB();
+            saveDB();
         }
-    }, 2000);
+    }, 3000);
 }
 
 function persistYouTubeTime() {

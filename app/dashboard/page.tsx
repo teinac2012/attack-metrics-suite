@@ -59,6 +59,14 @@ export default async function DashboardPage() {
       icon: "🧤",
       href: "/apps/app4",
       color: "from-emerald-500 to-teal-700"
+    },
+    {
+      id: 5,
+      name: "Attack Scout",
+      description: "Comparativa de perfiles y percentiles con pizza charts",
+      icon: "🍕",
+      href: "/apps/app5",
+      color: "from-pink-500 to-rose-700"
     }
   ];
 
