@@ -1278,9 +1278,9 @@ function restoreBackup(input) {
                     // 4. Restauramos UI en un timeout para dar tiempo a que el DOM esté listo
                     setTimeout(function() {
                         try {
-                            redrawRosters();
-                            filterAndDrawField();
+                            renderUI();
                             updatePossessionBar();
+                            drawPitch();
                             
                             // Actualizar nombres de equipos en UI
                             const nameLocal = document.getElementById('nombreLocal');

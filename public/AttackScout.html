@@ -213,7 +213,31 @@ let chartInstance = null;
 let scatterInstance = null;
 let POSITIONS_FOUND = new Set();
 
-window.onload = () => { renderSliders(); resetWeights(); };
+window.onload = () => { 
+    renderSliders(); 
+    resetWeights(); 
+    
+    // Restaurar datos guardados si existen
+    try {
+        const savedRaw = localStorage.getItem('attackscout_rawdb');
+        const savedNormalized = localStorage.getItem('attackscout_normalizeddb');
+        const savedPositions = localStorage.getItem('attackscout_positions');
+        
+        if (savedRaw && savedNormalized) {
+            RAW_DB = JSON.parse(savedRaw);
+            NORMALIZED_DB = JSON.parse(savedNormalized);
+            if (savedPositions) {
+                POSITIONS_FOUND = new Set(JSON.parse(savedPositions));
+            }
+            populateUI();
+            document.getElementById('targetSelect').disabled = false;
+            document.getElementById('btnSearch').disabled = false;
+            console.log('[AttackScout] Datos restaurados desde localStorage');
+        }
+    } catch(e) {
+        console.warn('Error restaurando datos:', e);
+    }
+};
 
 // --- UI ---
 function switchTab(id, btn) {
@@ -291,6 +315,16 @@ async function loadDatabase() {
 
     normalizeData();
     populateUI();
+    
+    // Guardar en localStorage para persistencia
+    try {
+        localStorage.setItem('attackscout_rawdb', JSON.stringify(RAW_DB));
+        localStorage.setItem('attackscout_normalizeddb', JSON.stringify(NORMALIZED_DB));
+        localStorage.setItem('attackscout_positions', JSON.stringify(Array.from(POSITIONS_FOUND)));
+    } catch(e) {
+        console.warn('No se pudo guardar en localStorage:', e);
+    }
+    
     document.getElementById('loader').style.display = 'none';
     document.getElementById('targetSelect').disabled = false;
     document.getElementById('btnSearch').disabled = false;
