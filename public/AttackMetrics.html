@@ -2252,11 +2252,11 @@ function getStats(name, isTeam=false) {
     // 4. Volumen (Sin cambios)
     const vol = Math.min(acts.length * (isTeam ? 0.16 : 1.25), 100);
     
-    // 5. Creación (Incluye Centros)
-    const creat = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type)).length * (isTeam ? 0.28 : 2.8);
+    // 5. Creación (Incluye Centros) - AUMENTADO: necesita 60+ acciones para 100%
+    const creat = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type)).length * (isTeam ? 0.15 : 1.4);
     
-    // 6. Ataque (Sin cambios)
-    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 1.25 : 10.0);
+    // 6. Ataque (AUMENTADO: necesita 40+ acciones para 100%) 
+    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 0.625 : 2.5);
     
     // --- MODIFICACIÓN DEFENSA ---
     // A) Añadido 'Defensiva' a la lista para contar el botón manual (+1).
