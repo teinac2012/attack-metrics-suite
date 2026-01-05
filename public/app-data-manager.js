@@ -13,32 +13,94 @@ window.AppDataManager = {
   _autoSaveInterval: null,
   _appState: null,
   _savedCount: 0,
+  _lastStateHash: null,
+  _debounceTimer: null,
+  _lastForceSave: 0,
+  _forceSaveInterval: 15000, // Máximo 15s sin guardar por seguridad
 
   // Inicializar y escuchar cambios
   init: function() {
-    console.log('[AppDataManager] Inicializando sistema de persistencia...');
+    console.log('[AppDataManager] Inicializando sistema de persistencia (OPTIMIZADO)...');
     
     // Cargar datos al iniciar (esperar a que el DOM esté listo)
     setTimeout(() => {
       this.loadFromParent();
     }, 500);
     
-    // Auto-guardar cada 5 segundos (garantiza persistencia al cambiar de app)
-    this._autoSaveInterval = setInterval(() => {
-      this.captureAndSave();
-    }, 5000);
-
     // Guardar antes de descargar
     window.addEventListener('beforeunload', () => {
-      this.captureAndSave(true);
+      this.debouncedSave(true);
     });
 
-    // Guardar en intervalos del usuario (cambios en inputs)
+    // Debounce en cambios de usuario
     document.addEventListener('change', () => {
-      this.captureAndSave();
+      this.debouncedSave();
     }, true);
 
-    console.log('[AppDataManager] Sistema inicializado y escuchando cambios');
+    // Debounce en inputs
+    document.addEventListener('input', () => {
+      this.debouncedSave();
+    }, true);
+
+    // Force save cada 15 segundos máximo (por seguridad)
+    this._autoSaveInterval = setInterval(() => {
+      const now = Date.now();
+      if (now - this._lastForceSave > this._forceSaveInterval) {
+        console.log('[AppDataManager] Force save (15s máximo)');
+        this.debouncedSave(true);
+      }
+    }, 15000);
+
+    console.log('[AppDataManager] Sistema optimizado: debounce + validación de cambios');
+  },
+
+  // Debounce inteligente: espera a que el usuario deje de escribir
+  debouncedSave: function(force = false) {
+    // Limpiar timer anterior
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+    }
+
+    // Si es force save, guardar inmediatamente
+    if (force) {
+      this.captureAndSave(true);
+      return;
+    }
+
+    // Si no hay cambios desde el último hash, no hacer nada
+    const currentHash = this.getStateHash();
+    if (currentHash === this._lastStateHash) {
+      return; // Evitar guardar lo mismo
+    }
+
+    // Esperar 2 segundos sin cambios antes de guardar
+    this._debounceTimer = setTimeout(() => {
+      const newHash = this.getStateHash();
+      if (newHash !== this._lastStateHash) {
+        this.captureAndSave(false);
+      }
+    }, 2000);
+  },
+
+  // Generar hash del estado actual para detectar cambios
+  getStateHash: function() {
+    try {
+      const state = {
+        formData: this.captureFormData(),
+        globalState: typeof STATE !== 'undefined' ? STATE : null,
+      };
+      const str = JSON.stringify(state);
+      // Simple hash function
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return hash.toString();
+    } catch (e) {
+      return null;
+    }
   },
 
   // Capturar estado actual de la página
@@ -141,26 +203,42 @@ window.AppDataManager = {
     return visible;
   },
 
-  // Guardar estado
+  // Guardar estado (solo si hay cambios reales)
   captureAndSave: function(isUnload = false) {
     try {
       const state = this.captureState();
+      const newHash = this.getStateHash();
+      
+      // Si no hay cambios y no es un force save, no guardar
+      if (newHash === this._lastStateHash && !isUnload) {
+        return;
+      }
+
+      // Actualizar hash y estado
+      this._lastStateHash = newHash;
       this._appState = state;
       this._savedCount++;
+      this._lastForceSave = Date.now();
       
-      // Enviar al parent
+      // Enviar al parent solo formData y globalState (no localStorage/sessionStorage para ahorrar banda)
+      const optimizedState = {
+        timestamp: state.timestamp,
+        formData: state.formData,
+        globalState: state.globalState,
+      };
+
       window.parent.postMessage(
         {
           type: 'SAVE_DATA',
-          data: JSON.stringify(state),
+          data: JSON.stringify(optimizedState),
           count: this._savedCount,
           isUnload: isUnload,
         },
         '*'
       );
 
-      if (isUnload) {
-        console.log('[AppDataManager] Datos guardados antes de descargar');
+      if (this._savedCount % 5 === 0) {
+        console.log(`[AppDataManager] Guard. #${this._savedCount} (datos optimizados)`);
       }
     } catch (e) {
       console.warn('Error capturando estado:', e);
