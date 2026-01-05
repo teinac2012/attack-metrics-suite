@@ -731,7 +731,9 @@
     </select>
     
     <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
-        <button class="btn-tool" style="background:#9b59b6" onclick="voronoiAddPlayer()">👥 +Jugador</button>
+        <button class="btn-tool" style="background:#3498db; padding:8px 12px;" onclick="voronoiSetMode('HOME')" title="Click para añadir LOCAL">🔵 LOCAL</button>
+        <button class="btn-tool" style="background:#e74c3c; padding:8px 12px;" onclick="voronoiSetMode('AWAY')" title="Click para añadir VISITANTE">🔴 VISITANTE</button>
+        <button class="btn-tool" style="background:#f1c40f; padding:8px 12px;" onclick="voronoiSetMode('BALL')" title="Click para colocar balón">⚽ BALÓN</button>
         <button class="btn-tool" style="background:#e74c3c" onclick="voronoiClearAll()">🗑 Limpiar</button>
         <button class="btn-tool" style="background:#f39c12" onclick="voronoiAnalyze()">📊 Analizar</button>
     </div>
@@ -1988,7 +1990,7 @@ let voronoiState = {
     ball: null,
     dragTarget: null,
     fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0,
-    waitingForPosition: null  // {name, team} cuando espera click para posicionar
+    currentMode: null  // 'HOME', 'AWAY', 'BALL' o null
 };
 
 // --- FUNCIÓN VORONOI MEJORADA ---
@@ -2196,53 +2198,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function voronoiAddPlayer() {
-    const name = prompt('Nombre del jugador:');
-    if (!name) return;
-    
-    // Crear modal visual para seleccionar equipo
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:9999;';
-    
-    const box = document.createElement('div');
-    box.style.cssText = 'background:#1e1e1e; padding:30px; border-radius:8px; text-align:center; border:2px solid #444;';
-    
-    box.innerHTML = `
-        <h3 style="color:#f1c40f; margin-bottom:20px;">⚽ ${name}</h3>
-        <p style="color:#aaa; margin-bottom:20px; font-size:0.9rem;">Selecciona el equipo:</p>
-        <div style="display:flex; gap:15px; justify-content:center; margin-bottom:20px;">
-            <button id="btnHome" style="padding:15px 30px; background:#3498db; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer; font-size:1rem;">🏠 LOCAL</button>
-            <button id="btnAway" style="padding:15px 30px; background:#e74c3c; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer; font-size:1rem;">✈️ VISITANTE</button>
-        </div>
-        <button id="btnCancel" style="padding:8px 20px; background:#555; border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.85rem;">❌ Cancelar</button>
-    `;
-    
-    modal.appendChild(box);
-    document.body.appendChild(modal);
-    
-    const selectTeam = (team) => {
-        document.body.removeChild(modal);
-        voronoiState.waitingForPosition = { name, team };
-        
-        // Mostrar mensaje en cancha
-        const canvas = document.getElementById('pitchCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#f1c40f';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('👆 HAZ CLICK EN EL CAMPO PARA POSICIONAR', canvas.width/2, canvas.height/2);
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillStyle = team === 'HOME' ? '#3498db' : '#e74c3c';
-        ctx.fillText(`${name} (${team === 'HOME' ? 'LOCAL' : 'VISITANTE'})`, canvas.width/2, canvas.height/2 + 30);
-        ctx.restore();
-    };
-    
-    document.getElementById('btnHome').onclick = () => selectTeam('HOME');
-    document.getElementById('btnAway').onclick = () => selectTeam('AWAY');
-    document.getElementById('btnCancel').onclick = () => document.body.removeChild(modal);
+function voronoiSetMode(mode) {
+    if (voronoiState.currentMode === mode) {
+        voronoiState.currentMode = null;  // Toggle off
+    } else {
+        voronoiState.currentMode = mode;
+    }
+    drawPitch();
 }
 
 function voronoiClearAll() {
@@ -2297,20 +2259,30 @@ function voronoiInputStart(e) {
     if (viewMode !== 'VORONOI') return;
     
     const p = getPos(e);
+    const mode = voronoiState.currentMode;
     
-    // Si está esperando posicionar un jugador
-    if (voronoiState.waitingForPosition) {
+    // Si está en modo de agregar
+    if (mode === 'HOME' || mode === 'AWAY') {
+        // Agregar jugador automático
+        const playerNum = voronoiState.points.filter(pt => pt.team === mode).length + 1;
         voronoiState.points.push({
             x: p.x,
             y: p.y,
-            team: voronoiState.waitingForPosition.team,
-            name: voronoiState.waitingForPosition.name
+            team: mode,
+            name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}`
         });
-        voronoiState.waitingForPosition = null;
         drawPitch();
         return;
     }
     
+    if (mode === 'BALL') {
+        voronoiState.ball = { x: p.x, y: p.y };
+        voronoiState.currentMode = null;
+        drawPitch();
+        return;
+    }
+    
+    // Modo normal: seleccionar para arrastrar
     let found = null;
 
     voronoiState.points.forEach((pt, idx) => { 
@@ -2323,11 +2295,8 @@ function voronoiInputStart(e) {
 
     if (found) {
         voronoiState.dragTarget = found;
-    } else {
-        // Clic en campo vacío = agregar balón
-        voronoiState.ball = { x: p.x, y: p.y };
-        drawPitch();
     }
+}
 }
 
 function voronoiInputMove(e) {
