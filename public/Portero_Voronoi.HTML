@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GK Elite Pro v7.4 - Match Bounds</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+
+    <style>
+        /* --- ESTILOS GENERALES --- */
+        :root {
+            --bg: #121212; --card: #1e1e24; --border: #333;
+            --accent: #9b59b6; --success: #27ae60; --danger: #c0392b; --warn: #f39c12;
+            --text: #ecf0f1; 
+            --field-dark: #204a2e; --field-light: #265a38;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header {
+            flex-shrink: 0; background: #000; border-bottom: 1px solid #444;
+            padding: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .header-controls { display: flex; gap: 4px; overflow-x: auto; align-items: center; flex: 1; }
+        
+        select { background: #333; color: white; border: 1px solid #555; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 0.8rem;}
+        .input-min { background: #333; color: #f1c40f; border: 1px solid #555; width: 50px; text-align: center; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 0.8rem;}
+        
+        .btn-icon { background: #333; border: 1px solid #555; color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; transition: background 0.2s; font-size: 0.85rem;}
+        .btn-icon:hover { background: #444; }
+        .btn-green { background: #27ae60; border-color: #2ecc71; }
+        .btn-purple { background: #8e44ad; border-color: #9b59b6; font-size: 0.7rem; }
+        .btn-red { background: #c0392b; border-color: #e74c3c; font-weight: bold; font-size: 0.75rem; }
+
+        /* LAYOUT */
+        .layout { display: flex; flex: 1; height: 100%; overflow: hidden; }
+        .view-col { flex: 6; display: flex; flex-direction: column; background: #090909; border-right: 1px solid #333; padding: 6px; gap: 6px; position: relative; }
+        .ctrl-col { flex: 4; background: var(--card); display: flex; flex-direction: column; min-width: 300px; height: 100%; border-left: 1px solid #2a2a2a; padding: 4px; gap: 4px; overflow-y: auto; }
+
+        /* BARRA DE HERRAMIENTAS VISUALES */
+        .viz-bar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; 
+            background: #1a1a1a;
+            padding: 5px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            margin-bottom: 4px;
+            gap: 10px;
+            flex-wrap: wrap;
+            min-height: 42px;
+        }
+
+        /* CANVAS CONTAINER */
+        .canvas-container { width: 100%; border-radius: 6px; border: 1px solid #444; background: #222; overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        
+        /* CAMPO */
+        #cntPitch { flex: 1; min-height: 0; background: var(--field-dark); position: relative;}
+        /* PORTERIA */
+        #cntGoal { height: 130px; flex-shrink: 0; background: #1a1a1a; padding: 5px; }
+        
+        canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+        /* VISTAS */
+        #viewField { display: flex; flex-direction: column; width: 100%; height: 100%; gap: 0px; }
+        #viewRadar, #viewScatter1, #viewScatter2 { display: none; flex-direction: column; width: 100%; height: 100%; background: #151515; padding: 10px; overflow-y: auto;}
+        
+        /* EXPORTAR */
+        #viewExport { display: none; flex-direction: column; width: 100%; height: 100%; background: #121212; padding: 20px; overflow-y: auto; align-items: center; }
+        .export-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; width: 100%; max-width: 800px; }
+        .export-card { background: #1e1e24; border: 1px solid #333; border-radius: 8px; padding: 15px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .export-btn-big { margin-top: 10px; padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+
+        .chart-title { color: #f1c40f; text-align: center; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .chart-box { flex: 1; background: #1e1e1e; border-radius: 8px; padding: 10px; position: relative; border: 1px solid #333; min-height: 250px;}
+
+        /* GRID PORTERIA */
+        .goal-grid-container { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 2px; width: 100%; height: 100%; border: 3px solid #eee; border-bottom: none; position: relative; background: rgba(255,255,255,0.02); }
+        .goal-grid-container::after { content:''; position: absolute; bottom: -5px; left:-3px; width:calc(100% + 6px); height: 5px; background: #2ecc71; border-top: 1px solid #1e824c;}
+        .zone-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; position: relative; background: rgba(255,255,255,0.03); transition: all 0.2s; }
+        .zone-btn.active { background: rgba(52, 152, 219, 0.3); border: 2px solid #3498db; z-index: 2;}
+        .zone-name { font-size: 0.55rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;}
+        .zone-pct { font-size: 1rem; font-weight: 800; color: #f1c40f; }
+
+        /* CONTROLES VISUALES */
+        .viz-controls { display: flex; align-items: center; gap: 4px; }
+        .viz-btn { padding: 5px 10px; font-size: 0.7rem; color: #aaa; cursor: pointer; font-weight: bold; background: transparent; border: 1px solid transparent; border-radius: 4px; transition: 0.2s;}
+        .viz-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .viz-btn.active { color: #fff; background: #444; border-color: #555; }
+        .viz-btn[data-mode="LIVE"].active { background: #27ae60; border-color: #27ae60; color:white; box-shadow:none;}
+        .viz-btn[data-mode="TACTICAL"].active { background: #3498db; border-color: #3498db; color:white; box-shadow:none;}
+        .viz-btn[data-mode="HEAT"].active { background: #e74c3c; border-color: #e74c3c; color:white; box-shadow:none;}
+        .viz-btn[data-mode="VORONOI"].active { background: #9b59b6; border-color: #9b59b6; color:white; box-shadow:none;}
+
+        .viz-select {
+            background: #222; color: #f1c40f; border: 1px solid #555; 
+            font-size: 0.7rem; padding: 4px 6px; border-radius: 4px; font-weight: bold;
+            margin-left: 0; outline: none; cursor: pointer;
+        }
+
+        /* CONTROLES LIVE */
+        .mode-switch { 
+            background: rgba(0,0,0,0.5); border-radius: 6px; display: flex; 
+            border: 1px solid #555; overflow: hidden; margin-left: auto;
+        }
+        .mode-btn { padding: 5px 10px; font-size: 0.7rem; color: #ccc; cursor: pointer; font-weight: 600; min-width: 60px; text-align: center;}
+        
+        /* Controles Voronoi - INTEGRADOS EN BARRA SUPERIOR */
+        .voronoi-tools { 
+            display: flex; gap: 6px; 
+            align-items: center; 
+            margin-left: 10px; padding-left: 10px; 
+            border-left: 1px solid #444;
+        }
+        .team-group { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; transition: 0.2s; cursor: pointer;}
+        .team-group:hover { background: rgba(255,255,255,0.05); }
+        .team-group.selected { background: rgba(255,255,255,0.15); border-color: #777; }
+        .team-name { font-size: 0.7rem; color: #fff; font-weight: bold; text-transform: uppercase;}
+        .v-team-btn { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; opacity: 0.7; }
+        .team-group.selected .v-team-btn { opacity: 1; transform: scale(1.1); box-shadow: 0 0 5px #fff; }
+        .ball-btn { font-size: 1.1rem; cursor: pointer; padding: 0 6px; background: none; border: none; opacity: 0.5; filter: grayscale(1); transition: 0.2s;}
+        .ball-btn.active { opacity: 1; filter: grayscale(0); transform: scale(1.2); }
+
+        /* BOTONERA */
+        .panel { background: #2d2d2d; margin: 2px 0; padding: 5px; border-radius: 6px; border: 1px solid #3a3a3a; }
+        .panel h4 { margin: 0 0 4px 0; font-size: 0.65rem; color: var(--accent); text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 2px; }
+        .grid-btn { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+        .btn-act { border: none; padding: 6px 2px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; font-size: 0.65rem; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 0 rgba(0,0,0,0.3); min-height: 40px; text-align: center; line-height: 1.1; }
+        .btn-act:active { transform: translateY(1px); box-shadow: none; }
+        .btn-act small { font-size: 0.5rem; font-weight: normal; opacity: 0.8; margin-top: 2px; }
+        
+        .c-def { background: linear-gradient(to bottom, #2ecc71, #27ae60); } 
+        .c-move { background: linear-gradient(to bottom, #9b59b6, #8e44ad); } 
+        .c-duel { background: linear-gradient(to bottom, #e74c3c, #c0392b); } 
+        .c-off { background: linear-gradient(to bottom, #3498db, #2980b9); }
+        .c-rec { background: linear-gradient(to bottom, #f39c12, #e67e22); }
+        .c-aux { background: #444; border: 1px dashed #666; box-shadow: none; min-height: 30px;}
+
+        /* LOG */
+        .log-container { flex: 1; background: #111; overflow-y: auto; font-size: 0.7rem; border-top: 1px solid #333; border-radius: 4px; min-height: 150px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #222; position: sticky; top: 0; text-align: left; padding: 4px; font-weight: 600; color: #aaa; border-bottom: 2px solid #333; font-size: 0.65rem;}
+        td { padding: 3px 5px; border-bottom: 1px solid #222; vertical-align: middle;}
+
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px);}
+        .modal.open { display: flex; }
+        .modal-box { background: #1e1e24; padding: 15px; border-radius: 10px; width: 90%; max-width: 360px; border: 1px solid #555; }
+        .modal-title { text-align: center; color: var(--accent); font-weight: 800; margin-bottom: 10px; text-transform: uppercase; font-size: 1rem;}
+        
+        /* RADAR STATS */
+        .radar-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; }
+        .r-box { background: #222; padding: 4px 2px; text-align: center; border-radius: 6px; border: 1px solid #444; display: flex; flex-direction: column; justify-content: center; min-height: 45px;}
+        .r-val { font-size: 0.9rem; font-weight: 800; color: #fff; display: block; line-height: 1.1;}
+        .r-count { font-size: 0.6rem; color: #bbb; display: block; margin: 1px 0; font-family: monospace; font-weight: bold;} 
+        .r-lbl { font-size: 0.45rem; color: #888; text-transform: uppercase; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;}
+
+        @media(max-width: 900px) { .layout { flex-direction: column; } .view-col { height: auto; min-height: 550px; } .ctrl-col { flex: 1; min-height: 0; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-top">
+        <div class="header-controls">
+            <span style="color:#aaa; font-size:0.6rem; font-weight:bold; margin-right:2px;">PORTERO:</span>
+            <select id="selGK" onchange="app.setGK()" style="max-width:150px;"></select>
+            <button class="btn-icon btn-green" onclick="app.addGK()">+</button>
+            <div style="width:1px; height:18px; background:#555; margin:0 4px;"></div>
+            <select id="selMatch" onchange="app.setMatch()"></select>
+            <button class="btn-icon btn-purple" onclick="app.addFriendly()">+Amistoso</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px; background:#222; padding:3px 6px; border-radius:4px; border:1px solid #444;">
+            <label style="color:#aaa; font-size:0.6rem; font-weight:bold;">MINS</label>
+            <input type="number" id="inMins" class="input-min" value="90" onchange="app.saveMins()">
+        </div>
+    </div>
+    <div class="header-top" style="justify-content: flex-end; gap: 5px; margin-top: 2px;">
+        <button class="btn-icon btn-red" onclick="app.endMatch()">🏁 FIN</button>
+        <div style="width:1px; height:18px; background:#555; margin:0 2px;"></div>
+        <button id="btnExport" class="btn-icon" onclick="app.setView('EXPORT')" style="background:#f39c12; border-color:#e67e22; color:#000; font-weight:900;">📥 EXPORTAR</button>
+        <button id="btnStats" class="btn-icon" onclick="app.cycleView()" style="background:#3498db; border-color:#2980b9; width:100px;">📊 ESTATS</button>
+        <button class="btn-icon" onclick="app.downloadCSV()">💾 CSV</button>
+        <button class="btn-icon" onclick="app.resetData()" style="color:#e74c3c">🗑️</button>
+    </div>
+</header>
+
+<div class="layout">
+    
+    <div class="view-col">
+        <div id="viewField">
+            <div class="viz-bar">
+                <div class="viz-controls">
+                    <button class="viz-btn active" data-mode="LIVE" onclick="app.setVizMode('LIVE')">🎥 VIVO</button>
+                    <button class="viz-btn" data-mode="TACTICAL" onclick="app.setVizMode('TACTICAL')">🏹 TAC</button>
+                    <button class="viz-btn" data-mode="HEAT" onclick="app.setVizMode('HEAT')">🔥 MAP</button>
+                    <button class="viz-btn" data-mode="VORONOI" onclick="app.setVizMode('VORONOI')">⬡ VOR</button>
+                    <select id="vizFilter" class="viz-select" onchange="app.setVizFilter(this.value)">
+                        <option value="ALL">👁️ TODO</option>
+                        <option value="DEF">🛡️ PARADAS</option>
+                        <option value="OFF">⚽ DISTRIB.</option>
+                        <option value="AIR">✈️ AÉREO</option>
+                        <option value="GOL">❌ GOLES</option>
+                    </select>
+                </div>
+                
+                <div id="voronoiControls" class="voronoi-tools" style="display:none;">
+                    <div id="grpA" class="team-group selected" onclick="app.setVoronoiTeam('A')">
+                        <div class="v-team-btn" style="background:red;"></div>
+                        <span id="nameTeamA" class="team-name" onclick="event.stopPropagation(); app.renameTeam('A')">ROJO</span>
+                    </div>
+                    <div id="grpB" class="team-group" onclick="app.setVoronoiTeam('B')">
+                        <div class="v-team-btn" style="background:blue;"></div>
+                        <span id="nameTeamB" class="team-name" onclick="event.stopPropagation(); app.renameTeam('B')">AZUL</span>
+                    </div>
+                    <button id="btnBall" class="ball-btn" onclick="app.setVoronoiTeam('BALL')" title="Colocar Balón">⚽</button>
+                    <button onclick="app.clearVoronoi()" class="viz-btn" style="border:1px solid #444; color:#ccc;">BORRAR</button>
+                    <label class="viz-btn" style="border:1px solid #444; color:#ccc; display:flex; align-items:center; gap:3px;">
+                        📷 FOTO <input type="file" accept="image/*" style="display:none" onchange="app.loadFrame(this)">
+                    </label>
+                </div>
+
+                <div id="liveControls" class="mode-switch">
+                    <div id="btnOrg" class="mode-btn active" onclick="app.setMode('org')">BALÓN</div>
+                    <div id="btnAct" class="mode-btn" onclick="app.setMode('act')">PORTERO</div>
+                </div>
+            </div>
+
+            <div id="cntPitch" class="canvas-container">
+                <canvas id="cvPitch"></canvas>
+            </div>
+            <div id="cntGoal" class="canvas-container">
+                <div style="text-align:center; color:#888; font-size:0.65rem; margin-bottom:4px; font-weight:600; text-transform:uppercase;">Zona de Disparo (Click para seleccionar)</div>
+                <div id="goalGrid" class="goal-grid-container"></div>
+            </div>
+        </div>
+
+        <div id="viewRadar">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">
+                <div class="chart-title" style="margin:0; border:none; text-align:left;">Análisis General (Escala 120%)</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:5px; background:#222; padding:2px 6px; border-radius:4px;">
+                        <input type="checkbox" id="chkP90" onchange="app.renderRadar()"> 
+                        <label for="chkP90" style="color:#f1c40f; font-size:0.7rem; font-weight:bold; cursor:pointer;">P90</label>
+                    </div>
+                    <button class="btn-icon" style="background:#fff; color:#000; font-weight:bold; font-size:0.7rem; border-color:#ccc;" onclick="app.downloadRadarImg()">📸 FOTO</button>
+                </div>
+            </div>
+            <div id="radarCapture" style="background:#151515; padding:5px; border-radius:6px;">
+                <div style="height:300px; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="cvRadar" style="width:100%; height:100%; max-height:300px;"></canvas>
+                </div>
+                <div id="radarStats" class="radar-stats"></div>
+            </div>
+            <div id="compareList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; padding-top:8px; border-top:1px solid #333;"></div>
+        </div>
+
+        <div id="viewScatter1">
+             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">
+                <div class="chart-title" style="margin:0; border:none; text-align:left;">Rendimiento (Goles Prevenidos)</div>
+                <button class="btn-icon" style="background:#fff; color:#000; font-weight:bold; font-size:0.7rem; border-color:#ccc;" onclick="app.downloadScatter1Img()">📸 FOTO</button>
+            </div>
+            <div id="scatter1Capture" style="background:#151515; padding:5px; border-radius:6px;">
+                <div class="chart-box"><canvas id="chartB1"></canvas></div>
+                <div style="padding:10px; font-size:0.7rem; color:#aaa;">Eje X: PSxG Total | Eje Y: Goles Prevenidos | Tamaño: % Paradas</div>
+            </div>
+        </div>
+
+        <div id="viewScatter2">
+             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">
+                <div class="chart-title" style="margin:0; border:none; text-align:left;">Estilo de Distribución</div>
+                <button class="btn-icon" style="background:#fff; color:#000; font-weight:bold; font-size:0.7rem; border-color:#ccc;" onclick="app.downloadScatter2Img()">📸 FOTO</button>
+            </div>
+            <div id="scatter2Capture" style="background:#151515; padding:5px; border-radius:6px;">
+                <div class="chart-box"><canvas id="chartB2"></canvas></div>
+                <div style="padding:10px; font-size:0.7rem; color:#aaa;">Eje X: % Acierto Largo | Eje Y: % Acierto Corto | Tamaño: Volumen</div>
+            </div>
+        </div>
+
+        <div id="viewExport">
+            <h2 style="color:#f39c12; margin-bottom:20px; border-bottom:1px solid #333; width:100%; text-align:center; padding-bottom:10px;">CENTRO DE DESCARGAS</h2>
+            <div class="export-grid">
+                <div class="export-card">
+                    <h3 style="color:#fff; font-size:0.9rem;">CAMPO / MAPA / VORONOI</h3>
+                    <p style="color:#888; font-size:0.7rem;">Descarga la vista actual del campo.</p>
+                    <button class="export-btn-big" onclick="app.downloadPitchImg()">📸 DESCARGAR IMAGEN</button>
+                </div>
+                <div class="export-card">
+                    <h3 style="color:#9b59b6; font-size:0.9rem;">RADAR & ESTADÍSTICAS</h3>
+                    <p style="color:#888; font-size:0.7rem;">Informe completo con gráfico.</p>
+                    <button class="export-btn-big" onclick="app.downloadRadarImg()" style="background:#8e44ad;">📸 DESCARGAR INFORME</button>
+                </div>
+                <div class="export-card">
+                    <h3 style="color:#2ecc71; font-size:0.9rem;">RENDIMIENTO (SCATTER)</h3>
+                    <button class="export-btn-big" onclick="app.downloadScatter1Img()" style="background:#27ae60;">📸 DESCARGAR GRÁFICO</button>
+                </div>
+                <div class="export-card">
+                    <h3 style="color:#e67e22; font-size:0.9rem;">DISTRIBUCIÓN (SCATTER)</h3>
+                    <button class="export-btn-big" onclick="app.downloadScatter2Img()" style="background:#d35400;">📸 DESCARGAR GRÁFICO</button>
+                </div>
+                <div class="export-card" style="border-color:#3498db; grid-column: 1 / -1;">
+                    <h3 style="color:#3498db; font-size:0.9rem;">DATOS CRUDOS (EXCEL/CSV)</h3>
+                    <button class="export-btn-big" onclick="app.downloadCSV()" style="background:#2980b9;">💾 DESCARGAR CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ctrl-col">
+        <div class="panel" style="border-top:2px solid #27ae60">
+            <h4>1. Defensa & Blocaje</h4>
+            <div class="grid-btn">
+                <button class="btn-act c-def" onclick="app.openMenu('Blocaje','Frontal')">BLOCAJE FRONTAL<small>Raso, Media, Arriba</small></button>
+                <button class="btn-act c-def" onclick="app.openMenu('Blocaje','Lateral')">BLOCAJE LATERAL<small>Raso, Media, Arriba</small></button>
+                <button class="btn-act c-def" onclick="app.openMenu('Defensa','Desvío')">DESVÍO / RECHACE<small>Mano, Pie...</small></button>
+                <button class="btn-act c-aux" style="color:#e74c3c" onclick="app.quickReg('Defensa','Error','KO')">ERROR / FALLO</button>
+                <button class="btn-act c-aux" onclick="app.quickReg('Defensa','Gol Imparable','GOL')">GOL IMPARABLE</button>
+            </div>
+        </div>
+
+        <div class="panel" style="border-top:2px solid #9b59b6">
+            <h4>2. Desplazamientos</h4>
+            <div class="grid-btn">
+                <button class="btn-act c-move" onclick="app.quickReg('Desplazamiento','Paso Lateral','OK')">PASO LATERAL</button>
+                <button class="btn-act c-move" onclick="app.quickReg('Desplazamiento','Paso Cruzado','OK')">PASO CRUZADO</button>
+                <button class="btn-act c-move" onclick="app.quickReg('Desplazamiento','Paso Ajuste','OK')">PASO AJUSTE</button>
+                <button class="btn-act c-move" onclick="app.quickReg('Desplazamiento','Paso Caída','OK')">PASO CAÍDA</button>
+            </div>
+        </div>
+
+        <div class="panel" style="border-top:2px solid #e74c3c">
+            <h4>3. Técnica Pie / Duelo</h4>
+            <div class="grid-btn">
+                <button class="btn-act c-duel" onclick="app.quickReg('TecnicaPie','Espagat','OK')">ESPAGAT</button>
+                <button class="btn-act c-duel" onclick="app.quickReg('TecnicaPie','La Cruz','OK')">LA CRUZ</button>
+                <button class="btn-act c-duel" onclick="app.quickReg('TecnicaPie','Ataque Pie','OK')">ATAQUE PIE</button>
+                <button class="btn-act c-duel" onclick="app.openMenu('Duelo','1 vs 1')">1 vs 1 (GENÉRICO)</button>
+            </div>
+        </div>
+
+        <div class="panel" style="border-top:2px solid #3498db">
+            <h4>4. Ofensivo (Distribución)</h4>
+            <div class="grid-btn">
+                <button class="btn-act c-off" onclick="app.openMenu('Ofensivo','Saque Puerta')">SAQUE PUERTA<small>Corto, Largo...</small></button>
+                <button class="btn-act c-off" onclick="app.openMenu('Ofensivo','Distribución')">DISTRIBUCIÓN JUEGO<small>Mano, Volea...</small></button>
+                <button class="btn-act c-off" onclick="app.quickReg('Ofensivo','Control Orientado','OK')">CONTROL ORIENTADO</button>
+                <button class="btn-act c-off" onclick="app.quickReg('Ofensivo','Pase Corto','OK')">PASE CORTO</button>
+                <button class="btn-act c-off" onclick="app.quickReg('Ofensivo','Pase Largo','OK')">PASE LARGO</button>
+            </div>
+        </div>
+
+        <div class="panel" style="border-top:2px solid #f39c12">
+            <h4>5. Otros</h4>
+            <div class="grid-btn">
+                <button class="btn-act c-rec" onclick="app.quickReg('Otros','Reincorporación','OK')">REINCORPORACIÓN</button>
+                <button class="btn-act c-rec" onclick="app.openMenu('Aéreo','Salida')">JUEGO AÉREO</button>
+            </div>
+        </div>
+
+        <div class="log-container">
+            <table id="logTable">
+                <thead><tr><th>Min</th><th>Acción</th><th>Res</th><th></th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="modal" class="modal" onclick="if(event.target==this) app.closeModal()">
+    <div class="modal-box">
+        <div id="mTitle" class="modal-title">OPCIONES</div>
+        <div id="mContent"></div>
+        <button onclick="app.closeModal()" style="width:100%; padding:10px; background:transparent; border:1px solid #555; color:#888; margin-top:10px; cursor:pointer; border-radius:6px; font-weight:bold;">CANCELAR</button>
+    </div>
+</div>
+
+<script>
+const app = {
+    data: { 
+        gk:1, match:'1', actions:[], gks:[{id:1,name:"Portero 1"}], friends:[], mins:{}, 
+        pitch:{ox:50,oy:15,ax:50,ay:90}, zone:'MC', modeP:'org', compare:[1],
+        voronoi: { points: [], team: 'A', bgImage: null, ball: null },
+        teams: { A: "ROJO", B: "AZUL" } 
+    },
+    viewMode: 0, 
+    vizMode: 'LIVE', 
+    vizFilter: 'ALL', 
+    dragTarget: null, 
+    charts: {}, 
+    db: {
+        "Blocaje": { "Frontal": ["Frontal Raso", "Frontal Media Altura", "Frontal Arriba", "Con Caída", "En Dos Tiempos"], "Lateral": ["Lateral Raso", "Lateral Media Altura", "Lateral Arriba", "Desvío al poste"] },
+        "Defensa": { "Desvío": ["Mano cambiada", "Mano natural", "Pie", "Rechace Corto", "Rechace Largo", "Puños (Despeje)"] },
+        "Ofensivo": { "Saque Puerta": ["Corto (Área)", "Medio (Carriles)", "Largo (Campo Rival)"], "Distribución": ["Mano (Rasa)", "Mano (Béisbol)", "Volea", "Bote Pronto", "Apoyo seguridad"] },
+        "Duelo": { "1 vs 1": ["Achique", "Aguantar", "Cruz"] },
+        "Aéreo": { "Salida": ["Puños (1 o 2)", "Blocaje Aéreo", "Prolongación"] }
+    },
+    zones: [ {id:'TL',l:'Arr Izq'},{id:'TC',l:'Arr Cen'},{id:'TR',l:'Arr Der'}, {id:'ML',l:'Med Izq'},{id:'MC',l:'Centro'},{id:'MR',l:'Med Der'}, {id:'BL',l:'Abj Izq'},{id:'BC',l:'Abj Cen'},{id:'BR',l:'Abj Der'} ],
+    colors: ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'],
+    temp: {},
+
+    init: function() {
+        if(localStorage.getItem('gk_v7_1_pro')) this.data = JSON.parse(localStorage.getItem('gk_v7_1_pro'));
+        if(!this.data.voronoi) this.data.voronoi = { points: [], team: 'A', bgImage: null, ball: null }; 
+        if(!this.data.teams) this.data.teams = { A: "ROJO", B: "AZUL" };
+
+        this.renderGKSelect(); this.renderMatchSelect(); this.renderGrid(); this.updateTable();
+        this.updateTeamNamesUI(); 
+        
+        requestAnimationFrame(() => {
+            this.resizeCanvas();
+        });
+        window.onresize = () => this.resizeCanvas();
+        
+        const cv = document.getElementById('cvPitch');
+        cv.addEventListener('mousedown', (e) => this.inputStart(e));
+        cv.addEventListener('mousemove', (e) => this.inputMove(e));
+        window.addEventListener('mouseup', (e) => this.inputEnd(e));
+        cv.addEventListener('dblclick', (e) => this.inputDblClick(e));
+        cv.addEventListener('touchstart', (e) => this.inputStart(e), {passive:false});
+        cv.addEventListener('touchmove', (e) => this.inputMove(e), {passive:false});
+        window.addEventListener('touchend', (e) => this.inputEnd(e));
+        
+        this.setMode('org'); 
+        this.updateViewUI();
+        this.updateStatsUI();
+        this.drawPitch(); 
+    },
+
+    save: function() { localStorage.setItem('gk_v7_1_pro', JSON.stringify(this.data)); },
+
+    // --- INPUT (DRAG & DROP) ---
+    getPos: function(e) {
+        let c = document.getElementById('cvPitch');
+        let r = c.getBoundingClientRect();
+        let t = (e.changedTouches) ? e.changedTouches[0] : e;
+        return { 
+            x: ((t.clientX - r.left) / r.width) * 100, 
+            y: ((t.clientY - r.top) / r.height) * 100 
+        };
+    },
+    getDist: function(p1, p2) { return Math.sqrt(Math.pow(p1.x-p2.x, 2) + Math.pow(p1.y-p2.y, 2)); },
+
+    inputStart: function(e) {
+        if(e.type === 'touchstart') e.preventDefault();
+        let p = this.getPos(e);
+
+        if (this.vizMode === 'VORONOI') {
+            let found = null;
+            this.data.voronoi.points.forEach((pt, idx) => { if(this.getDist(p, pt) < 5) found = { type: 'player', idx: idx }; });
+            if(!found && this.data.voronoi.ball) { if(this.getDist(p, this.data.voronoi.ball) < 5) found = { type: 'ball' }; }
+
+            if (found) {
+                this.dragTarget = found; 
+            } else {
+                if (this.data.voronoi.team === 'BALL') { this.data.voronoi.ball = { x: p.x, y: p.y }; } 
+                else { this.data.voronoi.points.push({ x: p.x, y: p.y, team: this.data.voronoi.team }); }
+                this.drawPitch();
+            }
+        } else if (this.vizMode === 'LIVE') {
+            if(this.data.modeP==='org'){this.data.pitch.ox=p.x;this.data.pitch.oy=p.y;}
+            else{this.data.pitch.ax=p.x;this.data.pitch.ay=p.y;}
+            this.drawPitch();
+        }
+    },
+    inputMove: function(e) {
+        if(e.type === 'touchmove') e.preventDefault();
+        if(!this.dragTarget) return; 
+        let p = this.getPos(e);
+        if (this.dragTarget.type === 'player') { this.data.voronoi.points[this.dragTarget.idx].x = p.x; this.data.voronoi.points[this.dragTarget.idx].y = p.y; } 
+        else if (this.dragTarget.type === 'ball') { this.data.voronoi.ball.x = p.x; this.data.voronoi.ball.y = p.y; }
+        this.drawPitch();
+    },
+    inputEnd: function(e) { this.dragTarget = null; },
+    inputDblClick: function(e) {
+        let p = this.getPos(e);
+        if (this.vizMode === 'VORONOI') {
+            let delIdx = -1;
+            this.data.voronoi.points.forEach((pt, idx) => { if(this.getDist(p, pt) < 5) delIdx = idx; });
+            if(delIdx > -1) { this.data.voronoi.points.splice(delIdx, 1); this.drawPitch(); return; }
+            if(this.data.voronoi.ball && this.getDist(p, this.data.voronoi.ball) < 5) { this.data.voronoi.ball = null; this.drawPitch(); }
+        }
+    },
+
+    // --- VISUALIZACIÓN ---
+    setVizMode: function(mode) {
+        this.vizMode = mode;
+        document.querySelectorAll('.viz-btn').forEach(b => { b.classList.toggle('active', b.dataset.mode === mode); });
+        
+        document.getElementById('liveControls').style.display = (mode === 'LIVE') ? 'flex' : 'none';
+        document.getElementById('voronoiControls').style.display = (mode === 'VORONOI') ? 'flex' : 'none';
+        
+        const showFilter = (mode === 'HEAT' || mode === 'TACTICAL');
+        document.getElementById('vizFilter').style.display = showFilter ? 'block' : 'none';
+        
+        this.drawPitch();
+    },
+    
+    setVizFilter: function(val) { this.vizFilter = val; this.drawPitch(); },
+
+    // --- VORONOI LOGIC ---
+    setVoronoiTeam: function(t) {
+        this.data.voronoi.team = t;
+        document.getElementById('grpA').classList.toggle('selected', t==='A');
+        document.getElementById('grpB').classList.toggle('selected', t==='B');
+        document.getElementById('btnBall').classList.toggle('active', t==='BALL');
+    },
+    renameTeam: function(t) {
+        let newName = prompt("Nombre del equipo:", this.data.teams[t]);
+        if (newName) {
+            this.data.teams[t] = newName.toUpperCase().substr(0, 10);
+            this.save();
+            this.updateTeamNamesUI();
+        }
+    },
+    updateTeamNamesUI: function() {
+        document.getElementById('nameTeamA').innerText = this.data.teams.A;
+        document.getElementById('nameTeamB').innerText = this.data.teams.B;
+    },
+    loadFrame: function(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.data.voronoi.bgImage = e.target.result;
+                this.drawPitch();
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    },
+    clearVoronoi: function() {
+        this.data.voronoi.points = [];
+        this.data.voronoi.ball = null;
+        this.drawPitch();
+    },
+
+    // --- CANVAS ENGINE ---
+    resizeCanvas: function() {
+        let c = document.getElementById('cvPitch'); 
+        if(!c || c.offsetParent === null) return;
+        
+        const dpr = window.devicePixelRatio || 1;
+        const rect = c.parentElement.getBoundingClientRect();
+
+        c.width = rect.width * dpr;
+        c.height = rect.height * dpr;
+        
+        let ctx = c.getContext('2d');
+        ctx.scale(dpr, dpr);
+        
+        c.style.width = rect.width + 'px';
+        c.style.height = rect.height + 'px';
+
+        this.drawPitch();
+    },
+
+    setMode: function(m) { 
+        this.data.modeP = m; 
+        const btnOrg = document.getElementById('btnOrg');
+        const btnAct = document.getElementById('btnAct');
+        if (m === 'org') {
+            btnOrg.classList.add('active'); btnOrg.style.backgroundColor = "#f1c40f"; btnOrg.style.color = "#000";
+            btnAct.classList.remove('active'); btnAct.style.backgroundColor = "rgba(0,0,0,0.7)"; btnAct.style.color = "#ccc";
+        } else {
+            btnAct.classList.add('active'); btnAct.style.backgroundColor = "#3498db"; btnAct.style.color = "#fff";
+            btnOrg.classList.remove('active'); btnOrg.style.backgroundColor = "rgba(0,0,0,0.7)"; btnOrg.style.color = "#ccc";
+        }
+    },
+
+    drawPitch: function() {
+        let c = document.getElementById('cvPitch');
+        let ctx = c.getContext('2d');
+        let W = c.clientWidth;
+        let H = c.clientHeight;
+
+        ctx.clearRect(0, 0, W, H);
+
+        const sX = W / 68;
+        const sY = H / 52.5;
+        const scale = Math.min(sX, sY) * 0.98; 
+        const oX = (W - 68 * scale) / 2;
+        const oY = (H - 52.5 * scale) / 2;
+        const s = (m) => m * scale; 
+
+        // 1. FONDO
+        if (this.vizMode === 'VORONOI' && this.data.voronoi.bgImage) {
+            let img = new Image();
+            img.src = this.data.voronoi.bgImage;
+            if(img.complete) {
+                ctx.drawImage(img, 0, 0, W, H);
+            } else {
+                img.onload = () => { ctx.drawImage(img, 0, 0, W, H); this.drawVoronoiLayer(ctx,W,H); };
+                return;
+            }
+        } else {
+            let grd = ctx.createLinearGradient(0,0,0,H); grd.addColorStop(0,"#204a2e"); grd.addColorStop(1,"#265a38");
+            ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
+            this.drawFieldLines(ctx, W, H, oX, oY, s);
+        }
+
+        // 2. CAPAS SUPERIORES
+        if (this.vizMode === 'HEAT') {
+            this.drawHeatmap(ctx, W, H);
+        } else if (this.vizMode === 'TACTICAL') {
+            this.drawTactical(ctx, W, H);
+        } else if (this.vizMode === 'VORONOI') {
+            this.drawVoronoiLayer(ctx, W, H);
+        } else {
+            let ox=this.data.pitch.ox/100*W, oy=this.data.pitch.oy/100*H, ax=this.data.pitch.ax/100*W, ay=this.data.pitch.ay/100*H;
+            ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ax,ay); 
+            ctx.strokeStyle="rgba(255,255,0,0.5)"; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+            
+            ctx.beginPath(); ctx.arc(ox,oy,s(0.5),0,Math.PI*2); ctx.fillStyle="#f1c40f"; ctx.fill(); 
+            ctx.lineWidth=1.5; ctx.strokeStyle="#000"; ctx.stroke(); 
+            ctx.fillStyle="#fff"; ctx.font="bold 10px sans-serif"; ctx.textAlign="center"; ctx.fillText("BALÓN", ox, oy-12);
+            
+            ctx.beginPath(); ctx.arc(ax,ay,s(0.5),0,Math.PI*2); ctx.fillStyle="#3498db"; ctx.fill(); ctx.stroke();
+            ctx.fillStyle="#fff"; ctx.fillText("PORTERO", ax, ay-12);
+        }
+    },
+
+    getPolygonArea: function(points) {
+        let area = 0;
+        for (let i = 0; i < points.length; i++) {
+            let j = (i + 1) % points.length;
+            area += points[i][0] * points[j][1];
+            area -= points[j][0] * points[i][1];
+        }
+        return Math.abs(area / 2);
+    },
+
+    drawVoronoiLayer: function(ctx, W, H) {
+        const points = this.data.voronoi.points;
+        const ball = this.data.voronoi.ball;
+
+        if (points.length >= 2) {
+            // CALCULAR LÍMITES EXACTOS DEL CAMPO (Igual que en drawPitch)
+            const sX = W / 68;
+            const sY = H / 52.5;
+            const scale = Math.min(sX, sY) * 0.98;
+            const oX = (W - 68 * scale) / 2;
+            const oY = (H - 52.5 * scale) / 2;
+            const endX = oX + (68 * scale);
+            const endY = oY + (52.5 * scale);
+
+            const formattedPoints = points.map(p => [(p.x/100)*W, (p.y/100)*H]);
+            const delaunay = d3.Delaunay.from(formattedPoints);
+            // RESTRICCION: Usamos el rectángulo del campo, no del canvas
+            const voronoi = delaunay.voronoi([oX, oY, endX, endY]);
+            
+            let attackingTeam = null;
+            let ballOwnerIdx = -1;
+            
+            if (ball) {
+                let minD = Infinity;
+                points.forEach((p, i) => {
+                    let d = Math.sqrt(Math.pow(p.x - ball.x, 2) + Math.pow(p.y - ball.y, 2));
+                    if (d < minD) { minD = d; attackingTeam = p.team; ballOwnerIdx = i; }
+                });
+            }
+
+            let bestOptionIdx = -1;
+            let maxArea = -1;
+
+            if (attackingTeam) {
+                for (let i = 0; i < points.length; i++) {
+                    if (points[i].team === attackingTeam && i !== ballOwnerIdx) {
+                        const polygon = voronoi.cellPolygon(i);
+                        if (polygon) {
+                            const area = this.getPolygonArea(polygon);
+                            if (area > maxArea) {
+                                maxArea = area;
+                                bestOptionIdx = i;
+                            }
+                        }
+                    }
+                }
+            }
+
+            ctx.save();
+            // CLIP para asegurar visualización perfecta
+            ctx.beginPath();
+            ctx.rect(oX, oY, endX - oX, endY - oY);
+            ctx.clip();
+
+            for (let i = 0; i < points.length; i++) {
+                ctx.beginPath();
+                voronoi.renderCell(i, ctx);
+                ctx.fillStyle = points[i].team === 'A' ? "rgba(255, 0, 0, 0.3)" : "rgba(0, 0, 255, 0.3)";
+                
+                if (i === bestOptionIdx) {
+                    ctx.fillStyle = points[i].team === 'A' ? "rgba(255, 50, 50, 0.6)" : "rgba(50, 50, 255, 0.6)";
+                }
+                
+                ctx.fill();
+                
+                if (i === bestOptionIdx) {
+                    ctx.lineWidth = 3; 
+                    ctx.strokeStyle = "#f1c40f";
+                } else {
+                    ctx.lineWidth = 1; 
+                    ctx.strokeStyle = "rgba(255,255,255,0.5)"; 
+                }
+                ctx.stroke();
+
+                if (i === bestOptionIdx) {
+                    const polygon = voronoi.cellPolygon(i);
+                    let cx = 0, cy = 0;
+                    polygon.forEach(p => { cx+=p[0]; cy+=p[1]; });
+                    cx /= polygon.length; cy /= polygon.length;
+                    
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "bold 10px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.shadowColor="black"; ctx.shadowBlur=4;
+                    ctx.fillText("★ MEJOR OPCIÓN", cx, cy);
+                    ctx.shadowBlur=0;
+                }
+            }
+            ctx.restore();
+        }
+
+        points.forEach(p => {
+            ctx.beginPath(); ctx.arc((p.x/100)*W, (p.y/100)*H, 4, 0, 2*Math.PI);
+            ctx.fillStyle = p.team === 'A' ? 'red' : 'blue'; 
+            ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        });
+
+        if (ball) {
+            let bx = (ball.x / 100) * W;
+            let by = (ball.y / 100) * H;
+            ctx.beginPath(); ctx.arc(bx, by, 6, 0, 2*Math.PI);
+            ctx.fillStyle = "#f1c40f"; ctx.fill();
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.beginPath(); ctx.arc(bx-2, by-2, 2, 0, 2*Math.PI); ctx.fillStyle = "#fff"; ctx.fill();
+        }
+    },
+
+    drawFieldLines: function(ctx, W, H, oX, oY, s) {
+        const PMW=68, PMH=52.5, BOXW=40.32, BOXH=16.5, GOALW=18.32, GOALH=5.5, SPOT=11, RAD=9.15;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = Math.max(1, s(0.08)); 
+        ctx.beginPath();
+        ctx.strokeRect(oX, oY, s(PMW), s(PMH));
+        ctx.strokeRect(oX+s((PMW-BOXW)/2), oY, s(BOXW), s(BOXH));
+        ctx.strokeRect(oX+s((PMW-GOALW)/2), oY, s(GOALW), s(GOALH));
+        
+        let py = oY+s(SPOT), px = W/2;
+        ctx.moveTo(px+s(0.2), py); ctx.arc(px, py, s(0.2), 0, Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+        
+        let angle = Math.acos((BOXH-SPOT)/RAD);
+        ctx.moveTo(px + s(RAD)*Math.cos(Math.PI/2-angle), oY+s(BOXH));
+        ctx.arc(px, py, s(RAD), Math.PI/2-angle, Math.PI/2+angle);
+        ctx.stroke();
+        
+        ctx.lineWidth = Math.max(1.5, s(0.12)); ctx.strokeStyle = "rgba(255,255,255,0.8)"; 
+        ctx.beginPath();
+        ctx.moveTo(oX+s((PMW-7.32)/2), oY-s(1)); ctx.lineTo(oX+s((PMW-7.32)/2), oY);
+        ctx.lineTo(oX+s((PMW+7.32)/2), oY); ctx.lineTo(oX+s((PMW+7.32)/2), oY-s(1)); ctx.stroke();
+    },
+
+    drawHeatmap: function(ctx, W, H) {
+        const actions = this.getFilteredActions();
+        actions.forEach(a => {
+            const x = (a.pitch.ax / 100) * W;
+            const y = (a.pitch.ay / 100) * H;
+            const grd = ctx.createRadialGradient(x, y, 2, x, y, 40);
+            grd.addColorStop(0, "rgba(231, 76, 60, 0.4)"); 
+            grd.addColorStop(1, "rgba(231, 76, 60, 0)");
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        
+        if(this.vizFilter !== 'ALL') {
+            ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "12px sans-serif"; ctx.textAlign="left";
+            ctx.fillText("FILTRO: " + this.vizFilter, 10, H-10);
+        }
+    },
+
+    drawTactical: function(ctx, W, H) {
+        const actions = this.getFilteredActions();
+        actions.forEach(a => {
+            const ox = (a.pitch.ox / 100) * W;
+            const oy = (a.pitch.oy / 100) * H;
+            const ax = (a.pitch.ax / 100) * W;
+            const ay = (a.pitch.ay / 100) * H;
+            
+            let color = '#2ecc71'; 
+            if(a.res === 'KO') color = '#f39c12'; 
+            if(a.res === 'GOL') color = '#c0392b';
+
+            ctx.strokeStyle = color; ctx.fillStyle = color;
+
+            if (a.cat === 'Ofensivo') {
+                this.drawArrow(ctx, ox, oy, ax, ay, color);
+            } else {
+                ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ax, ay); ctx.stroke(); ctx.setLineDash([]);
+                ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI*2); ctx.fill();
+                if (a.res === 'GOL') {
+                    ctx.beginPath(); ctx.moveTo(ax-4, ay-4); ctx.lineTo(ax+4, ay+4); 
+                    ctx.moveTo(ax+4, ay-4); ctx.lineTo(ax-4, ay+4); ctx.lineWidth=2; ctx.strokeStyle=color; ctx.stroke();
+                }
+            }
+        });
+    },
+
+    drawArrow: function(ctx, fromx, fromy, tox, toy, color) {
+        var headlen = 10; var dx = tox - fromx; var dy = toy - fromy; var angle = Math.atan2(dy, dx);
+        ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.fillStyle = color;
+        ctx.beginPath(); ctx.moveTo(fromx, fromy); ctx.lineTo(tox, toy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(tox, toy);
+        ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.fill();
+    },
+
+    getFilteredActions: function() {
+        let acts = this.data.actions.filter(a => a.gk == this.data.gk && a.match == this.data.match);
+        if (this.vizFilter === 'DEF') {
+            acts = acts.filter(a => ['Defensa','Blocaje','Duelo','TecnicaPie'].includes(a.cat) || a.cat==='Desplazamiento');
+        } else if (this.vizFilter === 'OFF') {
+            acts = acts.filter(a => a.cat === 'Ofensivo');
+        } else if (this.vizFilter === 'AIR') {
+            acts = acts.filter(a => a.cat === 'Aéreo');
+        } else if (this.vizFilter === 'GOL') {
+            acts = acts.filter(a => a.res === 'GOL');
+        }
+        return acts;
+    },
+
+    setView: function(viewId) {
+        if(viewId === 'EXPORT') this.viewMode = 4;
+        this.updateViewUI();
+    },
+
+    cycleView: function() { this.viewMode = (this.viewMode + 1) % 4; this.updateViewUI(); },
+    updateViewUI: function() {
+        ['viewField','viewRadar','viewScatter1','viewScatter2', 'viewExport'].forEach((v,i) => {
+            const el = document.getElementById(v);
+            if(el) el.style.display = (i === this.viewMode) ? 'flex' : 'none';
+        });
+        
+        const btn = document.getElementById('btnStats');
+        btn.innerText = "📊 ESTATS"; btn.style.background = "#3498db";
+        
+        if(this.viewMode===0) { this.resizeCanvas(); }
+        else if(this.viewMode===1) { btn.innerText = "🕸️ RADAR"; btn.style.background = "#9b59b6"; this.renderRadar(); }
+        else if(this.viewMode===2) { btn.innerText = "🔵 RENDIM."; btn.style.background = "#2ecc71"; this.renderScatter1(); }
+        else if(this.viewMode===3) { btn.innerText = "🟠 DISTRIB."; btn.style.background = "#e67e22"; this.renderScatter2(); }
+    },
+
+    openMenu: function(cat, key) {
+        this.temp = { cat:cat, key:key }; document.getElementById('mTitle').innerText = key;
+        let h = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">`;
+        if (this.db[cat] && this.db[cat][key]) {
+             this.db[cat][key].forEach(v => { h += `<button onclick="app.askRes('${v}')" style="padding:12px; background:#333; color:#eee; border:1px solid #555; border-radius:6px; cursor:pointer; font-weight:600;">${v}</button>`; });
+        } else {
+             h += `<button onclick="app.askRes('Genérico')" style="grid-column:span 2; padding:12px; background:#333; color:#eee;">Registrar Genérico</button>`;
+        }
+        h += `</div>`; document.getElementById('mContent').innerHTML = h; document.getElementById('modal').classList.add('open');
+    },
+    askRes: function(variant) {
+        this.temp.var = variant; document.getElementById('mTitle').innerText = "RESULTADO";
+        let isXG = (this.temp.cat==='Defensa'||this.temp.cat==='Blocaje'||this.temp.cat==='Duelo');
+        let h = `<div style="display:flex; gap:8px; margin-bottom:12px;"><input id="tMin" type="number" placeholder="Min" style="flex:1; padding:10px; background:#222; color:white; border:1px solid #555; border-radius:4px; text-align:center;"><input id="tSec" type="number" placeholder="Seg" style="flex:1; padding:10px; background:#222; color:white; border:1px solid #555; border-radius:4px; text-align:center;"></div>`;
+        if(isXG) h += `<input id="txG" type="number" step="0.01" placeholder="xGOT (Ej: 0.35)" style="width:100%; padding:10px; background:#222; border:1px solid #f1c40f; color:#f1c40f; margin-bottom:15px; border-radius:4px; text-align:center; font-weight:bold;">`;
+        h += `<div style="display:flex; flex-direction:column; gap:8px;">
+            <button onclick="app.saveAct('OK')" style="padding:14px; background:#27ae60; border:none; color:white; font-weight:800; border-radius:6px;">✅ ÉXITO (PARADA/PASE)</button>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <button onclick="app.saveAct('KO')" style="padding:14px; background:#f39c12; border:none; color:black; font-weight:800; border-radius:6px;">⚠️ FALLO (NO GOL)</button>
+                <button onclick="app.saveAct('GOL')" style="padding:14px; background:#c0392b; border:none; color:white; font-weight:800; border-radius:6px;">🥅 GOL ENCAJADO</button>
+            </div>
+        </div>`;
+        document.getElementById('mContent').innerHTML = h;
+        if(!document.getElementById('modal').classList.contains('open')) document.getElementById('modal').classList.add('open');
+    },
+    quickReg: function(cat, key, res) { this.temp = {cat:cat, key:key, var:'-', isQuick:true}; this.askRes('-'); },
+    saveAct: function(res) {
+        this.data.actions.unshift({ id: Date.now(), gk: this.data.gk, match: this.data.match, cat: this.temp.cat, key: this.temp.key, var: this.temp.var, res: res, xg: parseFloat(document.getElementById('txG')?.value)||0, min: document.getElementById('tMin')?.value||'', zone: (this.temp.cat==='Defensa'||this.temp.cat==='Blocaje') ? this.data.zone : null, pitch: {...this.data.pitch} });
+        this.save(); this.closeModal(); this.updateTable(); this.updateStatsUI();
+        if(this.vizMode !== 'LIVE') this.drawPitch();
+    },
+    deleteAct: function(id) { if(confirm("¿Eliminar acción?")) { this.data.actions = this.data.actions.filter(a=>a.id!==id); this.save(); this.updateTable(); this.updateStatsUI(); if(this.vizMode !== 'LIVE') this.drawPitch(); } },
+    closeModal: function() { document.getElementById('modal').classList.remove('open'); },
+
+    updateTable: function() {
+        const tb = document.querySelector('#logTable tbody'); tb.innerHTML='';
+        this.data.actions.filter(a => a.gk==this.data.gk && a.match==this.data.match).forEach(a => {
+            let col = a.res==='OK'?'#2ecc71':(a.res==='GOL'?'#c0392b':'#f39c12');
+            tb.innerHTML += `<tr style="border-left:3px solid ${col}"><td>${a.min||'-'}'</td><td><b>${a.key}</b><br><span style="color:#888;font-size:0.6rem">${a.var}</span></td><td style="color:${col};font-weight:bold">${a.res}</td><td><button onclick="app.deleteAct(${a.id})" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1.1rem;">×</button></td></tr>`;
+        });
+    },
+    updateStatsUI: function() {
+        let zs = {}; this.zones.forEach(z=>zs[z.id]={ok:0,tot:0});
+        this.data.actions.forEach(a => { if(a.gk==this.data.gk && a.zone && zs[a.zone]) { zs[a.zone].tot++; if(a.res==='OK') zs[a.zone].ok++; } });
+        this.zones.forEach(z => {
+            let el = document.getElementById('p_'+z.id); if(el) { let d = zs[z.id]; el.innerText = d.tot>0 ? Math.round((d.ok/d.tot)*100)+'%' : '-'; el.style.color = d.tot>0 ? ( (d.ok/d.tot)>=0.8 ? '#2ecc71' : ( (d.ok/d.tot)>=0.5 ? '#f1c40f' : '#e74c3c') ) : '#555'; }
+        });
+    },
+
+    downloadPitchImg: function() { this.downloadCapture('cntPitch', 'GK_Map_Voronoi.png'); },
+    downloadRadarImg: function() { this.downloadCapture('radarCapture', 'GK_Stats_Radar.png'); },
+    downloadScatter1Img: function() { this.downloadCapture('scatter1Capture', 'GK_Stats_Rendimiento.png'); },
+    downloadScatter2Img: function() { this.downloadCapture('scatter2Capture', 'GK_Stats_Distribucion.png'); },
+    downloadCapture: function(id, filename) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        html2canvas(el, { backgroundColor: "#151515", scale: 2 }).then(canvas => {
+            let l = document.createElement('a'); l.href = canvas.toDataURL('image/png'); l.download = filename; l.click();
+        }).catch(err => { alert("Error al generar imagen: " + err); });
+    },
+    renderGKSelect: function() {
+        const s = document.getElementById('selGK'); s.innerHTML = '';
+        this.data.gks.forEach(p => { let o=document.createElement('option'); o.value=p.id; o.innerText=p.name; s.appendChild(o); });
+        s.value = this.data.gk; this.updateCompareUI();
+    },
+    addGK: function() { let n = prompt("Nombre Portero:"); if(n) { let id=Date.now(); this.data.gks.push({id:id, name:n}); this.data.gk=id; this.data.compare.push(id); this.save(); this.renderGKSelect(); this.setGK(); } },
+    setGK: function() { 
+        this.data.gk = parseInt(document.getElementById('selGK').value); 
+        if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); 
+        this.updateTable(); this.updateStatsUI(); this.updateCompareUI(); 
+        if(this.viewMode===1) this.renderRadar(); else if(this.viewMode===2) this.renderScatter1(); else if(this.viewMode===3) this.renderScatter2();
+        if(this.vizMode !== 'LIVE') this.drawPitch();
+    },
+    renderMatchSelect: function() {
+        const s = document.getElementById('selMatch'); s.innerHTML = '';
+        let g1 = document.createElement('optgroup'); g1.label="Temporada";
+        for(let i=1; i<=38; i++) { let o=document.createElement('option'); o.value=i; o.innerText=`Jornada ${i}`; g1.appendChild(o); }
+        s.appendChild(g1);
+        if(this.data.friends.length){ let g2 = document.createElement('optgroup'); g2.label="Amistosos"; this.data.friends.forEach(f => { let o=document.createElement('option'); o.value=f.id; o.innerText=f.name; g2.appendChild(o); }); s.appendChild(g2); }
+        s.value = this.data.match; this.loadMins();
+    },
+    addFriendly: function() { let n = prompt("Nombre Partido:"); if(n) { let id='F-'+Date.now(); this.data.friends.push({id:id, name:n}); this.data.match=id; this.save(); this.renderMatchSelect(); this.setMatch(); } },
+    setMatch: function() { this.data.match = document.getElementById('selMatch').value; this.loadMins(); this.updateTable(); this.updateStatsUI(); if(this.vizMode !== 'LIVE') this.drawPitch();},
+    loadMins: function() { document.getElementById('inMins').value = this.data.mins[this.data.gk+'_'+this.data.match] || 90; },
+    saveMins: function() { this.data.mins[this.data.gk+'_'+this.data.match] = parseInt(document.getElementById('inMins').value); this.save(); },
+    renderGrid: function() {
+        const g = document.getElementById('goalGrid'); g.innerHTML = '';
+        this.zones.forEach(z => {
+            let b = document.createElement('div'); b.className = 'zone-btn ' + (this.data.zone===z.id?'active':'');
+            b.innerHTML = `<span class="zone-name">${z.l}</span><span id="p_${z.id}" class="zone-pct">-</span>`;
+            b.onclick = () => { this.data.zone = z.id; this.renderGrid(); };
+            g.appendChild(b);
+        });
+    },
+    updateCompareUI: function() {
+        let c = document.getElementById('compareList'); c.innerHTML='';
+        this.data.gks.forEach((g,i) => {
+            let col = this.colors[i%this.colors.length];
+            let chk = this.data.compare.includes(g.id);
+            c.innerHTML += `<div style="display:flex;align-items:center;gap:5px;background:#222;padding:4px 8px;border-radius:12px;border:1px solid ${col}"><span style="width:10px;height:10px;border-radius:50%;background:${col}"></span><input type="checkbox" ${chk?'checked':''} onclick="app.toggleComp(${g.id})"><span style="color:#ccc;font-size:0.75rem">${g.name}</span></div>`;
+        });
+    },
+    toggleComp: function(id) {
+        if(this.data.compare.includes(id)) this.data.compare = this.data.compare.filter(c=>c!==id); else this.data.compare.push(id);
+        if(!this.data.compare.includes(this.data.gk)) this.data.compare.push(this.data.gk); 
+        this.updateViewUI();
+    },
+    
+    renderRadar: function() {
+        let cv=document.getElementById('cvRadar'); cv.width=cv.parentElement.clientWidth; cv.height=cv.parentElement.clientHeight;
+        let ctx=cv.getContext('2d'), W=cv.width, H=cv.height, cx=W/2, cy=H/2, r=Math.min(W,H)*0.32; 
+        let isP90 = document.getElementById('chkP90').checked;
+        ctx.clearRect(0,0,W,H); ctx.strokeStyle="#444"; ctx.lineWidth=1; ctx.fillStyle="#aaa"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center";
+        
+        let lbls=["BLOCAJES", "DESVÍOS", "J. PIE", "1vs1 / TEC", "AÉREO", "PSxG"];
+        let totalAxes = 6;
+        let totalRings = 6; 
+
+        for(let l=1; l<=totalRings; l++){ 
+            ctx.beginPath(); 
+            for(let i=0;i<totalAxes;i++){ 
+                let a=(Math.PI*2*i)/totalAxes-Math.PI/2; 
+                let d=r*(l/totalRings); 
+                ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*d, cy+Math.sin(a)*d); 
+            } 
+            ctx.closePath(); 
+            ctx.lineWidth = (l === 5) ? 2 : 1; 
+            ctx.strokeStyle = (l === 5) ? "#666" : "#333";
+            ctx.stroke(); 
+            ctx.fillStyle = "#555"; ctx.font="8px sans-serif";
+            ctx.fillText((l*20)+"%", cx, cy - r*(l/totalRings) - 2);
+        }
+        
+        ctx.lineWidth=1; ctx.strokeStyle="#444"; ctx.fillStyle="#aaa"; ctx.font="bold 9px sans-serif";
+        for(let i=0;i<totalAxes;i++){ 
+            let a=(Math.PI*2*i)/totalAxes-Math.PI/2; 
+            let x=cx+Math.cos(a)*(r+25), y=cy+Math.sin(a)*(r+25); 
+            ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
+            ctx.fillText(lbls[i], x, y); 
+        }
+
+        this.data.gks.forEach((g,i)=>{ 
+            if(this.data.compare.includes(g.id)) { 
+                let s=this.getStats(g.id, isP90); 
+                this.drawPoly(ctx, cx, cy, r, s.v, this.colors[i%this.colors.length], g.id==this.data.gk, totalAxes); 
+            } 
+        });
+        
+        let ms=this.getStats(this.data.gk, isP90);
+        let s = ms.raw;
+        let renderBox = (label, ok, tot, color) => {
+            let pct = tot > 0 ? Math.round((ok/tot)*100) : 0;
+            return `
+            <div class="r-box" style="border-left:2px solid ${color}">
+                <span class="r-val" style="color:${color}">${pct}%</span>
+                <span class="r-count">(${ok}/${tot})</span>
+                <span class="r-lbl">${label}</span>
+            </div>`;
+        };
+
+        document.getElementById('radarStats').innerHTML = `
+            ${renderBox("BLOCAJES", s.bloc.o, s.bloc.t, "#2ecc71")}
+            ${renderBox("DESVÍOS", s.desv.o, s.desv.t, "#27ae60")}
+            ${renderBox("1vs1", s.duel.o, s.duel.t, "#e74c3c")}
+            ${renderBox("AÉREO", s.air.o, s.air.t, "#f39c12")}
+            ${renderBox("DISTRIB.", s.dist.o, s.dist.t, "#3498db")}
+            ${renderBox("DESPLAZ.", s.move.o, s.move.t, "#9b59b6")}
+            ${renderBox("TEC. PIE", s.tec.o, s.tec.t, "#e67e22")}
+            ${renderBox("REINCORP.", s.rec.o, s.rec.t, "#1abc9c")}
+            <div class="r-box" style="border-left:2px solid #f1c40f">
+                <span class="r-val" style="color:#f1c40f">${ms.psxg.toFixed(2)}</span>
+                <span class="r-count" style="color:#c0392b">(${s.gol} Goles)</span>
+                <span class="r-lbl">PSxG</span>
+            </div>
+        `;
+    },
+
+    getStats: function(id, p90) {
+        let acts=this.data.actions.filter(a=>a.gk==id);
+        let s={ 
+            bloc:{o:0,t:0}, desv:{o:0,t:0}, dist:{o:0,t:0}, duel:{o:0,t:0}, 
+            air:{o:0,t:0}, move:{o:0,t:0}, tec:{o:0,t:0}, rec:{o:0,t:0}, 
+            xg:0, gol:0 
+        };
+        
+        let mins=0; [...new Set(acts.map(a=>a.match))].forEach(m=>mins+=(this.data.mins[id+'_'+m]||90)); if(mins==0)mins=90;
+        
+        acts.forEach(a=>{ 
+            if(a.res==='GOL') s.gol++;
+            s.xg += (a.xg||0);
+            let isOk = (a.res==='OK');
+            if(a.cat==='Blocaje') { s.bloc.t++; if(isOk) s.bloc.o++; }
+            else if(a.cat==='Defensa') { s.desv.t++; if(isOk) s.desv.o++; }
+            else if(a.cat==='Ofensivo') { s.dist.t++; if(isOk) s.dist.o++; }
+            else if(a.cat==='Duelo') { s.duel.t++; if(isOk) s.duel.o++; }
+            else if(a.cat==='Aéreo') { s.air.t++; if(isOk) s.air.o++; }
+            else if(a.cat==='Desplazamiento') { s.move.t++; if(isOk) s.move.o++; }
+            else if(a.cat==='TecnicaPie') { s.tec.t++; if(isOk) s.tec.o++; }
+            else if(a.key==='Reincorporación') { s.rec.t++; if(isOk) s.rec.o++; }
+        });
+        
+        let pct=(o)=>o.t>0?o.o/o.t:0, fac=90/mins, psxg=(s.xg-s.gol)*(p90?fac:1), norm=0.5+(psxg/(p90?2:5));
+        let clamp = (v) => Math.max(0, Math.min(1.2, v));
+        let vRadar = [pct(s.bloc), pct(s.desv), pct(s.dist), (s.duel.t+s.tec.t)>0 ? (s.duel.o+s.tec.o)/(s.duel.t+s.tec.t) : 0, pct(s.air), clamp(norm)];
+        return { v:vRadar, psxg:psxg, raw:s };
+    },
+
+    drawPoly: function(ctx,cx,cy,r,d,c,m,total){ 
+        ctx.beginPath(); 
+        for(let i=0;i<total;i++){ 
+            let a=(Math.PI*2*i)/total-Math.PI/2; 
+            let scaleFactor = d[i] / 1.2;
+            let val = Math.max(0.05, Math.min(1, scaleFactor)); 
+            ctx[i==0?'moveTo':'lineTo'](cx+Math.cos(a)*r*val, cy+Math.sin(a)*r*val); 
+        } 
+        ctx.closePath(); 
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle=c; 
+        ctx.lineWidth=m?3:1.5; 
+        ctx.stroke(); 
+        if(m){ctx.fillStyle=c+'44';ctx.fill();} 
+    },
+    
+    renderScatter1: function() {
+        const ctx = document.getElementById('chartB1').getContext('2d');
+        if(this.charts['b1']) this.charts['b1'].destroy();
+        
+        let datasets = [];
+        this.data.gks.forEach((g,i) => {
+            if(!this.data.compare.includes(g.id)) return;
+            let acts = this.data.actions.filter(a => a.gk == g.id);
+            if(acts.length === 0) return;
+
+            let xgSum = 0, goals = 0, saves = 0;
+            acts.forEach(a => { xgSum+=a.xg; if(a.res=='GOL') goals++; if(a.res=='OK' && (a.cat=='Defensa'||a.cat=='Blocaje'||a.cat=='Duelo')) saves++; });
+            
+            datasets.push({
+                label: g.name,
+                data: [{ x: xgSum, y: (xgSum - goals), r: saves > 0 ? (saves/(saves+goals))*20 : 5 }],
+                backgroundColor: this.colors[i%this.colors.length] + '88',
+                borderColor: this.colors[i%this.colors.length],
+            });
+        });
+
+        this.charts['b1'] = new Chart(ctx, {
+            type: 'bubble',
+            data: { datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { title: {display:true, text:'PSxG Total', color:'#aaa'}, grid:{color:'#333'}, ticks:{color:'#ddd'} },
+                    y: { title: {display:true, text:'Goles Prevenidos', color:'#aaa'}, grid:{color:'#333'}, ticks:{color:'#ddd'} }
+                },
+                plugins: { legend: {labels:{color:'#fff'}} }
+            }
+        });
+    },
+
+    renderScatter2: function() {
+        const ctx = document.getElementById('chartB2').getContext('2d');
+        if(this.charts['b2']) this.charts['b2'].destroy();
+
+        let datasets = [];
+        this.data.gks.forEach((g,i) => {
+            if(!this.data.compare.includes(g.id)) return;
+            let acts = this.data.actions.filter(a => a.gk == g.id && a.cat=='Ofensivo');
+            if(acts.length === 0) return;
+
+            let sOk=0, sTot=0, lOk=0, lTot=0;
+            const longs = ["Largo (Campo Rival)", "Volea", "Bote Pronto", "Pase Largo", "Mano (Béisbol)"];
+            acts.forEach(a => {
+                let isLong = longs.some(l => a.var.includes(l) || a.key.includes('Largo'));
+                if(isLong) { lTot++; if(a.res=='OK') lOk++; } else { sTot++; if(a.res=='OK') sOk++; }
+            });
+            if((sTot+lTot)===0) return;
+            datasets.push({
+                label: g.name,
+                data: [{ x: lTot>0 ? (lOk/lTot)*100 : 0, y: sTot>0 ? (sOk/sTot)*100 : 0, r: (sTot+lTot) * 0.5 }],
+                backgroundColor: this.colors[i%this.colors.length] + '88',
+                borderColor: this.colors[i%this.colors.length],
+            });
+        });
+
+        this.charts['b2'] = new Chart(ctx, {
+            type: 'bubble',
+            data: { datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { title: {display:true, text:'% Acierto Largo', color:'#aaa'}, min:0, max:100, grid:{color:'#333'}, ticks:{color:'#ddd'} },
+                    y: { title: {display:true, text:'% Acierto Corto', color:'#aaa'}, min:0, max:100, grid:{color:'#333'}, ticks:{color:'#ddd'} }
+                },
+                plugins: { legend: {labels:{color:'#fff'}} }
+            }
+        });
+    },
+
+    endMatch: function() { if(confirm("¿Finalizar Jornada?")) { if(!isNaN(this.data.match))this.data.match=parseInt(this.data.match)+1; this.data.pitch={ox:50,oy:15,ax:50,ay:90}; this.save(); location.reload(); } },
+    resetData: function() { if(confirm("¿BORRAR TODO?")) { localStorage.removeItem('gk_v6_4_pro'); location.reload(); } },
+    downloadCSV: function() {
+        let c="Jornada,Min,Portero,Cat,Accion,Var,Zona,Res,xG\n";
+        this.data.actions.forEach(a=>{ let gn=this.data.gks.find(g=>g.id==a.gk).name; c+=`${a.match},${a.min},${gn},${a.cat},${a.key},${a.var},${a.zone||''},${a.res},${a.xg}\n`});
+        let b=new Blob([c],{type:'text/csv'}); let l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download='GK_Stats.csv'; l.click();
+    }
+};
+window.onload = () => app.init();
+</script>
+</body>
+</html>

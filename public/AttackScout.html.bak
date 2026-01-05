@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Scout Pro</title>
+    
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/app-data-manager.js"></script>
+
+    <style>
+        /* --- ESTILOS GENERALES (DARK MODE) --- */
+        :root { 
+            --bg: #0f0f0f; --panel: #1a1a1a; --border: #333;
+            --accent: #00e676; --secondary: #2980b9; --text: #ecf0f1; --text-muted: #888;
+            /* Colores Pizza Chart */
+            --c1: rgba(255, 99, 132, 0.7); --c2: rgba(54, 162, 235, 0.7);
+            --c3: rgba(255, 206, 86, 0.7); --c4: rgba(75, 192, 192, 0.7);
+            --c5: rgba(153, 102, 255, 0.7); --c6: rgba(255, 159, 64, 0.7);
+            --c7: rgba(199, 199, 199, 0.7);
+        }
+        * { box-sizing: border-box; outline: none; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #000; border-bottom: 1px solid var(--border); }
+        h1 { margin: 0; font-size: 1.2rem; font-weight: 900; letter-spacing: 1px; }
+        h1 span { color: var(--accent); }
+        
+        /* TABS */
+        .tabs { display: flex; gap: 5px; }
+        .tab-btn { background: #222; border: 1px solid var(--border); color: #888; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+        .tab-btn.active { background: var(--secondary); color: #fff; border-color: var(--secondary); }
+
+        /* LAYOUT */
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 340px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; overflow-y: auto; flex-shrink: 0; }
+        
+        /* CONTROLES */
+        .control-group { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333; }
+        .control-group label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+        
+        input[type="file"], select, input[type="number"] { width: 100%; background: #111; color: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 5px; }
+        
+        .filter-row { display: flex; gap: 5px; }
+        
+        button.btn-main { width: 100%; background: var(--accent); color: #000; border: none; padding: 10px; font-weight: 800; cursor: pointer; border-radius: 4px; margin-top: 5px; transition: 0.2s; }
+        button.btn-main:hover { filter: brightness(1.1); transform: scale(1.02); }
+        button:disabled { background: #444; cursor: not-allowed; transform: none; }
+
+        /* SLIDERS */
+        .slider-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 0.75rem; }
+        .slider-row span { width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .slider-row input { flex: 1; margin: 0 10px; accent-color: var(--accent); cursor: pointer; height: 4px; }
+        .slider-val { width: 30px; text-align: right; color: var(--accent); font-weight: bold; }
+
+        /* RESULTADOS */
+        .player-list { flex: 1; overflow-y: auto; margin-top: 5px; }
+        .player-card { background: #151515; padding: 10px; border-radius: 4px; border: 1px solid #333; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .player-card:hover { background: #222; }
+        .player-card.active { border-left: 4px solid var(--accent); background: #222; }
+        .pc-info b { display: block; font-size: 0.85rem; }
+        .pc-info span { font-size: 0.7rem; color: #888; }
+        .pc-score { font-weight: bold; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; background: #333; min-width: 45px; text-align: center; }
+
+        /* COLA DE ARCHIVOS */
+        .file-queue-item { background: #222; padding: 8px; border-radius: 4px; margin-bottom: 5px; border-left: 3px solid #f39c12; }
+        .file-queue-item .fname { font-weight: bold; font-size: 0.75rem; color: #fff; }
+        .file-queue-item .fsize { font-size: 0.65rem; color: #888; margin: 2px 0; }
+        .file-queue-item .fbtns { display: flex; gap: 5px; margin-top: 5px; }
+        .file-queue-item .fbtn { padding: 4px 8px; border: none; border-radius: 3px; font-size: 0.65rem; cursor: pointer; flex: 1; }
+        .fbtn-ok { background: #27ae60; color: white; font-weight: bold; }
+        .fbtn-ok:hover { background: #2ecc71; }
+        .fbtn-skip { background: #555; color: white; }
+        .fbtn-skip:hover { background: #666; }
+
+        .content-area { flex: 1; padding: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; background: #121212; }
+        .view-section { display: none; height: 100%; flex-direction: column; }
+        .view-section.active { display: flex; }
+
+        /* PIZZA CHART AREA */
+        .chart-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; min-height: 0; padding: 20px; }
+        .print-btn { position: absolute; top: 0; right: 0; background: #333; color: #fff; border: 1px solid #555; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 0.8rem; z-index: 10; }
+
+        /* TABLA DE ANÁLISIS */
+        .analysis-panel { height: 30%; background: #1a1a1a; border-top: 1px solid #333; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+        .stat-bars { display: flex; flex-direction: column; gap: 8px; }
+        .stat-row { display: flex; align-items: center; font-size: 0.8rem; }
+        .stat-label { width: 100px; color: #aaa; }
+        .stat-track { flex: 1; background: #333; height: 8px; border-radius: 4px; margin: 0 10px; overflow: hidden; position: relative; }
+        .stat-fill { height: 100%; background: var(--secondary); width: 0%; transition: width 1s ease; }
+        .stat-val { width: 40px; text-align: right; font-weight: bold; }
+        .stat-pct { width: 60px; text-align: right; color: var(--accent); font-size: 0.75rem; }
+
+        /* IMPRESIÓN */
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body { background: #fff; color: #000; display: block; height: auto; overflow: visible; }
+            .sidebar, .tabs, .print-btn, header { display: none !important; }
+            .content-area { padding: 0; display: block; }
+            .view-section { display: none; }
+            #viewProfile { display: block !important; }
+            .chart-wrapper { height: 450px; page-break-inside: avoid; }
+            .analysis-panel { height: auto; border: none; background: none; color: #000; }
+            .stat-track { background: #eee; }
+            .report-header { display: block !important; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px; }
+            .report-header h1 { font-size: 26px; margin-bottom: 5px; }
+            .similars-print { display: block !important; margin-top: 30px; }
+            .sim-item-print { padding: 8px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 12px; }
+        }
+        .report-header, .similars-print { display: none; }
+        #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; display:none; justify-content:center; align-items:center; color: var(--accent); flex-direction: column; }
+    </style>
+</head>
+<body>
+
+<div id="loader">
+    <div style="font-size:2rem; margin-bottom:10px;">⚽</div>
+    <div>Procesando Base de Datos...</div>
+</div>
+
+<header>
+    <h1>ATTACK<span>SCOUT</span> <span style="font-size:0.6em; color:#888;">PRO v5.0</span></h1>
+    <div class="tabs">
+        <div class="tab-btn active" onclick="switchTab('viewProfile', this)">🍕 PIZZA CHART</div>
+        <div class="tab-btn" onclick="switchTab('viewScatter', this)">📉 SCATTER</div>
+    </div>
+</header>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <div class="control-group">
+            <label>1. DATOS (XLSX)</label>
+            <input type="file" id="filesInput" accept=".xlsx" onchange="onFileSelected()">
+            <div id="fileQueue" style="margin-top:8px; max-height:120px; overflow-y:auto; display:none;"></div>
+        </div>
+
+        <div class="control-group">
+            <label>2. TARGET</label>
+            <select id="targetSelect" disabled onchange="onTargetChange()"><option>Carga datos primero...</option></select>
+        </div>
+
+        <div class="control-group">
+            <label>3. FILTROS DE BÚSQUEDA</label>
+            <select id="filterPos">
+                <option value="">Todas las Posiciones</option>
+            </select>
+            <div class="filter-row">
+                <input type="number" id="ageMin" placeholder="Edad Mín" min="15" max="45">
+                <input type="number" id="ageMax" placeholder="Edad Máx" min="15" max="45">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <label style="margin:0">4. PESOS (ALGORITMO)</label>
+                <span style="font-size:0.6rem; cursor:pointer; color:var(--secondary);" onclick="resetWeights()">Reset</span>
+            </div>
+            <div id="slidersContainer"></div>
+            <button class="btn-main" id="btnSearch" onclick="findSimilars()" disabled>🔍 BUSCAR SIMILARES</button>
+        </div>
+
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <label>RESULTADOS TOP 15</label>
+            <div class="player-list" id="resultsList"></div>
+        </div>
+    </div>
+
+    <div class="content-area">
+        
+        <div id="viewProfile" class="view-section active">
+            <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR PDF</button>
+
+            <div class="report-header">
+                <h1 id="printName">Nombre Jugador</h1>
+                <div id="printInfo">Equipo | Edad | Posición</div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="pizzaChart"></canvas>
+            </div>
+
+            <div class="analysis-panel">
+                <label style="color:#fff; margin-bottom:10px; display:block;">📊 ANÁLISIS DE RENDIMIENTO (Percentiles vs Base de Datos)</label>
+                <div id="statsBarsContainer" class="stat-bars"></div>
+            </div>
+
+            <div class="similars-print">
+                <h3>JUGADORES SIMILARES ENCONTRADOS</h3>
+                <div id="printSimilars"></div>
+            </div>
+        </div>
+
+        <div id="viewScatter" class="view-section">
+            <div style="background:#222; padding:10px; display:flex; gap:10px; border-radius:6px; margin-bottom:10px;">
+                <select id="axisX" onchange="updateScatter()" style="margin:0; width:auto;"><option value="xThreat">xThreat</option></select>
+                <select id="axisY" onchange="updateScatter()" style="margin:0; width:auto;"><option value="xBuild" selected>xBuild</option></select>
+            </div>
+            <div style="flex:1; position:relative; background:#151515; border-radius:8px; border:1px solid #333; padding:10px;">
+                <canvas id="scatterChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// --- CONFIGURACIÓN ---
+const METRICS = ['xG', 'xBuild', 'xThreat', 'Creacion', 'Ataque', 'Defensa', 'Pases'];
+const METRIC_LABELS = {
+    'xG': 'Goles Esp.', 'xBuild': 'Construcción', 'xThreat': 'Amenaza (xT)',
+    'Creacion': 'Creación', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
+};
+// Colores para el Pizza Chart (Uno por métrica)
+const PIZZA_COLORS = [
+    'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)', 
+    'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(201, 203, 207, 0.6)'
+];
+
+// Variables globales de datos
+let RAW_DB = [];
+let NORMALIZED_DB = [];
+let WEIGHTS = {};
+let chartInstance = null;
+let scatterInstance = null;
+let POSITIONS_FOUND = new Set();
+// Estado global para persistencia (capturado por AppDataManager)
+const STATE = {
+    rawDB: [],
+    normalizedDB: [],
+    positions: [],
+    weights: {}
+};
+
+// Función para sincronizar STATE con las variables globales
+function syncState() {
+    STATE.rawDB = RAW_DB;
+    STATE.normalizedDB = NORMALIZED_DB;
+    STATE.positions = Array.from(POSITIONS_FOUND);
+    STATE.weights = WEIGHTS;
+}
+
+
+window.onload = () => { 
+    renderSliders(); 
+    resetWeights(); 
+        // Restaurar datos desde STATE si el AppDataManager los cargó
+        setTimeout(() => {
+            if (STATE.rawDB && STATE.rawDB.length > 0) {
+                RAW_DB = STATE.rawDB;
+                NORMALIZED_DB = STATE.normalizedDB;
+                POSITIONS_FOUND = new Set(STATE.positions || []);
+                WEIGHTS = STATE.weights || {};
+            
+                populateUI();
+                document.getElementById('targetSelect').disabled = false;
+                document.getElementById('btnSearch').disabled = false;
+                console.log('[AttackScout] Datos restaurados desde STATE:', RAW_DB.length, 'jugadores');
+            }
+        }, 500);
+    
+    // Restaurar datos guardados si existen
+    try {
+        const savedRaw = localStorage.getItem('attackscout_rawdb');
+        const savedNormalized = localStorage.getItem('attackscout_normalizeddb');
+        const savedPositions = localStorage.getItem('attackscout_positions');
+        
+        if (savedRaw && savedNormalized) {
+            RAW_DB = JSON.parse(savedRaw);
+            NORMALIZED_DB = JSON.parse(savedNormalized);
+            if (savedPositions) {
+                POSITIONS_FOUND = new Set(JSON.parse(savedPositions));
+            }
+            populateUI();
+            document.getElementById('targetSelect').disabled = false;
+            document.getElementById('btnSearch').disabled = false;
+            console.log('[AttackScout] Datos restaurados desde localStorage');
+        }
+    } catch(e) {
+        console.warn('Error restaurando datos:', e);
+    }
+};
+
+// --- UI ---
+function switchTab(id, btn) {
+    document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+    btn.classList.add('active');
+    if(id === 'viewScatter' && RAW_DB.length) updateScatter();
+}
+
+function renderSliders() {
+    const c = document.getElementById('slidersContainer');
+    c.innerHTML = METRICS.map(m => `
+        <div class="slider-row">
+            <span>${METRIC_LABELS[m]}</span>
+            <input type="range" id="w_${m}" min="0" max="100" value="50" oninput="updateW('${m}',this.value)">
+            <div id="val_${m}" class="slider-val">0.5</div>
+        </div>`).join('');
+}
+function updateW(m, v) { 
+    WEIGHTS[m] = parseFloat((v/100).toFixed(1)); 
+    document.getElementById(`val_${m}`).innerText = WEIGHTS[m];
+    syncState();
+}
+function resetWeights() { 
+    METRICS.forEach(m => { 
+        document.getElementById(`w_${m}`).value=50; 
+        updateW(m,50); 
+    }); 
+    syncState();
+}
+
+// --- LECTURA DE DATOS ---
+async function loadDatabase() {
+    const input = document.getElementById('filesInput');
+    if(!input.files.length) return;
+    document.getElementById('loader').style.display = 'flex';
+    
+    const pMap = {};
+    POSITIONS_FOUND.clear();
+
+    for(let f of input.files) {
+        await new Promise(res => {
+            const r = new FileReader();
+            r.onload = e => {
+                try {
+                    const wb = XLSX.read(e.target.result, {type:'array'});
+                    const ws = wb.Sheets["Jugadores"];
+                    if(ws) {
+                        XLSX.utils.sheet_to_json(ws).forEach(row => {
+                            const name = row["Jugador"];
+                            if(!name) return;
+                            const team = row["Equipo"] || "Free Agent";
+                            const pos = row["Posicion"] || "N/A"; // Nuevo campo
+                            const age = row["Edad"] || 25;       // Nuevo campo
+                            
+                            if(pos !== "N/A") POSITIONS_FOUND.add(pos);
+
+                            const id = `${name}|${team}`;
+                            if(!pMap[id]) pMap[id] = { id, name, team, pos, age, matches:0, stats:{} };
+                            
+                            pMap[id].matches++;
+                            METRICS.forEach(m => {
+                                if(!pMap[id].stats[m]) pMap[id].stats[m] = 0;
+                                pMap[id].stats[m] += (row[m] || 0);
+                            });
+                        });
+                    }
+                } catch(err) { console.error(err); }
+                res();
+            };
+            r.readAsArrayBuffer(f);
+        });
+    }
+
+    // Promediar y guardar
+    RAW_DB = Object.values(pMap).map(p => {
+        const obj = { id:p.id, name:p.name, team:p.team, pos:p.pos, age:p.age };
+        METRICS.forEach(m => obj[m] = p.stats[m] / p.matches);
+        return obj;
+    });
+
+    normalizeData();
+    populateUI();
+    
+    // Sincronizar con STATE para persistencia automática
+    syncState();
+    
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('targetSelect').disabled = false;
+    document.getElementById('btnSearch').disabled = false;
+}
+
+function normalizeData() {
+    const maxs = {};
+    METRICS.forEach(m => maxs[m] = 0);
+    RAW_DB.forEach(p => METRICS.forEach(m => { if(p[m]>maxs[m]) maxs[m]=p[m]; }));
+    
+    NORMALIZED_DB = RAW_DB.map(p => {
+        const n = { ...p, raw: { ...p } }; // Guardar raw dentro
+        METRICS.forEach(m => n[m] = maxs[m] ? p[m]/maxs[m] : 0);
+        return n;
+    });
+}
+
+function populateUI() {
+    // Select Target
+    const sel = document.getElementById('targetSelect');
+    sel.innerHTML = '<option value="">Selecciona Jugador...</option>';
+    RAW_DB.sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.text = `${p.name} (${p.team})`;
+        sel.appendChild(opt);
+    });
+
+    // Select Posicion (Filtro)
+    const posSel = document.getElementById('filterPos');
+    posSel.innerHTML = '<option value="">Todas las Posiciones</option>';
+    Array.from(POSITIONS_FOUND).sort().forEach(pos => {
+        const opt = document.createElement('option');
+        opt.value = pos;
+        opt.text = pos;
+        posSel.appendChild(opt);
+    });
+
+    // Scatter axes
+    ['axisX','axisY'].forEach(id => {
+        const el = document.getElementById(id);
+        el.innerHTML = METRICS.map(m => `<option value="${m}">${METRIC_LABELS[m]}</option>`).join('');
+        if(id==='axisY') el.value = METRICS[1];
+    });
+}
+
+// --- ALGORITMO Y BÚSQUEDA ---
+function findSimilars() {
+    const targetId = document.getElementById('targetSelect').value;
+    if(!targetId) return;
+    
+    const target = NORMALIZED_DB.find(p => p.id === targetId);
+
+    // 1. FILTRADO (CATEGORÍA 1)
+    const fPos = document.getElementById('filterPos').value;
+    const fMin = parseInt(document.getElementById('ageMin').value) || 0;
+    const fMax = parseInt(document.getElementById('ageMax').value) || 100;
+
+    const pool = NORMALIZED_DB.filter(p => {
+        if(p.id === targetId) return false; // Excluirse a sí mismo
+        if(fPos && p.pos !== fPos) return false;
+        if(p.age < fMin || p.age > fMax) return false;
+        return true;
+    });
+
+    // 2. CÁLCULO DISTANCIA
+    const results = pool.map(other => {
+        let sumSq = 0, sumW = 0;
+        METRICS.forEach(m => {
+            const diff = target[m] - other[m];
+            sumSq += (diff*diff) * WEIGHTS[m];
+            sumW += WEIGHTS[m];
+        });
+        const dist = sumW > 0 ? Math.sqrt(sumSq/sumW) : 1;
+        const sim = Math.max(0, 100 - (dist*100*1.5));
+        return { ...other, similarity: sim };
+    });
+
+    results.sort((a,b) => b.similarity - a.similarity);
+    
+    renderResults(results.slice(0,15));
+    updateProfile(target, results[0] || null); // Mostrar target y el top 1 (si existe)
+    updatePrintSimilars(results.slice(0,5));
+}
+
+function onTargetChange() { document.getElementById('btnSearch').click(); }
+
+function renderResults(list) {
+    const div = document.getElementById('resultsList');
+    div.innerHTML = '';
+    list.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'player-card';
+        // Color por similitud
+        const c = p.similarity > 90 ? '#00e676' : (p.similarity>80 ? '#f1c40f' : '#e74c3c');
+        el.innerHTML = `
+            <div class="pc-info"><b>${p.name}</b><span>${p.team} | ${p.pos} | ${p.age} años</span></div>
+            <div class="pc-score" style="color:${c}">${p.similarity.toFixed(1)}%</div>
+        `;
+        el.onclick = () => { updateProfile(NORMALIZED_DB.find(x=>x.id === document.getElementById('targetSelect').value), p); };
+        div.appendChild(el);
+    });
+}
+
+// --- VISUALIZACIONES & ESTADÍSTICAS ---
+
+// Helper: Calcular Percentil (CATEGORÍA 2)
+function calculatePercentil(metric, value, dataset) {
+    // Cuántos tienen un valor menor a 'value'
+    const lowerCount = dataset.filter(p => p[metric] < value).length;
+    return Math.round((lowerCount / dataset.length) * 100);
+}
+
+function updateProfile(target, comparison) {
+    // Textos
+    document.getElementById('printName').innerText = comparison ? `Comparativa: ${target.name} vs ${comparison.name}` : target.name;
+    document.getElementById('printInfo').innerText = `${target.team} (${target.pos}) | Edad: ${target.age}`;
+
+    // --- CHART (PIZZA) ---
+    const ctx = document.getElementById('pizzaChart').getContext('2d');
+    if(chartInstance) chartInstance.destroy();
+
+    const datasets = [{
+        label: target.name,
+        data: METRICS.map(m => target[m]*100),
+        backgroundColor: PIZZA_COLORS,
+        borderColor: '#111',
+        borderWidth: 2
+    }];
+    
+    // Si hay comparación, añadimos un borde o dataset (En Pizza chart es mejor ver uno solo o superponer con cuidado)
+    // Para simplificar "Pro V5", mostraremos los datos del TARGET en Pizza, y la comparación en barras abajo.
+    // Opcional: Podríamos poner datasets[1], pero PolarArea se vuelve confuso con 2 series. 
+    // Vamos a dejar el Pizza Chart SOLO del TARGET para limpieza visual.
+    
+    chartInstance = new Chart(ctx, {
+        type: 'polarArea', // CATEGORÍA 3
+        data: { labels: METRICS.map(m => METRIC_LABELS[m]), datasets: datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { r: { display: false, min:0, max:100 } }, // Ocultar grilla fea
+            plugins: {
+                legend: { display: true, position: 'right', labels:{color:'#fff'} },
+                tooltip: { callbacks: { label: (c) => `${c.label}: ${c.raw.toFixed(0)} (Norm)` } }
+            }
+        }
+    });
+
+    // --- BARRAS DE PERCENTILES (CATEGORÍA 2) ---
+    const container = document.getElementById('statsBarsContainer');
+    container.innerHTML = '';
+
+    METRICS.forEach(m => {
+        // Usamos RAW_DB para calcular percentiles reales sobre valores absolutos
+        const pVal = target.raw[m];
+        const pct = calculatePercentil(m, target[m], NORMALIZED_DB); // Usamos normalized para percentil relativo rápido
+        
+        let compHTML = '';
+        if(comparison) {
+            const cPct = calculatePercentil(m, comparison[m], NORMALIZED_DB);
+            // Pequeño indicador para el comparado
+            compHTML = `<div style="position:absolute; top:-2px; left:${cPct}%; width:4px; height:12px; background:#fff; z-index:2; box-shadow:0 0 4px #000;" title="${comparison.name}: ${cPct}"></div>`;
+        }
+
+        const color = pct > 80 ? '#00e676' : (pct > 50 ? '#f1c40f' : '#e74c3c');
+        
+        container.innerHTML += `
+            <div class="stat-row">
+                <div class="stat-label">${METRIC_LABELS[m]}</div>
+                <div class="stat-track">
+                    ${compHTML}
+                    <div class="stat-fill" style="width:${pct}%; background:${color}"></div>
+                </div>
+                <div class="stat-val">${pVal.toFixed(2)}</div>
+                <div class="stat-pct">P${pct}</div>
+            </div>
+        `;
+    });
+}
+
+function updatePrintSimilars(list) {
+    document.getElementById('printSimilars').innerHTML = list.map(p => `
+        <div class="sim-item-print">
+            <strong>${p.name}</strong> 
+            <span>${p.team} - Sim: ${p.similarity.toFixed(1)}%</span>
+        </div>
+    `).join('');
+}
+
+function updateScatter() {
+    const xK = document.getElementById('axisX').value;
+    const yK = document.getElementById('axisY').value;
+    const ctx = document.getElementById('scatterChart').getContext('2d');
+    
+    // Respetar filtros actuales
+    const fPos = document.getElementById('filterPos').value;
+    const data = RAW_DB.filter(p => !fPos || p.pos === fPos).map(p => ({ x:p[xK], y:p[yK], n:p.name, t:p.team }));
+
+    if(scatterInstance) scatterInstance.destroy();
+    scatterInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Jugadores', data: data, backgroundColor: '#00e676', pointRadius:4 }] },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            scales: {
+                x: { grid:{color:'#333'}, title:{display:true,text:METRIC_LABELS[xK],color:'#888'} },
+                y: { grid:{color:'#333'}, title:{display:true,text:METRIC_LABELS[yK],color:'#888'} }
+            },
+            plugins: { tooltip: { callbacks: { label: (c)=> `${c.raw.n} (${c.raw.t})` } }, legend:{display:false} }
+        }
+    });
+}
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
     <script src="/app-data-manager.js"></script>
 
     <style>
@@ -720,11 +721,12 @@
         <option value="Banda">Banda</option>
     </select>
     
-    <select class="header-select" id="viewMode" onchange="drawPitch()" style="background:#2c3e50;color:#fff;width:75px">
+    <select class="header-select" id="viewMode" onchange="drawPitch()" style="background:#2c3e50;color:#fff;width:85px">
         <option value="LIVE">🎥 VIVO</option>
         <option value="ALL">🏹 TAC</option>
         <option value="HEAT">🔥 MAP</option>
         <option value="XBUILD">🏗 xBUILD</option>
+        <option value="VORONOI">🗺️ VOR</option>
     </select>
     
     <select class="header-select" id="teamView" onchange="onTeamSelect()"><option value="HOME">L</option><option value="AWAY">V</option><option value="ALL">T</option></select>
@@ -1797,6 +1799,7 @@ function drawPitch(dragS, dragE) {
     let actionsToDraw = filtered;
     if(viewMode === 'LIVE') actionsToDraw = filtered.slice(-2); // Solo las últimas 2
     else if(viewMode === 'HEAT') actionsToDraw = []; // El Heatmap va aparte
+    else if(viewMode === 'VORONOI') actionsToDraw = []; // El Voronoi va aparte
 
     // Lógica para invertir visualización de acciones pasadas
     const shouldInvertVisuals = (STATE.invertSides !== STATE.isSecondHalf);
@@ -1813,6 +1816,11 @@ function drawPitch(dragS, dragE) {
             ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.fill();
         });
         ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // PINTAR VORONOI (Si está activo)
+    if(viewMode === 'VORONOI') {
+        drawVoronoiDiagram(ctx, w, h, filtered, shouldInvertVisuals);
     }
 
     // 6. PINTAR FLECHAS (CON SEMÁFORO xBUILD)
@@ -1867,6 +1875,93 @@ function drawPitch(dragS, dragE) {
         ctx.strokeStyle="white"; ctx.fillStyle="white"; ctx.lineWidth=3; 
         arrow(ctx, (dragS.x/100)*w, (dragS.y/100)*h, (dragE.x/100)*w, (dragE.y/100)*h); 
     }
+}
+
+// --- FUNCIÓN VORONOI ---
+function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
+    // Extraer posiciones únicas de jugadores
+    const playerPositions = {};
+    const teamColor = {};
+    
+    actions.forEach(a => {
+        const team = a.team;
+        if (!playerPositions[a.player]) {
+            playerPositions[a.player] = { x: a.x, y: a.y, team: team, count: 0 };
+        }
+        playerPositions[a.player].count++;
+    });
+
+    const players = Object.values(playerPositions);
+    if (players.length < 2) { 
+        ctx.fillStyle = "rgba(200,200,200,0.3)"; 
+        ctx.font = "20px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Insuficientes posiciones de jugadores", w/2, h/2);
+        return;
+    }
+
+    // Convertir coordenadas para d3-delaunay (0-100 a píxeles)
+    const formattedPoints = players.map(p => {
+        let px = p.x, py = p.y;
+        if (shouldInvert) { px = 100 - px; py = 100 - py; }
+        return [(px/100)*w, (py/100)*h];
+    });
+
+    // Calcular límites del campo
+    const fieldX1 = w*0.05, fieldY1 = h*0.05;
+    const fieldX2 = w*0.95, fieldY2 = h*0.95;
+
+    // Generar Voronoi
+    const delaunay = d3.Delaunay.from(formattedPoints);
+    const voronoi = delaunay.voronoi([fieldX1, fieldY1, fieldX2, fieldY2]);
+
+    // Dibujar celdas Voronoi
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(fieldX1, fieldY1, fieldX2 - fieldX1, fieldY2 - fieldY1);
+    ctx.clip();
+
+    const colorHome = "rgba(52, 152, 219, 0.2)";
+    const colorAway = "rgba(231, 76, 60, 0.2)";
+
+    for (let i = 0; i < players.length; i++) {
+        ctx.beginPath();
+        voronoi.renderCell(i, ctx);
+        
+        ctx.fillStyle = players[i].team === 'HOME' ? colorHome : colorAway;
+        ctx.fill();
+        
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = players[i].team === 'HOME' ? "rgba(52, 152, 219, 0.6)" : "rgba(231, 76, 60, 0.6)";
+        ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Dibujar puntos de jugadores
+    players.forEach((p, idx) => {
+        let px = p.x, py = p.y;
+        if (shouldInvert) { px = 100 - px; py = 100 - py; }
+        const x = (px/100)*w, y = (py/100)*h;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, 2*Math.PI);
+        ctx.fillStyle = p.team === 'HOME' ? '#3498db' : '#e74c3c';
+        ctx.fill();
+        
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Etiqueta con nombre del jugador (truncado)
+        ctx.fillStyle = '#fff';
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.shadowColor = "#000";
+        ctx.shadowBlur = 3;
+        ctx.fillText(p.player.substr(0, 3), x, y - 12);
+        ctx.shadowBlur = 0;
+    });
 }
 
 function arrow(ctx, x1, y1, x2, y2) {
@@ -2252,11 +2347,11 @@ function getStats(name, isTeam=false) {
     // 4. Volumen (Sin cambios)
     const vol = Math.min(acts.length * (isTeam ? 0.16 : 1.25), 100);
     
-    // 5. Creación (Incluye Centros) - AUMENTADO: necesita 60+ acciones para 100%
-    const creat = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type)).length * (isTeam ? 0.15 : 1.4);
+    // 5. Creación (Incluye Centros) - AUMENTADO: necesita 140+ acciones para 100%
+    const creat = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type)).length * (isTeam ? 0.075 : 0.7);
     
-    // 6. Ataque (AUMENTADO: necesita 40+ acciones para 100%) 
-    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 0.625 : 2.5);
+    // 6. Ataque (AUMENTADO: necesita 80+ acciones para 100%) 
+    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 0.3125 : 1.25);
     
     // --- MODIFICACIÓN DEFENSA ---
     // A) Añadido 'Defensiva' a la lista para contar el botón manual (+1).
