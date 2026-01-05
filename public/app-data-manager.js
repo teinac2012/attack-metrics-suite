@@ -23,10 +23,10 @@ window.AppDataManager = {
       this.loadFromParent();
     }, 500);
     
-    // Auto-guardar cada 30 segundos (reducido para minimizar uso de API)
+    // Auto-guardar cada 5 segundos (garantiza persistencia al cambiar de app)
     this._autoSaveInterval = setInterval(() => {
       this.captureAndSave();
-    }, 30000);
+    }, 5000);
 
     // Guardar antes de descargar
     window.addEventListener('beforeunload', () => {
