@@ -1794,12 +1794,13 @@ let isDrag = false, startP = null;
 
 function setupCanvas() {
     window.addEventListener('resize', drawPitch);
-    cv.addEventListener('mousedown', e => { isDrag=true; startP=getPos(e); });
-    cv.addEventListener('mousemove', e => { if(isDrag) { DB.lastClick = getPos(e); drawPitch(startP, DB.lastClick); } });
-    cv.addEventListener('mouseup', e => finishDrag(e));
-    cv.addEventListener('touchstart', e => { e.preventDefault(); isDrag=true; startP=getPos(e.touches[0]); });
-    cv.addEventListener('touchmove', e => { e.preventDefault(); if(isDrag) { DB.lastClick = getPos(e.touches[0]); drawPitch(startP, DB.lastClick); } });
-    cv.addEventListener('touchend', e => { e.preventDefault(); finishDrag(e.changedTouches[0]); });
+    cv.addEventListener('mousedown', e => { voronoiInputStart(e); isDrag=true; startP=getPos(e); });
+    cv.addEventListener('mousemove', e => { voronoiInputMove(e); if(isDrag) { DB.lastClick = getPos(e); drawPitch(startP, DB.lastClick); } });
+    cv.addEventListener('mouseup', e => { voronoiInputEnd(e); finishDrag(e); });
+    cv.addEventListener('dblclick', e => { voronoiInputDblClick(e); });
+    cv.addEventListener('touchstart', e => { e.preventDefault(); voronoiInputStart(e); isDrag=true; startP=getPos(e.touches[0]); });
+    cv.addEventListener('touchmove', e => { e.preventDefault(); voronoiInputMove(e); if(isDrag) { DB.lastClick = getPos(e.touches[0]); drawPitch(startP, DB.lastClick); } });
+    cv.addEventListener('touchend', e => { e.preventDefault(); voronoiInputEnd(e); finishDrag(e.changedTouches[0]); });
     drawPitch();
 }
 
@@ -1974,62 +1975,114 @@ function drawPitch(dragS, dragE) {
     }
 }
 
-// --- FUNCIÓN VORONOI ---
-function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
-    // Extraer posiciones únicas de jugadores
-    const playerPositions = {};
-    const teamColor = {};
-    
-    actions.forEach(a => {
-        const team = a.team;
-        if (!playerPositions[a.player]) {
-            playerPositions[a.player] = { x: a.x, y: a.y, team: team, count: 0 };
-        }
-        playerPositions[a.player].count++;
-    });
+// --- VARIABLES GLOBALES PARA VORONOI ---
+let voronoiState = {
+    points: [],
+    ball: null,
+    dragTarget: null,
+    fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0
+};
 
-    const players = Object.values(playerPositions);
+// --- FUNCIÓN VORONOI MEJORADA ---
+function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
+    // Guardar límites del campo para interacción
+    voronoiState.fieldX1 = w*0.05;
+    voronoiState.fieldY1 = h*0.05;
+    voronoiState.fieldX2 = w*0.95;
+    voronoiState.fieldY2 = h*0.95;
+
+    // Extraer posiciones únicas de jugadores o usar estado anterior
+    if (voronoiState.points.length === 0) {
+        const playerPositions = {};
+        actions.forEach(a => {
+            if (!playerPositions[a.player]) {
+                playerPositions[a.player] = { x: a.x, y: a.y, team: a.team, name: a.player };
+            }
+        });
+        voronoiState.points = Object.values(playerPositions);
+    }
+
+    const players = voronoiState.points;
+    
     if (players.length < 2) { 
         ctx.fillStyle = "rgba(200,200,200,0.3)"; 
         ctx.font = "20px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Insuficientes posiciones de jugadores", w/2, h/2);
+        ctx.fillText("Insuficientes posiciones de jugadores (Haz clic para agregar)", w/2, h/2);
         return;
     }
 
-    // Convertir coordenadas para d3-delaunay (0-100 a píxeles)
+    // Convertir coordenadas para d3-delaunay
     const formattedPoints = players.map(p => {
         let px = p.x, py = p.y;
         if (shouldInvert) { px = 100 - px; py = 100 - py; }
         return [(px/100)*w, (py/100)*h];
     });
 
-    // Calcular límites del campo
-    const fieldX1 = w*0.05, fieldY1 = h*0.05;
-    const fieldX2 = w*0.95, fieldY2 = h*0.95;
-
-    // Generar Voronoi
+    // Generar Voronoi con límites del campo
     const delaunay = d3.Delaunay.from(formattedPoints);
-    const voronoi = delaunay.voronoi([fieldX1, fieldY1, fieldX2, fieldY2]);
+    const voronoi = delaunay.voronoi([voronoiState.fieldX1, voronoiState.fieldY1, voronoiState.fieldX2, voronoiState.fieldY2]);
 
     // Dibujar celdas Voronoi
     ctx.save();
     ctx.beginPath();
-    ctx.rect(fieldX1, fieldY1, fieldX2 - fieldX1, fieldY2 - fieldY1);
+    ctx.rect(voronoiState.fieldX1, voronoiState.fieldY1, voronoiState.fieldX2 - voronoiState.fieldX1, voronoiState.fieldY2 - voronoiState.fieldY1);
     ctx.clip();
 
     const colorHome = "rgba(52, 152, 219, 0.2)";
     const colorAway = "rgba(231, 76, 60, 0.2)";
+    const colorHomeBright = "rgba(52, 152, 219, 0.5)";
+    const colorAwayBright = "rgba(231, 76, 60, 0.5)";
 
+    // Encontrar polígono con mayor área (mejor opción)
+    let bestOptionIdx = -1;
+    let maxArea = -1;
+    
+    if (voronoiState.ball) {
+        let minDist = Infinity;
+        let ballOwnerIdx = -1;
+        players.forEach((p, i) => {
+            const px = (p.x / 100) * w;
+            const py = (p.y / 100) * h;
+            const dist = Math.sqrt(Math.pow(voronoiState.ball.x - px, 2) + Math.pow(voronoiState.ball.y - py, 2));
+            if (dist < minDist) {
+                minDist = dist;
+                ballOwnerIdx = i;
+            }
+        });
+
+        if (ballOwnerIdx >= 0) {
+            for (let i = 0; i < players.length; i++) {
+                if (players[i].team === players[ballOwnerIdx].team && i !== ballOwnerIdx) {
+                    const polygon = voronoi.cellPolygon(i);
+                    if (polygon) {
+                        const area = getPolygonArea(polygon);
+                        if (area > maxArea) {
+                            maxArea = area;
+                            bestOptionIdx = i;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Dibujar polígonos
     for (let i = 0; i < players.length; i++) {
         ctx.beginPath();
         voronoi.renderCell(i, ctx);
         
-        ctx.fillStyle = players[i].team === 'HOME' ? colorHome : colorAway;
-        ctx.fill();
+        if (i === bestOptionIdx) {
+            ctx.fillStyle = players[i].team === 'HOME' ? colorHomeBright : colorAwayBright;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = players[i].team === 'HOME' ? "#3498db" : "#e74c3c";
+        } else {
+            ctx.fillStyle = players[i].team === 'HOME' ? colorHome : colorAway;
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = players[i].team === 'HOME' ? "rgba(52, 152, 219, 0.6)" : "rgba(231, 76, 60, 0.6)";
+        }
         
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = players[i].team === 'HOME' ? "rgba(52, 152, 219, 0.6)" : "rgba(231, 76, 60, 0.6)";
+        ctx.fill();
         ctx.stroke();
     }
 
@@ -2042,7 +2095,7 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
         const x = (px/100)*w, y = (py/100)*h;
 
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 2*Math.PI);
+        ctx.arc(x, y, 7, 0, 2*Math.PI);
         ctx.fillStyle = p.team === 'HOME' ? '#3498db' : '#e74c3c';
         ctx.fill();
         
@@ -2050,15 +2103,55 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Etiqueta con nombre del jugador (truncado)
+        // Etiqueta
         ctx.fillStyle = '#fff';
-        ctx.font = "bold 10px sans-serif";
+        ctx.font = "bold 11px sans-serif";
         ctx.textAlign = "center";
         ctx.shadowColor = "#000";
         ctx.shadowBlur = 3;
-        ctx.fillText(p.player.substr(0, 3), x, y - 12);
+        ctx.fillText(p.name.substr(0, 3).toUpperCase(), x, y - 14);
         ctx.shadowBlur = 0;
     });
+
+    // Dibujar balón si existe
+    if (voronoiState.ball) {
+        const bx = (voronoiState.ball.x / 100) * w;
+        const by = (voronoiState.ball.y / 100) * h;
+        
+        ctx.beginPath();
+        ctx.arc(bx, by, 6, 0, 2*Math.PI);
+        ctx.fillStyle = "#f1c40f";
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Etiqueta "Balón"
+        ctx.fillStyle = '#fff';
+        ctx.font = "bold 9px sans-serif";
+        ctx.textAlign = "center";
+        ctx.shadowColor = "#000";
+        ctx.shadowBlur = 2;
+        ctx.fillText("⚽", bx, by - 12);
+        ctx.shadowBlur = 0;
+    }
+
+    // Mostrar instrucciones
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("🖱 Arrastra jugadores | 🖱🖱 Doble click para borrar | 🎯 Click en campo para balón", 10, h - 10);
+}
+
+// Helper: Calcular área del polígono
+function getPolygonArea(points) {
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+        let j = (i + 1) % points.length;
+        area += points[i][0] * points[j][1];
+        area -= points[j][0] * points[i][1];
+    }
+    return Math.abs(area / 2);
 }
 
 function arrow(ctx, x1, y1, x2, y2) {
@@ -2075,6 +2168,77 @@ function editTeamNames() {
     let a = prompt("Nombre RIVAL:", DB.config.awayName); if(a) DB.config.awayName = a;
     saveDB(); updateTeamLabels(); updateDash(); 
     drawPitch(); 
+}
+
+// --- FUNCIONES DE ENTRADA VORONOI ---
+function getDist(p1, p2) { 
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)); 
+}
+
+function voronoiInputStart(e) {
+    const viewMode = document.getElementById('viewMode').value;
+    if (viewMode !== 'VORONOI') return;
+    
+    const p = getPos(e);
+    let found = null;
+
+    voronoiState.points.forEach((pt, idx) => { 
+        if (getDist(p, pt) < 5) found = { type: 'player', idx: idx }; 
+    });
+    
+    if (!found && voronoiState.ball) { 
+        if (getDist(p, voronoiState.ball) < 5) found = { type: 'ball' }; 
+    }
+
+    if (found) {
+        voronoiState.dragTarget = found;
+    } else {
+        // Clic en campo vacío = agregar balón
+        voronoiState.ball = { x: p.x, y: p.y };
+        drawPitch();
+    }
+}
+
+function voronoiInputMove(e) {
+    const viewMode = document.getElementById('viewMode').value;
+    if (viewMode !== 'VORONOI' || !voronoiState.dragTarget) return;
+
+    const p = getPos(e);
+    if (voronoiState.dragTarget.type === 'player') {
+        voronoiState.points[voronoiState.dragTarget.idx].x = p.x;
+        voronoiState.points[voronoiState.dragTarget.idx].y = p.y;
+    } else if (voronoiState.dragTarget.type === 'ball') {
+        voronoiState.ball.x = p.x;
+        voronoiState.ball.y = p.y;
+    }
+    drawPitch();
+}
+
+function voronoiInputEnd(e) {
+    voronoiState.dragTarget = null;
+}
+
+function voronoiInputDblClick(e) {
+    const viewMode = document.getElementById('viewMode').value;
+    if (viewMode !== 'VORONOI') return;
+
+    const p = getPos(e);
+    let delIdx = -1;
+    
+    voronoiState.points.forEach((pt, idx) => { 
+        if (getDist(p, pt) < 5) delIdx = idx; 
+    });
+    
+    if (delIdx > -1) {
+        voronoiState.points.splice(delIdx, 1);
+        drawPitch();
+        return;
+    }
+    
+    if (voronoiState.ball && getDist(p, voronoiState.ball) < 5) {
+        voronoiState.ball = null;
+        drawPitch();
+    }
 }
 
 function updateTeamLabels() {
