@@ -683,6 +683,9 @@
     <button class="btn-header btn-save" onclick="document.getElementById('restoreFile').click()">📂</button>
     <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="restoreBackup(this)">
     
+    <button class="btn-header btn-save" onclick="document.getElementById('dataFile').click()">📊</button>
+    <input type="file" id="dataFile" style="display:none" accept=".xlsx,.xls,.csv" onchange="loadDataFile(this)">
+    
     <button class="btn-header" onclick="toggleVideoPanel()" style="color:#f1c40f">🎥</button>
     <button class="btn-header" onclick="editTeamNames()" style="color:#fff">✎</button>
     <button class="btn-header" onclick="openSquad()" style="color:#f39c12">👥</button>
@@ -1321,6 +1324,134 @@ function restoreBackup(input) {
 
     // 5. IMPORTANTE: Limpiar el input para permitir cargar el mismo archivo si hubo error antes
     input.value = ""; 
+}
+
+// --- FUNCIÓN PARA CARGAR DATOS DE EXCEL/CSV ---
+function loadDataFile(input) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    
+    if (isExcel) {
+        // Leer como ArrayBuffer para XLSX
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Obtener la primera hoja
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(worksheet);
+                
+                if (!rows || rows.length === 0) {
+                    alert('❌ El archivo Excel está vacío');
+                    return;
+                }
+                
+                // Procesar datos
+                processLoadedData(rows, file.name);
+                
+            } catch (err) {
+                console.error(err);
+                alert("❌ Error al procesar Excel: " + err.message);
+            }
+        };
+        reader.onerror = () => alert("Error al leer el archivo Excel");
+        reader.readAsArrayBuffer(file);
+    } else {
+        // CSV
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const text = e.target.result;
+                const lines = text.split('\n').filter(l => l.trim());
+                
+                if (lines.length < 2) {
+                    alert('❌ El archivo CSV está vacío');
+                    return;
+                }
+                
+                // Parsear CSV
+                const headers = lines[0].split(',').map(h => h.trim());
+                const rows = lines.slice(1).map(line => {
+                    const values = line.split(',').map(v => v.trim());
+                    const obj = {};
+                    headers.forEach((h, i) => obj[h] = values[i] || '');
+                    return obj;
+                });
+                
+                processLoadedData(rows, file.name);
+                
+            } catch (err) {
+                console.error(err);
+                alert("❌ Error al procesar CSV: " + err.message);
+            }
+        };
+        reader.onerror = () => alert("Error al leer el archivo CSV");
+        reader.readAsText(file);
+    }
+    
+    input.value = "";
+}
+
+// Procesar datos cargados
+function processLoadedData(rows, fileName) {
+    try {
+        // Detectar estructura del archivo
+        const headers = Object.keys(rows[0] || {}).map(h => h.toLowerCase());
+        
+        // Búsqueda flexible de columnas clave
+        const findColumn = (names) => headers.findIndex(h => names.some(n => h.includes(n.toLowerCase())));
+        
+        const colPlayer = findColumn(['jugador', 'player', 'nombre', 'name']);
+        const colType = findColumn(['tipo', 'type', 'acción', 'action']);
+        const colX = findColumn(['x', 'inicio_x', 'start_x']);
+        const colY = findColumn(['y', 'inicio_y', 'start_y']);
+        const colXEnd = findColumn(['x_fin', 'end_x', 'xfin']);
+        const colYEnd = findColumn(['y_fin', 'end_y', 'yfin']);
+        const colResult = findColumn(['resultado', 'result', 'res']);
+        const colTeam = findColumn(['equipo', 'team', 'squad']);
+        
+        if (colPlayer < 0 || colX < 0 || colY < 0) {
+            alert('⚠️ No se encontraron las columnas esperadas (Jugador, X, Y)');
+            return;
+        }
+        
+        // Mapear datos a formato interno
+        const headerKeys = Object.keys(rows[0] || {});
+        const newActions = rows.map((row, idx) => {
+            const action = {
+                id: 'imported_' + Date.now() + '_' + idx,
+                player: row[headerKeys[colPlayer]] || 'UNK',
+                type: row[headerKeys[colType]] || 'Pase',
+                x: parseFloat(row[headerKeys[colX]]) || 50,
+                y: parseFloat(row[headerKeys[colY]]) || 50,
+                endX: colXEnd >= 0 ? parseFloat(row[headerKeys[colXEnd]]) : null,
+                endY: colYEnd >= 0 ? parseFloat(row[headerKeys[colYEnd]]) : null,
+                res: colResult >= 0 ? (row[headerKeys[colResult]] === 'Fallado' ? 'Fallado' : 'Completado') : 'Completado',
+                team: colTeam >= 0 ? (row[headerKeys[colTeam]].toUpperCase().includes('AWAY') ? 'AWAY' : 'HOME') : 'HOME',
+                timestamp: Date.now() + idx
+            };
+            return action;
+        });
+        
+        // Agregar a BD actual
+        DB.actions.push(...newActions);
+        saveDB();
+        
+        // Refrescar UI
+        renderUI();
+        updateDash();
+        drawPitch();
+        
+        showToast(`✅ ${newActions.length} acciones cargadas de ${fileName}`);
+        
+    } catch (err) {
+        console.error(err);
+        alert("❌ Error procesando datos: " + err.message);
+    }
 }
 
 function toggleVideoPanel() {
