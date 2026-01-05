@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attack Scout Pro v5.1</title>
+    <title>Attack Scout Pro</title>
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/app-data-manager.js"></script>
 
     <style>
         /* --- ESTILOS GENERALES (DARK MODE) --- */
@@ -19,91 +18,93 @@
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* HEADER */
-        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #000; border-bottom: 1px solid var(--border); }
-        h1 { margin: 0; font-size: 1.2rem; font-weight: 900; letter-spacing: 1px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #000; border-bottom: 1px solid var(--border); height: 50px; }
+        h1 { margin: 0; font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; }
         h1 span { color: var(--accent); }
         
         /* TABS */
         .tabs { display: flex; gap: 5px; }
-        .tab-btn { background: #222; border: 1px solid var(--border); color: #888; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+        .tab-btn { background: #222; border: 1px solid var(--border); color: #888; padding: 5px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 0.75rem; }
         .tab-btn.active { background: var(--secondary); color: #fff; border-color: var(--secondary); }
 
         /* LAYOUT */
-        .main-layout { display: flex; flex: 1; overflow: hidden; }
-        .sidebar { width: 360px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; overflow-y: auto; flex-shrink: 0; }
+        .main-layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 50px); }
         
-        /* CONTROLES */
-        .control-group { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333; }
-        .control-group label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+        /* SIDEBAR MEJORADA */
+        .sidebar { width: 320px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 10px; flex-shrink: 0; }
         
-        input[type="file"], select, input[type="number"] { width: 100%; background: #111; color: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 5px; }
+        /* CONTROLES COMPACTOS */
+        .control-group { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #333; flex-shrink: 0; }
+        .control-group label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
         
+        input[type="file"], select, input[type="number"] { width: 100%; background: #111; color: #fff; border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-size: 0.75rem; margin-bottom: 4px; }
         .filter-row { display: flex; gap: 5px; }
         
-        button.btn-main { width: 100%; background: var(--accent); color: #000; border: none; padding: 10px; font-weight: 800; cursor: pointer; border-radius: 4px; margin-top: 5px; transition: 0.2s; }
+        button.btn-main { width: 100%; background: var(--accent); color: #000; border: none; padding: 8px; font-weight: 800; cursor: pointer; border-radius: 4px; margin-top: 5px; transition: 0.2s; font-size: 0.8rem; }
         button.btn-main:hover { filter: brightness(1.1); transform: scale(1.02); }
         button:disabled { background: #444; cursor: not-allowed; transform: none; }
 
+        /* ACORDEÓN PARA SLIDERS */
+        .accordion-header { cursor: pointer; background: #222; padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .accordion-content { display: none; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 10px; }
+        .accordion-content.open { display: block; }
+
         /* SLIDERS */
-        .slider-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 0.75rem; }
-        .slider-row span { width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .slider-row input { flex: 1; margin: 0 10px; accent-color: var(--accent); cursor: pointer; height: 4px; }
-        .slider-val { width: 30px; text-align: right; color: var(--accent); font-weight: bold; }
+        .slider-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 0.7rem; }
+        .slider-row span { width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .slider-row input { flex: 1; margin: 0 8px; accent-color: var(--accent); cursor: pointer; height: 3px; }
+        .slider-val { width: 25px; text-align: right; color: var(--accent); font-weight: bold; }
 
-        /* COLA DE ARCHIVOS */
-        .file-queue { background: #222; border: 1px solid #333; border-radius: 4px; padding: 8px; max-height: 150px; overflow-y: auto; display: none; margin-top: 8px; }
-        .file-queue.active { display: block; }
-        .file-item { background: #1a1a1a; padding: 8px; border-radius: 3px; margin-bottom: 6px; border-left: 3px solid #f39c12; }
-        .file-name { font-size: 0.7rem; font-weight: bold; margin-bottom: 4px; }
-        .file-btns { display: flex; gap: 3px; }
-        .f-btn { padding: 4px 8px; border: none; border-radius: 2px; font-size: 0.65rem; cursor: pointer; font-weight: bold; flex: 1; }
-        .f-btn-ok { background: #27ae60; color: white; }
-        .f-btn-ok:hover { background: #2ecc71; }
-        .f-btn-skip { background: #555; color: white; }
-        .f-btn-skip:hover { background: #666; }
+        /* RESULTADOS (LISTA GRANDE) */
+        .results-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+        .results-header { font-size: 0.75rem; font-weight: bold; color: #fff; margin-bottom: 5px; padding-top: 5px; border-top: 1px solid #333; }
+        
+        .player-list { flex: 1; overflow-y: auto; padding-right: 5px; }
+        
+        /* SCROLLBAR */
+        .player-list::-webkit-scrollbar { width: 6px; }
+        .player-list::-webkit-scrollbar-track { background: #111; }
+        .player-list::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
-        /* RESULTADOS - MÁS GRANDES */
-        .player-list { flex: 1; overflow-y: auto; margin-top: 5px; }
-        .player-card { background: #151515; padding: 12px; border-radius: 4px; border: 1px solid #333; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; min-height: 60px; }
-        .player-card:hover { background: #222; border-color: #555; }
-        .player-card.active { border-left: 4px solid var(--accent); background: #222; }
-        .pc-info { flex: 1; }
-        .pc-info b { display: block; font-size: 0.9rem; margin-bottom: 2px; }
-        .pc-info span { font-size: 0.75rem; color: #888; line-height: 1.3; }
-        .pc-score { font-weight: bold; font-size: 0.85rem; padding: 6px 10px; border-radius: 4px; background: #333; min-width: 55px; text-align: center; }
+        .player-card { background: #151515; padding: 8px 10px; border-radius: 4px; border: 1px solid #333; margin-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .player-card:hover { background: #252525; border-color: #555; }
+        .player-card.active { border-left: 4px solid var(--secondary); background: #202020; }
+        .pc-info b { display: block; font-size: 0.8rem; color: #fff; }
+        .pc-info span { font-size: 0.65rem; color: #888; display: block; margin-top: 2px; }
+        .pc-score { font-weight: bold; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; background: #222; min-width: 45px; text-align: center; }
 
         /* CONTENT AREA */
-        .content-area { flex: 1; padding: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; background: #121212; }
+        .content-area { flex: 1; padding: 15px; display: flex; flex-direction: column; overflow: hidden; position: relative; background: #121212; }
         .view-section { display: none; height: 100%; flex-direction: column; }
         .view-section.active { display: flex; }
 
-        /* PIZZA CHART AREA */
-        .chart-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; min-height: 0; padding: 20px; }
+        /* CHART AREA */
+        .chart-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; min-height: 0; padding: 10px; margin-bottom: 10px; }
         .print-btn { position: absolute; top: 0; right: 0; background: #333; color: #fff; border: 1px solid #555; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 0.8rem; z-index: 10; }
 
         /* TABLA DE ANÁLISIS */
-        .analysis-panel { height: 30%; background: #1a1a1a; border-top: 1px solid #333; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
-        .stat-bars { display: flex; flex-direction: column; gap: 8px; }
-        .stat-row { display: flex; align-items: center; font-size: 0.8rem; }
-        .stat-label { width: 100px; color: #aaa; }
-        .stat-track { flex: 1; background: #333; height: 8px; border-radius: 4px; margin: 0 10px; overflow: hidden; position: relative; }
-        .stat-fill { height: 100%; background: var(--secondary); width: 0%; transition: width 1s ease; }
-        .stat-val { width: 40px; text-align: right; font-weight: bold; }
-        .stat-pct { width: 60px; text-align: right; color: var(--accent); font-size: 0.75rem; }
+        .analysis-panel { height: 28%; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+        .stat-bars { display: flex; flex-direction: column; gap: 6px; }
+        .stat-row { display: flex; align-items: center; font-size: 0.75rem; }
+        .stat-label { width: 90px; color: #aaa; }
+        .stat-track { flex: 1; background: #2a2a2a; height: 6px; border-radius: 3px; margin: 0 10px; position: relative; }
+        .stat-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 3px; transition: width 0.5s ease; }
+        .stat-val { width: 35px; text-align: right; font-weight: bold; color: #fff; }
+        .stat-pct { width: 50px; text-align: right; color: var(--accent); font-size: 0.7rem; }
 
         /* IMPRESIÓN */
         @media print {
             @page { size: A4; margin: 10mm; }
             body { background: #fff; color: #000; display: block; height: auto; overflow: visible; }
             .sidebar, .tabs, .print-btn, header { display: none !important; }
-            .content-area { padding: 0; display: block; }
+            .content-area { padding: 0; display: block; border: none; }
             .view-section { display: none; }
             #viewProfile { display: block !important; }
-            .chart-wrapper { height: 450px; page-break-inside: avoid; }
+            .chart-wrapper { height: 500px; page-break-inside: avoid; }
             .analysis-panel { height: auto; border: none; background: none; color: #000; }
             .stat-track { background: #eee; }
             .report-header { display: block !important; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px; }
-            .report-header h1 { font-size: 26px; margin-bottom: 5px; }
+            .report-header h1 { font-size: 24px; margin-bottom: 5px; }
         }
         .report-header { display: none; }
         #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; display:none; justify-content:center; align-items:center; color: var(--accent); flex-direction: column; }
@@ -113,11 +114,11 @@
 
 <div id="loader">
     <div style="font-size:2rem; margin-bottom:10px;">⚽</div>
-    <div>Procesando archivo...</div>
+    <div>Procesando Base de Datos...</div>
 </div>
 
 <header>
-    <h1>ATTACK<span>SCOUT</span> <span style="font-size:0.6em; color:#888;">PRO v5.1</span></h1>
+    <h1>ATTACK<span>SCOUT</span> <span style="font-size:0.6em; color:#888;">PRO v5.3</span></h1>
     <div class="tabs">
         <div class="tab-btn active" onclick="switchTab('viewProfile', this)">🍕 RADAR COMPARISON</div>
         <div class="tab-btn" onclick="switchTab('viewScatter', this)">📉 SCATTER</div>
@@ -127,9 +128,8 @@
 <div class="main-layout">
     <div class="sidebar">
         <div class="control-group">
-            <label>1. DATOS (XLSX) - UNO POR UNO</label>
-            <input type="file" id="filesInput" accept=".xlsx" onchange="onFileSelected()">
-            <div id="fileQueue" class="file-queue"></div>
+            <label>1. DATOS (XLSX)</label>
+            <input type="file" id="filesInput" multiple accept=".xlsx" onchange="loadDatabase()">
         </div>
 
         <div class="control-group">
@@ -148,18 +148,27 @@
             </div>
         </div>
 
-        <div class="control-group">
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <label>4. PESOS ALGORITMO</label>
-                <span style="font-size:0.6rem; cursor:pointer; color:var(--secondary);" onclick="resetWeights()">Reset</span>
+        <div class="control-group" style="border:none;">
+            <div class="accordion-header" onclick="toggleSliders()">
+                <span>4. PESOS ALGORITMO</span>
+                <span id="sliderIcon">▼</span>
             </div>
-            <div id="slidersContainer"></div>
+            <div id="slidersPanel" class="accordion-content">
+                <div style="display:flex; justify-content:flex-end; margin-bottom:5px;">
+                    <span style="font-size:0.6rem; cursor:pointer; color:var(--secondary);" onclick="resetWeights()">Resetear</span>
+                </div>
+                <div id="slidersContainer"></div>
+            </div>
             <button class="btn-main" id="btnSearch" onclick="findSimilars()" disabled>🔍 BUSCAR SIMILARES</button>
         </div>
 
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; min-height: 0;">
-            <label style="margin-bottom: 5px; font-size: 0.7rem;">JUGADORES COMPATIBLES</label>
-            <div class="player-list" id="resultsList"></div>
+        <div class="results-container">
+            <div class="results-header">RESULTADOS TOP 15</div>
+            <div class="player-list" id="resultsList">
+                <div style="padding:10px; text-align:center; color:#555; font-size:0.8rem;">
+                    Los resultados aparecerán aquí...
+                </div>
+            </div>
         </div>
     </div>
 
@@ -178,7 +187,9 @@
             </div>
 
             <div class="analysis-panel">
-                <label style="color:#fff; margin-bottom:10px; display:block; font-size:0.8rem;">📊 ANÁLISIS DE RENDIMIENTO</label>
+                <label style="color:#fff; margin-bottom:10px; display:block; font-size:0.8rem;">
+                    📊 COMPARATIVA DE RENDIMIENTO (vs Escala Fija)
+                </label>
                 <div id="statsBarsContainer" class="stat-bars"></div>
             </div>
         </div>
@@ -197,131 +208,38 @@
 </div>
 
 <script>
-// --- CONFIGURACIÓN ---
+// --- CONFIGURACIÓN DE MÉTRICAS ---
 const METRICS = ['xG', 'xBuild', 'xThreat', 'Creacion', 'Ataque', 'Defensa', 'Pases'];
 const METRIC_LABELS = {
     'xG': 'Goles Esp.', 'xBuild': 'Construcción', 'xThreat': 'Amenaza (xT)',
     'Creacion': 'Creación', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
 };
 
-// --- CALIBRADO: LÍMITES FIJOS PARA RADAR ---
+// --- [CALIBRADO] LÍMITES "NIVEL DIOS" PARA EL RADAR (v5.3) ---
+// Ajustados para evitar saturación (100%) en jugadores como Bellido o Angel.
 const MAX_LIMITS = {
-    'xG': 1.2,         
-    'xBuild': 1.5,     
-    'xThreat': 1.0,    
-    'Creacion': 30.0,  
-    'Ataque': 15.0,    
-    'Defensa': 15.0,   
-    'Pases': 60.0      
+    'xG': 1.2,         // Margen seguro.
+    'xBuild': 1.5,     // Correcto para tus datos.
+    'xThreat': 1.0,    // Correcto.
+    'Creacion': 30.0,  // AJUSTADO: Cubre los 24.0 de Bellido (será ~80%).
+    'Ataque': 15.0,    // AJUSTADO: Cubre los 10.0 de Angel (será ~66%).
+    'Defensa': 15.0,   // AJUSTADO: Cubre los 10.0 de Bellido (será ~66%).
+    'Pases': 60.0      // Estándar.
 };
 
 // Variables globales
 let RAW_DB = [], NORMALIZED_DB = [], WEIGHTS = {}, chartInstance = null, scatterInstance = null;
 let POSITIONS_FOUND = new Set();
 let currentTarget = null;
-let fileQueue = [];
+let currentComparison = null;
 
-window.onload = () => { 
-    renderSliders(); 
-    resetWeights(); 
-};
+window.onload = () => { renderSliders(); resetWeights(); };
 
-// --- COLA DE CARGA (UNO POR UNO) ---
-function onFileSelected() {
-    const input = document.getElementById('filesInput');
-    if(!input.files.length) return;
-    
-    fileQueue = Array.from(input.files);
-    renderFileQueue();
-}
-
-function renderFileQueue() {
-    const qDiv = document.getElementById('fileQueue');
-    qDiv.innerHTML = '';
-    
-    if(fileQueue.length === 0) {
-        qDiv.classList.remove('active');
-        return;
-    }
-    
-    qDiv.classList.add('active');
-    
-    fileQueue.forEach((f, idx) => {
-        const el = document.createElement('div');
-        el.className = 'file-item';
-        el.innerHTML = `
-            <div class="file-name">📄 ${f.name}</div>
-            <div class="file-btns">
-                <button class="f-btn f-btn-ok" onclick="processFile(${idx})">✓ Cargar</button>
-                <button class="f-btn f-btn-skip" onclick="skipFile(${idx})">⊗ Saltar</button>
-            </div>
-        `;
-        qDiv.appendChild(el);
-    });
-}
-
-async function processFile(idx) {
-    if(idx >= fileQueue.length) return;
-    
-    const f = fileQueue[idx];
-    document.getElementById('loader').style.display = 'flex';
-    
-    await new Promise(res => {
-        const r = new FileReader();
-        r.onload = e => {
-            try {
-                const wb = XLSX.read(e.target.result, {type:'array'});
-                const ws = wb.Sheets["Jugadores"] || Object.values(wb.Sheets)[0];
-                if(ws) {
-                    const pMap = {};
-                    XLSX.utils.sheet_to_json(ws).forEach(row => {
-                        const name = row["Jugador"];
-                        if(!name) return;
-                        const team = row["Equipo"] || "Free Agent";
-                        const pos = row["Posicion"] || "N/A";
-                        const age = row["Edad"] || 25;
-                        if(pos !== "N/A") POSITIONS_FOUND.add(pos);
-
-                        const id = `${name}|${team}`;
-                        if(!pMap[id]) pMap[id] = { id, name, team, pos, age, matches:0, stats:{} };
-                        pMap[id].matches++;
-                        METRICS.forEach(m => {
-                            if(!pMap[id].stats[m]) pMap[id].stats[m] = 0;
-                            pMap[id].stats[m] += (row[m] || 0);
-                        });
-                    });
-
-                    Object.values(pMap).forEach(p => {
-                        const obj = { id:p.id, name:p.name, team:p.team, pos:p.pos, age:p.age };
-                        METRICS.forEach(m => obj[m] = p.stats[m] / p.matches);
-                        const existing = RAW_DB.find(x => x.id === obj.id);
-                        if(existing) RAW_DB.splice(RAW_DB.indexOf(existing), 1);
-                        RAW_DB.push(obj);
-                    });
-                }
-            } catch(err) { console.error(err); }
-            res();
-        };
-        r.readAsArrayBuffer(f);
-    });
-    
-    fileQueue.splice(idx, 1);
-    renderFileQueue();
-    
-    if(fileQueue.length > 0) {
-        document.getElementById('loader').style.display = 'none';
-    } else {
-        normalizeData();
-        populateUI();
-        document.getElementById('loader').style.display = 'none';
-        document.getElementById('targetSelect').disabled = false;
-        document.getElementById('btnSearch').disabled = false;
-    }
-}
-
-function skipFile(idx) {
-    fileQueue.splice(idx, 1);
-    renderFileQueue();
+function toggleSliders() {
+    const p = document.getElementById('slidersPanel');
+    const i = document.getElementById('sliderIcon');
+    p.classList.toggle('open');
+    i.innerText = p.classList.contains('open') ? '▲' : '▼';
 }
 
 // --- UI ---
@@ -345,15 +263,69 @@ function renderSliders() {
 function updateW(m, v) { WEIGHTS[m] = parseFloat((v/100).toFixed(1)); document.getElementById(`val_${m}`).innerText = WEIGHTS[m]; }
 function resetWeights() { METRICS.forEach(m => { document.getElementById(`w_${m}`).value=50; updateW(m,50); }); }
 
+// --- CARGA DE DATOS ---
+async function loadDatabase() {
+    const input = document.getElementById('filesInput');
+    if(!input.files.length) return;
+    document.getElementById('loader').style.display = 'flex';
+    
+    const pMap = {};
+    POSITIONS_FOUND.clear();
+
+    for(let f of input.files) {
+        await new Promise(res => {
+            const r = new FileReader();
+            r.onload = e => {
+                try {
+                    const wb = XLSX.read(e.target.result, {type:'array'});
+                    const ws = wb.Sheets["Jugadores"] || Object.values(wb.Sheets)[0];
+                    if(ws) {
+                        XLSX.utils.sheet_to_json(ws).forEach(row => {
+                            const name = row["Jugador"];
+                            if(!name) return;
+                            const team = row["Equipo"] || "Free Agent";
+                            const pos = row["Posicion"] || "N/A";
+                            const age = row["Edad"] || 25;
+                            if(pos !== "N/A") POSITIONS_FOUND.add(pos);
+
+                            const id = `${name}|${team}`;
+                            if(!pMap[id]) pMap[id] = { id, name, team, pos, age, matches:0, stats:{} };
+                            pMap[id].matches++;
+                            METRICS.forEach(m => {
+                                if(!pMap[id].stats[m]) pMap[id].stats[m] = 0;
+                                pMap[id].stats[m] += (row[m] || 0);
+                            });
+                        });
+                    }
+                } catch(err) { console.error(err); }
+                res();
+            };
+            r.readAsArrayBuffer(f);
+        });
+    }
+
+    RAW_DB = Object.values(pMap).map(p => {
+        const obj = { id:p.id, name:p.name, team:p.team, pos:p.pos, age:p.age };
+        METRICS.forEach(m => obj[m] = p.stats[m] / p.matches);
+        return obj;
+    });
+
+    normalizeData(); // AQUI SE APLICAN LOS LIMITES FIJOS
+    populateUI();
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('targetSelect').disabled = false;
+    document.getElementById('btnSearch').disabled = false;
+}
+
 // --- NORMALIZACIÓN CON LÍMITES FIJOS ---
 function normalizeData() {
     NORMALIZED_DB = RAW_DB.map(p => {
-        const n = { ...p, raw: { ...p } };
+        const n = { ...p, raw: { ...p } }; // Guardar raw dentro
         METRICS.forEach(m => {
             const val = p[m] || 0;
-            const max = MAX_LIMITS[m] || 1;
+            const max = MAX_LIMITS[m] || 1; // Usar el límite definido arriba
             let norm = val / max;
-            if(norm > 1) norm = 1;
+            if(norm > 1) norm = 1; // Tope máximo 100%
             n[m] = norm;
         });
         return n;
@@ -393,6 +365,7 @@ function findSimilars() {
     
     currentTarget = NORMALIZED_DB.find(p => p.id === targetId);
     
+    // Filtros
     const fPos = document.getElementById('filterPos').value;
     const fMin = parseInt(document.getElementById('ageMin').value) || 0;
     const fMax = parseInt(document.getElementById('ageMax').value) || 100;
@@ -429,7 +402,7 @@ function renderResults(list) {
         el.className = 'player-card';
         const c = p.similarity > 90 ? '#00e676' : (p.similarity>80 ? '#f1c40f' : '#e74c3c');
         el.innerHTML = `
-            <div class="pc-info"><b>${p.name}</b><span>${p.team} | ${p.pos} | ${p.age} años</span></div>
+            <div class="pc-info"><b>${p.name}</b><span>${p.team} | ${p.pos} | ${p.age}</span></div>
             <div class="pc-score" style="color:${c}">${p.similarity.toFixed(0)}%</div>
         `;
         el.onclick = () => {
@@ -443,10 +416,13 @@ function renderResults(list) {
 
 // --- GRÁFICO RADAR ---
 function updateProfile(target, comparison) {
+    currentComparison = comparison;
+    
     const compText = comparison ? ` vs ${comparison.name}` : '';
     document.getElementById('printName').innerText = target.name + compText;
     document.getElementById('printInfo').innerText = `${target.team} | ${target.pos}`;
 
+    // 1. CHART RADAR
     const ctx = document.getElementById('pizzaChart').getContext('2d');
     if(chartInstance) chartInstance.destroy();
 
@@ -496,12 +472,13 @@ function updateProfile(target, comparison) {
         }
     });
 
+    // 2. BARRAS (Ahora muestran % respecto a tu límite fijo)
     const container = document.getElementById('statsBarsContainer');
     container.innerHTML = '';
 
     METRICS.forEach(m => {
         const tVal = target.raw[m];
-        const tPct = (target[m] * 100).toFixed(0);
+        const tPct = (target[m] * 100).toFixed(0); // Porcentaje directo del valor normalizado
         
         let compMarker = '';
         if(comparison) {

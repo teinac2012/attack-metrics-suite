@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
 
     <style>
         /* --- ESTILOS GENERALES --- */
@@ -188,6 +189,8 @@
         <button id="btnExport" class="btn-icon" onclick="app.setView('EXPORT')" style="background:#f39c12; border-color:#e67e22; color:#000; font-weight:900;">📥 EXPORTAR</button>
         <button id="btnStats" class="btn-icon" onclick="app.cycleView()" style="background:#3498db; border-color:#2980b9; width:100px;">📊 ESTATS</button>
         <button class="btn-icon" onclick="app.downloadCSV()">💾 CSV</button>
+        <button class="btn-icon" onclick="document.getElementById('loadCSVFile').click()">📂</button>
+        <input type="file" id="loadCSVFile" style="display:none" accept=".csv,.xlsx,.xls,.json" onchange="app.loadCSV(this)">
         <button class="btn-icon" onclick="app.resetData()" style="color:#e74c3c">🗑️</button>
     </div>
 </header>
@@ -1151,6 +1154,128 @@ const app = {
                 plugins: { legend: {labels:{color:'#fff'}} }
             }
         });
+    },
+
+    loadCSV: function(input) {
+        if (!input.files || !input.files[0]) return;
+        let file = input.files[0];
+        let reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                if (file.name.endsWith('.csv')) {
+                    this.parseCSV(e.target.result);
+                } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    this.parseXLSX(file);
+                } else if (file.name.endsWith('.json')) {
+                    this.parseJSON(e.target.result);
+                }
+            } catch(err) {
+                alert('Error al cargar archivo: ' + err.message);
+            }
+        };
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file);
+        }
+        input.value = '';
+    },
+
+    parseCSV: function(text) {
+        let lines = text.trim().split('\n');
+        if (lines.length < 2) { alert('Archivo CSV vacío'); return; }
+        let headers = lines[0].split(',').map(h => h.trim());
+        let newActions = [];
+        for (let i = 1; i < lines.length; i++) {
+            let row = lines[i].split(',').map(v => v.trim());
+            if (row.length < 5 || !row[0]) continue;
+            let action = {
+                id: Math.random().toString(36).substr(2, 9),
+                match: row[0] || this.data.match,
+                min: parseInt(row[1]) || 0,
+                gk: this.data.gks[0]?.id || 'DEFAULT',
+                cat: row[3] || 'DEF',
+                key: row[4] || 'PAR',
+                var: row[5] || '',
+                zone: row[6] || '',
+                res: row[7] || 'OK',
+                xg: parseFloat(row[8]) || 0,
+                ts: Date.now()
+            };
+            newActions.push(action);
+        }
+        if (newActions.length > 0) {
+            this.data.actions = [...this.data.actions, ...newActions];
+            this.save();
+            this.render();
+            alert(`✅ Cargados ${newActions.length} registros`);
+        } else {
+            alert('❌ No se encontraron registros válidos');
+        }
+    },
+
+    parseJSON: function(text) {
+        let json = JSON.parse(text);
+        if (json.actions && Array.isArray(json.actions)) {
+            this.data.actions = [...this.data.actions, ...json.actions];
+            if (json.gks && Array.isArray(json.gks)) {
+                json.gks.forEach(gk => {
+                    if (!this.data.gks.find(g => g.id === gk.id)) {
+                        this.data.gks.push(gk);
+                    }
+                });
+            }
+            this.save();
+            this.render();
+            alert(`✅ Cargados ${json.actions.length} registros`);
+        } else {
+            alert('❌ Formato JSON inválido');
+        }
+    },
+
+    parseXLSX: function(file) {
+        let reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                if (typeof XLSX === 'undefined') {
+                    alert('⚠️ Necesita cargar librería XLSX primero');
+                    return;
+                }
+                let data = new Uint8Array(e.target.result);
+                let workbook = XLSX.read(data, { type: 'array' });
+                let sheet = workbook.Sheets[workbook.SheetNames[0]];
+                let rows = XLSX.utils.sheet_to_json(sheet);
+                let newActions = [];
+                rows.forEach(row => {
+                    if (!row['Min'] && !row['Minuto']) return;
+                    let action = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        match: row['Jornada'] || this.data.match,
+                        min: parseInt(row['Min'] || row['Minuto']) || 0,
+                        gk: this.data.gks[0]?.id || 'DEFAULT',
+                        cat: row['Cat'] || 'DEF',
+                        key: row['Accion'] || row['Action'] || 'PAR',
+                        var: row['Var'] || '',
+                        zone: row['Zona'] || row['Zone'] || '',
+                        res: row['Res'] || row['Result'] || 'OK',
+                        xg: parseFloat(row['xG']) || 0,
+                        ts: Date.now()
+                    };
+                    newActions.push(action);
+                });
+                if (newActions.length > 0) {
+                    this.data.actions = [...this.data.actions, ...newActions];
+                    this.save();
+                    this.render();
+                    alert(`✅ Cargados ${newActions.length} registros`);
+                } else {
+                    alert('❌ No se encontraron registros válidos');
+                }
+            } catch(err) {
+                alert('Error al procesar XLSX: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
     },
 
     endMatch: function() { if(confirm("¿Finalizar Jornada?")) { if(!isNaN(this.data.match))this.data.match=parseInt(this.data.match)+1; this.data.pitch={ox:50,oy:15,ax:50,ay:90}; this.save(); location.reload(); } },
