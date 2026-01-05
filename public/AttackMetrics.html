@@ -681,7 +681,7 @@
     <div class="logo">ATTACK<span>METRICS</span></div>
     <button class="btn-header btn-save" onclick="downloadBackup()">💾</button>
     <button class="btn-header btn-save" onclick="document.getElementById('restoreFile').click()">📂</button>
-    <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="restoreBackup(this)">
+    <input type="file" id="restoreFile" style="display:none" accept=".json,.xlsx,.xls,.csv" onchange="restoreBackup(this)">
     
     <button class="btn-header" onclick="toggleVideoPanel()" style="color:#f1c40f">🎥</button>
     <button class="btn-header" onclick="editTeamNames()" style="color:#fff">✎</button>
@@ -1254,73 +1254,170 @@ function restoreBackup(input) {
     // 1. Verificamos si hay archivo
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        const reader = new FileReader();
+        const fileName = file.name.toLowerCase();
+        const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+        const isCSV = fileName.endsWith('.csv');
+        const isJSON = fileName.endsWith('.json');
 
-        reader.onload = function(e) {
-            try {
-                // Intentamos leer el JSON
-                const loadedDB = JSON.parse(e.target.result);
-
-                // 2. Validación más flexible (Solo exigimos que haya acciones o rosters)
-                if (loadedDB && (loadedDB.actions || loadedDB.rosters)) {
+        if (isExcel) {
+            // --- PROCESAR EXCEL ---
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(worksheet);
                     
-                    // 3. FUSIÓN DE DATOS (Importante para compatibilidad con versiones viejas)
-                    // Si el archivo no tiene posesión o config, usamos los valores por defecto
-                    DB.actions = loadedDB.actions || [];
-                    DB.rosters = loadedDB.rosters || { HOME: [], AWAY: [] };
-                    DB.config = loadedDB.config || { homeName: "LOCAL", awayName: "RIVAL" };
-                    DB.possession = loadedDB.possession || { home: 0, away: 0, out: 0 };
-
-                    // Recalculamos el tiempo total asegurando que sean números
-                    const h = parseInt(DB.possession.home) || 0;
-                    const a = parseInt(DB.possession.away) || 0;
-                    const o = parseInt(DB.possession.out) || 0;
-                    totalPossessionTime = h + a + o;
-
-                    // 4. Restauramos UI en un timeout para dar tiempo a que el DOM esté listo
-                    setTimeout(function() {
-                        try {
-                            renderUI();
-                            updatePossessionBar();
-                            drawPitch();
-                            
-                            // Actualizar nombres de equipos en UI
-                            const nameLocal = document.getElementById('nombreLocal');
-                            const nameVisit = document.getElementById('nombreVisitante');
-                            if(nameLocal) nameLocal.textContent = DB.config.homeName;
-                            if(nameVisit) nameVisit.textContent = DB.config.awayName;
-
-                            // Si había un archivo de video guardado y state persistido, considerar restaurar
-                            if(loadedDB.state && loadedDB.state.videoMode && loadedDB.state.videoMode !== 'NONE') {
-                                // Aquí podríamos intentar restaurar el video, pero por ahora solo cargamos los datos
-                                console.log("Backup contenía referencia a video:", loadedDB.state.videoFileName);
-                            }
-
-                            alert("✅ Archivo restaurado exitosamente");
-                        } catch (uiError) {
-                            console.error(uiError);
-                            alert("El archivo cargó, pero hubo un error visualizando los datos.");
-                        }
-                    }, 50);
-
-                } else {
-                    alert("⚠️ El archivo no parece una copia de seguridad válida de AttackMetrics.");
+                    if (!rows || rows.length === 0) {
+                        alert('❌ El archivo Excel está vacío');
+                        return;
+                    }
+                    
+                    processExternalData(rows, file.name);
+                } catch (err) {
+                    console.error(err);
+                    alert("❌ Error al procesar Excel: " + err.message);
                 }
-            } catch (err) {
-                console.error("Error de lectura:", err);
-                alert("❌ Error: El archivo está corrupto o no es JSON.");
-            }
-        };
+            };
+            reader.onerror = () => alert("Error al leer el archivo Excel");
+            reader.readAsArrayBuffer(file);
+        } else if (isCSV) {
+            // --- PROCESAR CSV ---
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n').filter(l => l.trim());
+                    
+                    if (lines.length < 2) {
+                        alert('❌ El archivo CSV está vacío');
+                        return;
+                    }
+                    
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    const rows = lines.slice(1).map(line => {
+                        const values = line.split(',').map(v => v.trim());
+                        const obj = {};
+                        headers.forEach((h, i) => obj[h] = values[i] || '');
+                        return obj;
+                    });
+                    
+                    processExternalData(rows, file.name);
+                } catch (err) {
+                    console.error(err);
+                    alert("❌ Error al procesar CSV: " + err.message);
+                }
+            };
+            reader.onerror = () => alert("Error al leer el archivo CSV");
+            reader.readAsText(file);
+        } else if (isJSON) {
+            // --- PROCESAR JSON (COMPORTAMIENTO ORIGINAL) ---
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedDB = JSON.parse(e.target.result);
 
-        reader.onerror = function() {
-            alert("Error del navegador al leer el archivo.");
-        };
+                    if (loadedDB && (loadedDB.actions || loadedDB.rosters)) {
+                        DB.actions = loadedDB.actions || [];
+                        DB.rosters = loadedDB.rosters || { HOME: [], AWAY: [] };
+                        DB.config = loadedDB.config || { homeName: "LOCAL", awayName: "RIVAL" };
+                        DB.possession = loadedDB.possession || { home: 0, away: 0, out: 0 };
 
-        reader.readAsText(file);
+                        const h = parseInt(DB.possession.home) || 0;
+                        const a = parseInt(DB.possession.away) || 0;
+                        const o = parseInt(DB.possession.out) || 0;
+                        totalPossessionTime = h + a + o;
+
+                        setTimeout(function() {
+                            try {
+                                renderUI();
+                                updatePossessionBar();
+                                drawPitch();
+                                
+                                const nameLocal = document.getElementById('nombreLocal');
+                                const nameVisit = document.getElementById('nombreVisitante');
+                                if(nameLocal) nameLocal.textContent = DB.config.homeName;
+                                if(nameVisit) nameVisit.textContent = DB.config.awayName;
+
+                                if(loadedDB.state && loadedDB.state.videoMode && loadedDB.state.videoMode !== 'NONE') {
+                                    console.log("Backup contenía referencia a video:", loadedDB.state.videoFileName);
+                                }
+
+                                alert("✅ Archivo restaurado exitosamente");
+                            } catch (uiError) {
+                                console.error(uiError);
+                                alert("El archivo cargó, pero hubo un error visualizando los datos.");
+                            }
+                        }, 50);
+                    } else {
+                        alert("⚠️ El archivo no parece una copia de seguridad válida de AttackMetrics.");
+                    }
+                } catch (err) {
+                    console.error("Error de lectura:", err);
+                    alert("❌ Error: El archivo está corrupto o no es JSON.");
+                }
+            };
+            reader.readAsText(file);
+        } else {
+            alert('⚠️ Formato no soportado. Use: JSON (backup), Excel (.xlsx, .xls) o CSV');
+        }
     }
 
-    // 5. IMPORTANTE: Limpiar el input para permitir cargar el mismo archivo si hubo error antes
-    input.value = ""; 
+    input.value = "";
+}
+
+// Función auxiliar para procesar datos de Excel/CSV
+function processExternalData(rows, fileName) {
+    try {
+        const headers = Object.keys(rows[0] || {}).map(h => h.toLowerCase());
+        
+        const findColumn = (names) => headers.findIndex(h => names.some(n => h.includes(n.toLowerCase())));
+        
+        const colPlayer = findColumn(['jugador', 'player', 'nombre', 'name']);
+        const colType = findColumn(['tipo', 'type', 'acción', 'action']);
+        const colX = findColumn(['x', 'inicio_x', 'start_x']);
+        const colY = findColumn(['y', 'inicio_y', 'start_y']);
+        const colXEnd = findColumn(['x_fin', 'end_x', 'xfin']);
+        const colYEnd = findColumn(['y_fin', 'end_y', 'yfin']);
+        const colResult = findColumn(['resultado', 'result', 'res']);
+        const colTeam = findColumn(['equipo', 'team', 'squad']);
+        
+        if (colPlayer < 0 || colX < 0 || colY < 0) {
+            alert('⚠️ Columnas requeridas no encontradas: Jugador/Player, X, Y');
+            return;
+        }
+        
+        const headerKeys = Object.keys(rows[0] || {});
+        const newActions = rows.map((row, idx) => {
+            return {
+                id: 'imported_' + Date.now() + '_' + idx,
+                player: row[headerKeys[colPlayer]] || 'UNK',
+                type: row[headerKeys[colType]] || 'Pase',
+                x: parseFloat(row[headerKeys[colX]]) || 50,
+                y: parseFloat(row[headerKeys[colY]]) || 50,
+                endX: colXEnd >= 0 ? parseFloat(row[headerKeys[colXEnd]]) : null,
+                endY: colYEnd >= 0 ? parseFloat(row[headerKeys[colYEnd]]) : null,
+                res: colResult >= 0 ? (row[headerKeys[colResult]].includes('Fallado') ? 'Fallado' : 'Completado') : 'Completado',
+                team: colTeam >= 0 ? (row[headerKeys[colTeam]].toUpperCase().includes('AWAY') ? 'AWAY' : 'HOME') : 'HOME',
+                timestamp: Date.now() + idx
+            };
+        });
+        
+        DB.actions.push(...newActions);
+        saveDB();
+        
+        setTimeout(() => {
+            renderUI();
+            updateDash();
+            drawPitch();
+            showToast(`✅ ${newActions.length} acciones cargadas de ${fileName}`);
+        }, 50);
+        
+    } catch (err) {
+        console.error(err);
+        alert("❌ Error procesando datos: " + err.message);
+    }
 }
 
 function toggleVideoPanel() {
