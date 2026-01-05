@@ -1987,7 +1987,8 @@ let voronoiState = {
     points: [],
     ball: null,
     dragTarget: null,
-    fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0
+    fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0,
+    waitingForPosition: null  // {name, team} cuando espera click para posicionar
 };
 
 // --- FUNCIÓN VORONOI MEJORADA ---
@@ -2199,18 +2200,49 @@ function voronoiAddPlayer() {
     const name = prompt('Nombre del jugador:');
     if (!name) return;
     
-    const team = prompt('Equipo (HOME/AWAY):', 'HOME').toUpperCase();
-    if (team !== 'HOME' && team !== 'AWAY') return alert('Debe ser HOME o AWAY');
+    // Crear modal visual para seleccionar equipo
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:9999;';
     
-    const x = parseFloat(prompt('Posición X (0-100):', '50'));
-    const y = parseFloat(prompt('Posición Y (0-100):', '50'));
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1e1e1e; padding:30px; border-radius:8px; text-align:center; border:2px solid #444;';
     
-    if (isNaN(x) || isNaN(y) || x < 0 || x > 100 || y < 0 || y > 100) {
-        return alert('Posiciones deben estar entre 0 y 100');
-    }
+    box.innerHTML = `
+        <h3 style="color:#f1c40f; margin-bottom:20px;">⚽ ${name}</h3>
+        <p style="color:#aaa; margin-bottom:20px; font-size:0.9rem;">Selecciona el equipo:</p>
+        <div style="display:flex; gap:15px; justify-content:center; margin-bottom:20px;">
+            <button id="btnHome" style="padding:15px 30px; background:#3498db; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer; font-size:1rem;">🏠 LOCAL</button>
+            <button id="btnAway" style="padding:15px 30px; background:#e74c3c; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer; font-size:1rem;">✈️ VISITANTE</button>
+        </div>
+        <button id="btnCancel" style="padding:8px 20px; background:#555; border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.85rem;">❌ Cancelar</button>
+    `;
     
-    voronoiState.points.push({ x, y, team, name });
-    drawPitch();
+    modal.appendChild(box);
+    document.body.appendChild(modal);
+    
+    const selectTeam = (team) => {
+        document.body.removeChild(modal);
+        voronoiState.waitingForPosition = { name, team };
+        
+        // Mostrar mensaje en cancha
+        const canvas = document.getElementById('pitchCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👆 HAZ CLICK EN EL CAMPO PARA POSICIONAR', canvas.width/2, canvas.height/2);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillStyle = team === 'HOME' ? '#3498db' : '#e74c3c';
+        ctx.fillText(`${name} (${team === 'HOME' ? 'LOCAL' : 'VISITANTE'})`, canvas.width/2, canvas.height/2 + 30);
+        ctx.restore();
+    };
+    
+    document.getElementById('btnHome').onclick = () => selectTeam('HOME');
+    document.getElementById('btnAway').onclick = () => selectTeam('AWAY');
+    document.getElementById('btnCancel').onclick = () => document.body.removeChild(modal);
 }
 
 function voronoiClearAll() {
@@ -2265,6 +2297,20 @@ function voronoiInputStart(e) {
     if (viewMode !== 'VORONOI') return;
     
     const p = getPos(e);
+    
+    // Si está esperando posicionar un jugador
+    if (voronoiState.waitingForPosition) {
+        voronoiState.points.push({
+            x: p.x,
+            y: p.y,
+            team: voronoiState.waitingForPosition.team,
+            name: voronoiState.waitingForPosition.name
+        });
+        voronoiState.waitingForPosition = null;
+        drawPitch();
+        return;
+    }
+    
     let found = null;
 
     voronoiState.points.forEach((pt, idx) => { 
