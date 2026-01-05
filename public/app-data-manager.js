@@ -166,7 +166,7 @@ window.AppDataManager = {
                   size: file.size,
                   type: file.type,
                   lastModified: file.lastModified,
-                  content: e.target.result // Base64
+                  content: e.target.result // DataURL base64
                 };
                 localStorage.setItem(key, JSON.stringify(fileData));
                 console.log(`[AppDataManager] Archivo guardado: ${file.name} (${file.size} bytes)`);
@@ -175,7 +175,7 @@ window.AppDataManager = {
               }
             };
             
-            reader.readAsArrayBuffer(file);
+            reader.readAsDataURL(file);
             
             // También guardar metadatos en formData
             formData[el.id + '_files'] = {
@@ -323,29 +323,25 @@ window.AppDataManager = {
           try {
             const fileData = JSON.parse(savedFile);
             
-            // Convertir ArrayBuffer a Blob
-            // El contenido está en base64, necesitamos decodificarlo
-            const byteCharacters = atob(fileData.content.split(',')[1] || fileData.content);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: fileData.type });
-            
-            // Crear un File desde el Blob
-            const restoredFile = new File([blob], fileData.name, { type: fileData.type });
-            
-            // Crear DataTransfer para asignar el archivo
-            const dt = new DataTransfer();
-            dt.items.add(restoredFile);
-            fileInput.files = dt.files;
-            
-            // Disparar eventos para que la app detecte el cambio
-            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-            fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            console.log(`[AppDataManager] Archivo restaurado: ${fileData.name}`);
+            // El contenido está en DataURL (base64://...), convertir a Blob
+            const response = fetch(fileData.content);
+            response.then(res => res.blob()).then(blob => {
+              // Crear un File desde el Blob
+              const restoredFile = new File([blob], fileData.name, { type: fileData.type });
+              
+              // Crear DataTransfer para asignar el archivo
+              const dt = new DataTransfer();
+              dt.items.add(restoredFile);
+              fileInput.files = dt.files;
+              
+              // Disparar eventos para que la app detecte el cambio
+              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+              fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+              
+              console.log(`[AppDataManager] Archivo restaurado: ${fileData.name}`);
+            }).catch(err => {
+              console.warn('[AppDataManager] Error al restaurar blob:', key, err);
+            });
           } catch (err) {
             console.warn('[AppDataManager] Error al restaurar archivo:', key, err);
           }
