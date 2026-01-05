@@ -42,6 +42,17 @@ window.AppDataManager = {
       this.debouncedSave();
     }, true);
 
+    // ⭐ CRÍTICO: Guardar cuando pierda focus (cambio de pestaña/app)
+    window.addEventListener('blur', () => {
+      console.log('[AppDataManager] Ventana perdió focus - guardando datos ahora');
+      this.debouncedSave(true); // Force save inmediato
+    });
+
+    // ⭐ También guardar al recuperar focus (por si acaso)
+    window.addEventListener('focus', () => {
+      // No hacer nada, solo registrar
+    });
+
     // Force save cada 15 segundos máximo (por seguridad)
     this._autoSaveInterval = setInterval(() => {
       const now = Date.now();
