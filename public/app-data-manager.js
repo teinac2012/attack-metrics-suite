@@ -152,14 +152,38 @@ window.AppDataManager = {
         if (el.type === 'checkbox' || el.type === 'radio') {
           formData[el.id] = el.checked;
         } else if (el.type === 'file') {
-          // Para file inputs, guardar lista de nombres (no los archivos mismos)
+          // Para file inputs, guardar metadatos y contenido en base64
           if (el.files && el.files.length > 0) {
-            formData[el.id + '_files'] = Array.from(el.files).map(f => ({
-              name: f.name,
-              size: f.size,
-              type: f.type,
-              lastModified: f.lastModified,
-            }));
+            const file = el.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+              try {
+                // Guardar en localStorage con clave especial
+                const key = '_file_' + el.id;
+                const fileData = {
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  lastModified: file.lastModified,
+                  content: e.target.result // Base64
+                };
+                localStorage.setItem(key, JSON.stringify(fileData));
+                console.log(`[AppDataManager] Archivo guardado: ${file.name} (${file.size} bytes)`);
+              } catch (err) {
+                console.warn('[AppDataManager] No se puede guardar archivo (quota?)', err);
+              }
+            };
+            
+            reader.readAsArrayBuffer(file);
+            
+            // También guardar metadatos en formData
+            formData[el.id + '_files'] = {
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              lastModified: file.lastModified,
+            };
           }
         } else {
           formData[el.id] = el.value;
@@ -287,6 +311,51 @@ window.AppDataManager = {
     );
   },
 
+  // Restaurar archivos desde localStorage
+  restoreFiles: function() {
+    try {
+      // Buscar todos los file inputs
+      document.querySelectorAll('input[type="file"]').forEach((fileInput) => {
+        const key = '_file_' + fileInput.id;
+        const savedFile = localStorage.getItem(key);
+        
+        if (savedFile) {
+          try {
+            const fileData = JSON.parse(savedFile);
+            
+            // Convertir ArrayBuffer a Blob
+            // El contenido está en base64, necesitamos decodificarlo
+            const byteCharacters = atob(fileData.content.split(',')[1] || fileData.content);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: fileData.type });
+            
+            // Crear un File desde el Blob
+            const restoredFile = new File([blob], fileData.name, { type: fileData.type });
+            
+            // Crear DataTransfer para asignar el archivo
+            const dt = new DataTransfer();
+            dt.items.add(restoredFile);
+            fileInput.files = dt.files;
+            
+            // Disparar eventos para que la app detecte el cambio
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+            
+            console.log(`[AppDataManager] Archivo restaurado: ${fileData.name}`);
+          } catch (err) {
+            console.warn('[AppDataManager] Error al restaurar archivo:', key, err);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('[AppDataManager] Error en restoreFiles:', err);
+    }
+  },
+
   // Restaurar estado
   restoreState: function(state) {
     if (!state) return;
@@ -345,6 +414,9 @@ window.AppDataManager = {
         console.warn('Error restaurando STATE global:', e);
       }
     }
+
+    // ⭐ Restaurar archivos desde localStorage
+    this.restoreFiles();
 
     // Restaurar scroll position (con delay)
     if (state.scrollPosition) {
