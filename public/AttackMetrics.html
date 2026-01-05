@@ -12,6 +12,7 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js"></script>
     <script src="/app-data-manager.js"></script>
 
     <style>
@@ -728,6 +729,12 @@
         <option value="XBUILD">🏗 xBUILD</option>
         <option value="VORONOI">🗺️ VOR</option>
     </select>
+    
+    <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
+        <button class="btn-tool" style="background:#9b59b6" onclick="voronoiAddPlayer()">👥 +Jugador</button>
+        <button class="btn-tool" style="background:#e74c3c" onclick="voronoiClearAll()">🗑 Limpiar</button>
+        <button class="btn-tool" style="background:#f39c12" onclick="voronoiAnalyze()">📊 Analizar</button>
+    </div>
     
     <select class="header-select" id="teamView" onchange="onTeamSelect()"><option value="HOME">L</option><option value="AWAY">V</option><option value="ALL">T</option></select>
     
@@ -2173,6 +2180,84 @@ function editTeamNames() {
 // --- FUNCIONES DE ENTRADA VORONOI ---
 function getDist(p1, p2) { 
     return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)); 
+}
+
+// Mostrar/Ocultar controles de Voronoi
+document.addEventListener('DOMContentLoaded', () => {
+    const viewMode = document.getElementById('viewMode');
+    if (viewMode) {
+        viewMode.addEventListener('change', () => {
+            const controls = document.getElementById('voronoiControls');
+            if (controls) {
+                controls.style.display = viewMode.value === 'VORONOI' ? 'flex' : 'none';
+            }
+        });
+    }
+});
+
+function voronoiAddPlayer() {
+    const name = prompt('Nombre del jugador:');
+    if (!name) return;
+    
+    const team = prompt('Equipo (HOME/AWAY):', 'HOME').toUpperCase();
+    if (team !== 'HOME' && team !== 'AWAY') return alert('Debe ser HOME o AWAY');
+    
+    const x = parseFloat(prompt('Posición X (0-100):', '50'));
+    const y = parseFloat(prompt('Posición Y (0-100):', '50'));
+    
+    if (isNaN(x) || isNaN(y) || x < 0 || x > 100 || y < 0 || y > 100) {
+        return alert('Posiciones deben estar entre 0 y 100');
+    }
+    
+    voronoiState.points.push({ x, y, team, name });
+    drawPitch();
+}
+
+function voronoiClearAll() {
+    if (confirm('¿Limpiar todos los jugadores y el balón?')) {
+        voronoiState.points = [];
+        voronoiState.ball = null;
+        drawPitch();
+    }
+}
+
+function voronoiAnalyze() {
+    if (voronoiState.points.length < 2) {
+        return alert('Necesitas al menos 2 jugadores');
+    }
+    
+    // Análisis de áreas
+    const canvas = document.getElementById('pitchCanvas');
+    const w = canvas.width, h = canvas.height;
+    
+    const formattedPoints = voronoiState.points.map(p => [
+        (p.x / 100) * w,
+        (p.y / 100) * h
+    ]);
+    
+    const delaunay = d3.Delaunay.from(formattedPoints);
+    const voronoi = delaunay.voronoi([w*0.05, h*0.05, w*0.95, h*0.95]);
+    
+    const areas = [];
+    voronoiState.points.forEach((p, i) => {
+        const polygon = voronoi.cellPolygon(i);
+        const area = polygon ? getPolygonArea(polygon) : 0;
+        areas.push({ idx: i, player: p.name, team: p.team, area: area });
+    });
+    
+    areas.sort((a, b) => b.area - a.area);
+    
+    let msg = '📊 ANÁLISIS DE POLÍGONOS VORONOI\n\n';
+    msg += '🏆 MEJOR OPCIÓN: ' + areas[0].player + ' (' + areas[0].team + ')\n';
+    msg += '   Área: ' + areas[0].area.toFixed(0) + ' px²\n\n';
+    
+    msg += 'RANKING:\n';
+    areas.forEach((a, i) => {
+        const emoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
+        msg += `${emoji} ${i+1}. ${a.player} (${a.team}): ${a.area.toFixed(0)} px²\n`;
+    });
+    
+    alert(msg);
 }
 
 function voronoiInputStart(e) {
