@@ -2261,16 +2261,16 @@ function voronoiInputStart(e) {
     const p = getPos(e);
     const mode = voronoiState.currentMode;
     
-    // Si está en modo de agregar
+    // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
+    let found = null;
+    voronoiState.points.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx }; });
+    if (!found && voronoiState.ball && getDist(p, voronoiState.ball) < 5) found = { type: 'ball' };
+    if (found) { voronoiState.dragTarget = found; return; }
+
+    // Si no tocó un jugador/ball y hay modo de agregar
     if (mode === 'HOME' || mode === 'AWAY') {
-        // Agregar jugador automático
         const playerNum = voronoiState.points.filter(pt => pt.team === mode).length + 1;
-        voronoiState.points.push({
-            x: p.x,
-            y: p.y,
-            team: mode,
-            name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}`
-        });
+        voronoiState.points.push({ x: p.x, y: p.y, team: mode, name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}` });
         drawPitch();
         return;
     }
@@ -2281,28 +2281,26 @@ function voronoiInputStart(e) {
         drawPitch();
         return;
     }
-    
-    // Modo normal: seleccionar para arrastrar
-    let found = null;
-
-    voronoiState.points.forEach((pt, idx) => { 
-        if (getDist(p, pt) < 5) found = { type: 'player', idx: idx }; 
-    });
-    
-    if (!found && voronoiState.ball) { 
-        if (getDist(p, voronoiState.ball) < 5) found = { type: 'ball' }; 
-    }
-
-    if (found) {
-        voronoiState.dragTarget = found;
-    }
 }
 
 function voronoiInputMove(e) {
     const viewMode = document.getElementById('viewMode').value;
-    if (viewMode !== 'VORONOI' || !voronoiState.dragTarget) return;
+    if (viewMode !== 'VORONOI') return;
 
     const p = getPos(e);
+
+    // Cambiar cursor según hover
+    const cv = document.getElementById('pitchCanvas');
+    let hover = null;
+    voronoiState.points.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx }; });
+    if (!hover && voronoiState.ball && getDist(p, voronoiState.ball) < 5) hover = { type: 'ball' };
+    if (hover || voronoiState.dragTarget) cv.style.cursor = 'grab';
+    else if (voronoiState.currentMode) cv.style.cursor = 'crosshair';
+    else cv.style.cursor = 'default';
+
+    // Si no se está arrastrando, salir
+    if (!voronoiState.dragTarget) return;
+
     if (voronoiState.dragTarget.type === 'player') {
         voronoiState.points[voronoiState.dragTarget.idx].x = p.x;
         voronoiState.points[voronoiState.dragTarget.idx].y = p.y;
