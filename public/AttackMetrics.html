@@ -1993,6 +1993,13 @@ let voronoiState = {
     currentMode: null  // 'HOME', 'AWAY', 'BALL' o null
 };
 
+function clampToFieldPercent(p) {
+    return {
+        x: Math.min(95, Math.max(5, p.x)),
+        y: Math.min(95, Math.max(5, p.y))
+    };
+}
+
 // --- FUNCIÓN VORONOI MEJORADA ---
 function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
     // Guardar límites del campo para interacción
@@ -2006,10 +2013,20 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
         const playerPositions = {};
         actions.forEach(a => {
             if (!playerPositions[a.player]) {
-                playerPositions[a.player] = { x: a.x, y: a.y, team: a.team, name: a.player };
+                const pos = clampToFieldPercent({ x: a.x, y: a.y });
+                playerPositions[a.player] = { x: pos.x, y: pos.y, team: a.team, name: a.player };
             }
         });
         voronoiState.points = Object.values(playerPositions);
+    }
+
+    voronoiState.points = voronoiState.points.map(p => {
+        const pos = clampToFieldPercent(p);
+        return { ...p, x: pos.x, y: pos.y };
+    });
+
+    if (voronoiState.ball) {
+        voronoiState.ball = clampToFieldPercent(voronoiState.ball);
     }
 
     const players = voronoiState.points;
@@ -2275,7 +2292,7 @@ function voronoiInputStart(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
     
-    const p = getPos(e);
+    const p = clampToFieldPercent(getPos(e));
     const mode = voronoiState.currentMode;
     
     // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
@@ -2304,7 +2321,7 @@ function voronoiInputMove(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
 
-    const p = getPos(e);
+    const p = clampToFieldPercent(getPos(e));
 
     // Cambiar cursor según hover
     const cv = document.getElementById('pitchCanvas');
