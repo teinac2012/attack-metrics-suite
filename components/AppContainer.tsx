@@ -204,7 +204,7 @@ export default function AppContainer({ appUrl, appName, appId }: AppContainerPro
           src={appUrl}
           className="w-full h-full"
           title={appName}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
           onLoad={() => {
             console.log(`[AppContainer] Iframe ${appId} se ha cargado completamente`);
             setIsLoading(false);
