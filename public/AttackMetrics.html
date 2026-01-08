@@ -2163,14 +2163,17 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
     // Encontrar polígono con mayor área (mejor opción)
     let bestOptionIdx = -1;
     let maxArea = -1;
+    let attackingTeam = null;
     
     if (voronoiState.ball) {
         let minDist = Infinity;
         let ballOwnerIdx = -1;
+        
+        // CORREGIDO: Comparar distancias en la misma escala (porcentaje 0-100)
         players.forEach((p, i) => {
-            const px = (p.x / 100) * w;
-            const py = (p.y / 100) * h;
-            const dist = Math.sqrt(Math.pow(voronoiState.ball.x - px, 2) + Math.pow(voronoiState.ball.y - py, 2));
+            const dx = p.x - voronoiState.ball.x;
+            const dy = p.y - voronoiState.ball.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < minDist) {
                 minDist = dist;
                 ballOwnerIdx = i;
@@ -2178,8 +2181,11 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
         });
 
         if (ballOwnerIdx >= 0) {
+            attackingTeam = players[ballOwnerIdx].team;
+            console.log(`[DrawVoronoi] Balón más cerca de: ${players[ballOwnerIdx].name} (${attackingTeam})`);
+            
             for (let i = 0; i < players.length; i++) {
-                if (players[i].team === players[ballOwnerIdx].team && i !== ballOwnerIdx) {
+                if (players[i].team === attackingTeam && i !== ballOwnerIdx) {
                     const polygon = voronoi.cellPolygon(i);
                     if (polygon) {
                         const area = getPolygonArea(polygon);
@@ -2189,6 +2195,10 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
                         }
                     }
                 }
+            }
+            
+            if (bestOptionIdx >= 0) {
+                console.log(`[DrawVoronoi] Mejor opción: ${players[bestOptionIdx].name} (área: ${maxArea.toFixed(0)})`);
             }
         }
     }
