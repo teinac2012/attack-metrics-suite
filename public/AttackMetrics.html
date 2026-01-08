@@ -2355,6 +2355,10 @@ function voronoiAnalyze() {
         return alert('Necesitas al menos 2 jugadores');
     }
     
+    if (!voronoiState.ball) {
+        return alert('Coloca el balón en el campo para análisis');
+    }
+    
     // Análisis de áreas
     const canvas = document.getElementById('pitchCanvas');
     const w = canvas.width, h = canvas.height;
@@ -2374,16 +2378,41 @@ function voronoiAnalyze() {
         areas.push({ idx: i, player: p.name, team: p.team, area: area });
     });
     
-    areas.sort((a, b) => b.area - a.area);
+    // ===== DETERMINAR EQUIPO CON BALÓN =====
+    const ballPixelX = (voronoiState.ball.x / 100) * w;
+    const ballPixelY = (voronoiState.ball.y / 100) * h;
+    
+    let closestPlayer = null;
+    let closestDist = Infinity;
+    
+    formattedPoints.forEach((pt, idx) => {
+        const dist = Math.hypot(pt[0] - ballPixelX, pt[1] - ballPixelY);
+        if (dist < closestDist) {
+            closestDist = dist;
+            closestPlayer = allPlayers[idx];
+        }
+    });
+    
+    const ballTeam = closestPlayer ? closestPlayer.team : 'UNKNOWN';
+    
+    // Filtrar jugadores por equipo que tiene el balón
+    const teamAreas = areas.filter(a => a.team === ballTeam);
+    
+    if (teamAreas.length === 0) {
+        return alert('❌ Error: No hay jugadores del equipo que tiene el balón');
+    }
+    
+    teamAreas.sort((a, b) => b.area - a.area);
     
     let msg = '📊 ANÁLISIS DE POLÍGONOS VORONOI\n\n';
-    msg += '🏆 MEJOR OPCIÓN: ' + areas[0].player + ' (' + areas[0].team + ')\n';
-    msg += '   Área: ' + areas[0].area.toFixed(0) + ' px²\n\n';
+    msg += `👥 Equipo en posesión: ${ballTeam}\n`;
+    msg += `🏆 MEJOR OPCIÓN: ${teamAreas[0].player} (${teamAreas[0].team})\n`;
+    msg += `   Área: ${teamAreas[0].area.toFixed(0)} px²\n\n`;
     
-    msg += 'RANKING:\n';
-    areas.forEach((a, i) => {
+    msg += `RANKING (${ballTeam}):\n`;
+    teamAreas.forEach((a, i) => {
         const emoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
-        msg += `${emoji} ${i+1}. ${a.player} (${a.team}): ${a.area.toFixed(0)} px²\n`;
+        msg += `${emoji} ${i+1}. ${a.player}: ${a.area.toFixed(0)} px²\n`;
     });
     
     alert(msg);
