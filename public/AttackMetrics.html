@@ -1192,87 +1192,81 @@ function saveDB() {
 
 // ===== FUNCIÓN DE DESCARGA VÍA API =====
 function downloadFileViaAPI(blob, filename, onSuccess) {
-    // Primero intentar con la API
+    // En sandbox, usar directamente window.open con data URL
     const reader = new FileReader();
     reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1]; // Extrae la parte base64
-        const payload = {
-            filename: filename,
-            data: base64Data,
-            mimeType: blob.type || 'application/octet-stream'
-        };
+        const dataUrl = e.target.result;
         
-        fetch('/api/apps/download', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.blob();
-        })
-        .then(responseBlob => {
-            // Crear un link temporal para descargar
-            const url = window.URL.createObjectURL(responseBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+        // Intentar abrir en nueva ventana (funciona en sandbox)
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+            newWindow.document.write(`
+                <html>
+                <head><title>${filename}</title></head>
+                <body>
+                    <h2>Descarga lista: ${filename}</h2>
+                    <p>Haz clic en el enlace para descargar:</p>
+                    <a href="${dataUrl}" download="${filename}" style="font-size:18px; padding:10px 20px; background:#27ae60; color:white; text-decoration:none; border-radius:5px; display:inline-block;">
+                        📥 Descargar ${filename}
+                    </a>
+                    <script>
+                        // Intentar descarga automática
+                        window.onload = function() {
+                            const link = document.querySelector('a');
+                            link.click();
+                        };
+                    </script>
+                </body>
+                </html>
+            `);
             
             if (typeof onSuccess === 'function') onSuccess();
-        })
-        .catch(error => {
-            console.warn('API download falló, usando fallback:', error);
-            // Fallback: descargar localmente si el API falla
-            fallbackDownload(blob, filename);
-            if (typeof onSuccess === 'function') onSuccess();
-        });
+        } else {
+            alert('Por favor permite ventanas emergentes para descargar archivos.\n\nAlternativamente, copia los datos manualmente.');
+        }
     };
     reader.onerror = function() {
         console.error('Error leyendo el archivo');
-        fallbackDownload(blob, filename);
+        alert('❌ Error al preparar la descarga');
     };
     reader.readAsDataURL(blob);
 }
 
 // Fallback para descargas locales (sin API)
 function fallbackDownload(blob, filename) {
-    try {
-        // Método 1: Intentar con createObjectURL y link.click()
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        }, 100);
-    } catch (e) {
-        console.warn('Método 1 falló, intentando método 2:', e);
-        try {
-            // Método 2: Usar window.open con data URL (funciona en sandbox)
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const dataUrl = e.target.result;
-                const newWindow = window.open(dataUrl, '_blank');
-                if (!newWindow) {
-                    alert('Por favor permite ventanas emergentes para descargar archivos');
-                }
-            };
-            reader.readAsDataURL(blob);
-        } catch (e2) {
-            console.error('Todos los métodos de descarga fallaron:', e2);
-            alert('❌ No se puede descargar el archivo. Intenta copiar los datos manualmente.');
+    // Usar window.open con data URL - funciona en sandbox
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+            newWindow.document.write(`
+                <html>
+                <head><title>${filename}</title></head>
+                <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+                    <h2>📥 Descarga lista</h2>
+                    <p style="font-size: 16px;">${filename}</p>
+                    <a href="${dataUrl}" download="${filename}" 
+                       style="font-size:18px; padding:15px 30px; background:#27ae60; color:white; 
+                              text-decoration:none; border-radius:8px; display:inline-block; margin-top:20px;">
+                        Descargar Archivo
+                    </a>
+                    <script>
+                        window.onload = function() {
+                            document.querySelector('a').click();
+                        };
+                    </script>
+                </body>
+                </html>
+            `);
+        } else {
+            alert('Por favor permite ventanas emergentes para descargar archivos');
         }
-    }
+    };
+    reader.onerror = function() {
+        alert('❌ Error al preparar la descarga');
+    };
+    reader.readAsDataURL(blob);
 }
 
 function downloadBackup() {
