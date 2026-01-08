@@ -1192,6 +1192,7 @@ function saveDB() {
 
 // ===== FUNCIÓN DE DESCARGA VÍA API =====
 function downloadFileViaAPI(blob, filename, onSuccess) {
+    // Primero intentar con la API
     const reader = new FileReader();
     reader.onload = function(e) {
         const base64Data = e.target.result.split(',')[1]; // Extrae la parte base64
@@ -1212,9 +1213,9 @@ function downloadFileViaAPI(blob, filename, onSuccess) {
             }
             return response.blob();
         })
-        .then(blob => {
+        .then(responseBlob => {
             // Crear un link temporal para descargar
-            const url = window.URL.createObjectURL(blob);
+            const url = window.URL.createObjectURL(responseBlob);
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
@@ -1226,29 +1227,52 @@ function downloadFileViaAPI(blob, filename, onSuccess) {
             if (typeof onSuccess === 'function') onSuccess();
         })
         .catch(error => {
-            console.error('Error en descarga:', error);
-            showToast('❌ Error descargando archivo: ' + error.message);
-            
+            console.warn('API download falló, usando fallback:', error);
             // Fallback: descargar localmente si el API falla
             fallbackDownload(blob, filename);
+            if (typeof onSuccess === 'function') onSuccess();
         });
+    };
+    reader.onerror = function() {
+        console.error('Error leyendo el archivo');
+        fallbackDownload(blob, filename);
     };
     reader.readAsDataURL(blob);
 }
 
 // Fallback para descargas locales (sin API)
 function fallbackDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-    }, 100);
+    try {
+        // Método 1: Intentar con createObjectURL y link.click()
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+    } catch (e) {
+        console.warn('Método 1 falló, intentando método 2:', e);
+        try {
+            // Método 2: Usar window.open con data URL (funciona en sandbox)
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                const newWindow = window.open(dataUrl, '_blank');
+                if (!newWindow) {
+                    alert('Por favor permite ventanas emergentes para descargar archivos');
+                }
+            };
+            reader.readAsDataURL(blob);
+        } catch (e2) {
+            console.error('Todos los métodos de descarga fallaron:', e2);
+            alert('❌ No se puede descargar el archivo. Intenta copiar los datos manualmente.');
+        }
+    }
 }
 
 function downloadBackup() {
