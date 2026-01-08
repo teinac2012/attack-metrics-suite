@@ -2384,10 +2384,19 @@ function voronoiAnalyze() {
     let ballOwner = null;
     let minDistance = Infinity;
     
+    // DEBUG: Mostrar todos los jugadores y distancias
+    console.log('=== VORONOI ANALYZE DEBUG ===');
+    console.log('Ball position:', { x: voronoiState.ball.x, y: voronoiState.ball.y });
+    console.log('All Players:');
+    console.log('points_HOME:', voronoiState.points_HOME);
+    console.log('points_AWAY:', voronoiState.points_AWAY);
+    
     allPlayers.forEach((p, idx) => {
         const dx = p.x - voronoiState.ball.x;
         const dy = p.y - voronoiState.ball.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        console.log(`${p.name} (${p.team}): pos={x:${p.x}, y:${p.y}}, dist=${distance.toFixed(2)}`);
         
         if (distance < minDistance) {
             minDistance = distance;
@@ -2395,6 +2404,9 @@ function voronoiAnalyze() {
             ballOwner = p.name;
         }
     });
+    
+    console.log('WINNER:', { ballOwner, ballTeam, minDistance });
+    console.log('================================');
     
     // Filtrar jugadores por equipo que tiene el balón
     const teamAreas = areas.filter(a => a.team === ballTeam);
@@ -2407,7 +2419,7 @@ function voronoiAnalyze() {
     
     let msg = '📊 ANÁLISIS DE POLÍGONOS VORONOI\n\n';
     msg += `👥 Equipo en posesión: ${ballTeam}\n`;
-    if (ballOwner) msg += `   (Balón cerca de: ${ballOwner})\n`;
+    if (ballOwner) msg += `   (Balón cerca de: ${ballOwner} a ${minDistance.toFixed(1)} unidades)\n`;
     msg += `🏆 MEJOR OPCIÓN: ${teamAreas[0].player}\n`;
     msg += `   Área: ${teamAreas[0].area.toFixed(0)} px²\n\n`;
     
