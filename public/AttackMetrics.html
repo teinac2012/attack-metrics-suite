@@ -1427,6 +1427,11 @@ function restoreBackup(input) {
                                     console.log("Backup contenía referencia a video:", loadedDB.state.videoFileName);
                                 }
 
+                                // ===== GUARDAR DATOS DESPUÉS DE RESTAURAR =====
+                                // Esto asegura que los datos persistan en localStorage y se sincronicen
+                                saveDB();
+                                console.log('[Restore] Datos guardados en localStorage y sincronizados');
+
                                 alert("✅ Archivo restaurado exitosamente");
                             } catch (uiError) {
                                 console.error(uiError);
