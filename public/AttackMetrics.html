@@ -2379,34 +2379,50 @@ function voronoiAnalyze() {
     });
     
     // ===== DETERMINAR EQUIPO CON BALÓN =====
+    // Convertir posición del balón a píxeles
     const ballPixelX = (voronoiState.ball.x / 100) * w;
     const ballPixelY = (voronoiState.ball.y / 100) * h;
     
-    let closestPlayer = null;
-    let closestDist = Infinity;
+    // Encontrar en qué polígono de Voronoi está el balón
+    let ballTeam = 'UNKNOWN';
+    let ballOwner = null;
     
-    formattedPoints.forEach((pt, idx) => {
-        const dist = Math.hypot(pt[0] - ballPixelX, pt[1] - ballPixelY);
-        if (dist < closestDist) {
-            closestDist = dist;
-            closestPlayer = allPlayers[idx];
+    for (let i = 0; i < allPlayers.length; i++) {
+        const polygon = voronoi.cellPolygon(i);
+        if (polygon && pointInPolygon([ballPixelX, ballPixelY], polygon)) {
+            ballTeam = allPlayers[i].team;
+            ballOwner = allPlayers[i].name;
+            break;
         }
-    });
+    }
     
-    const ballTeam = closestPlayer ? closestPlayer.team : 'UNKNOWN';
+    // Si no se encuentra en ningún polígono, buscar el más cercano
+    if (ballTeam === 'UNKNOWN') {
+        let closestDist = Infinity;
+        for (let i = 0; i < formattedPoints.length; i++) {
+            const pt = formattedPoints[i];
+            const dist = Math.hypot(pt[0] - ballPixelX, pt[1] - ballPixelY);
+            if (dist < closestDist) {
+                closestDist = dist;
+                ballTeam = allPlayers[i].team;
+                ballOwner = allPlayers[i].name;
+            }
+        }
+    }
     
     // Filtrar jugadores por equipo que tiene el balón
     const teamAreas = areas.filter(a => a.team === ballTeam);
     
     if (teamAreas.length === 0) {
-        return alert('❌ Error: No hay jugadores del equipo que tiene el balón');
+        return alert(`❌ Error: No hay jugadores del equipo ${ballTeam}`);
     }
     
     teamAreas.sort((a, b) => b.area - a.area);
     
     let msg = '📊 ANÁLISIS DE POLÍGONOS VORONOI\n\n';
     msg += `👥 Equipo en posesión: ${ballTeam}\n`;
-    msg += `🏆 MEJOR OPCIÓN: ${teamAreas[0].player} (${teamAreas[0].team})\n`;
+    if (ballOwner) msg += `   (Balón en: ${ballOwner})\n`;
+    msg += `🏆 MEJOR OPCIÓN: ${teamAreas[0].player}\n`;
     msg += `   Área: ${teamAreas[0].area.toFixed(0)} px²\n\n`;
     
     msg += `RANKING (${ballTeam}):\n`;
@@ -2416,6 +2432,22 @@ function voronoiAnalyze() {
     });
     
     alert(msg);
+}
+
+// Función helper: verificar si un punto está dentro de un polígono
+function pointInPolygon(point, polygon) {
+    const [x, y] = point;
+    let inside = false;
+    
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+        
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    
+    return inside;
 }
 
 function voronoiInputStart(e) {
