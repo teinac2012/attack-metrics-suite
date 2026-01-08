@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "optimize": "npm run optimize:next",
+    "optimize:next": "echo 'Next.js optimizations enabled in next.config.ts'"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

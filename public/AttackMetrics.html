@@ -7,12 +7,44 @@
     <meta name="theme-color" content="#121212">
     <title>Attack Metrics v3.1 - Red Filtrada</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
-    <script src="https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js"></script>
+    <!-- Lazy-load: Scripts cargados solo cuando se necesitan -->
+    <script>
+        // Estado de scripts cargados
+        const loadedScripts = {
+            chart: false,
+            xlsx: false,
+            html2canvas: false,
+            plotly: false,
+            delaunay: false,
+            voronoi: false
+        };
+
+        // Función genérica para cargar scripts
+        function loadScript(name, url) {
+            return new Promise((resolve, reject) => {
+                if (loadedScripts[name]) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = () => {
+                    loadedScripts[name] = true;
+                    resolve();
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Funciones específicas
+        function loadChartJS() { return loadScript('chart', 'https://cdn.jsdelivr.net/npm/chart.js'); }
+        function loadXLSX() { return loadScript('xlsx', 'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'); }
+        function loadHTML2Canvas() { return loadScript('html2canvas', 'https://html2canvas.hertzen.com/dist/html2canvas.min.js'); }
+        function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
+        function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6'); }
+        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js'); }
+    </script>
     <script src="/app-data-manager.js"></script>
 
     <style>
@@ -2795,7 +2827,8 @@ function downloadRadar() {
     showToast("Imagen Radar Guardada");
 }
 
-function downloadElementImage(elementId, filename) {
+async function downloadElementImage(elementId, filename) {
+    await loadHTML2Canvas(); // Lazy-load html2canvas
     const element = document.getElementById(elementId);
     if(!element) return;
     
@@ -3470,7 +3503,8 @@ let avgPosHover = null; // Jugador sobre el que está el ratón
 let avgNodePositions = []; // Almacena coordenadas para detectar el ratón
 let avgListenersAdded = false; // Evita duplicar eventos
 
-function openAvgPosModal() {
+async function openAvgPosModal() {
+    await loadPlotly(); // Lazy-load Plotly
     const modal = document.getElementById('modalAvgPos');
     modal.style.display = 'flex';
     document.getElementById('btnAvgHome').innerText = DB.config.homeName;
@@ -3924,7 +3958,7 @@ function downloadAvgPosImg() {
 // SANKEY DIAGRAM
 // ==========================================
 let currentSankeyTeam = 'HOME';
-function openSankeyModal() { document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
+async function openSankeyModal() { await loadPlotly(); document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
 function updateSankey(team) {
     currentSankeyTeam = team;
     document.getElementById('btnSankeyHome').className = team==='HOME'?'t-opt active-home':'t-opt';
@@ -3972,7 +4006,7 @@ function updateSankey(team) {
 // ==========================================
 let hullTeam = 'HOME';
 const HULL_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3'];
-function openHullModal() { document.getElementById('modalHulls').style.display = 'flex'; document.getElementById('hullHome').innerText = DB.config.homeName; document.getElementById('hullAway').innerText = DB.config.awayName; setHullTeam('HOME'); }
+async function openHullModal() { await loadDelaunay(); await loadVoronoi(); document.getElementById('modalHulls').style.display = 'flex'; document.getElementById('hullHome').innerText = DB.config.homeName; document.getElementById('hullAway').innerText = DB.config.awayName; setHullTeam('HOME'); }
 function setHullTeam(t) { hullTeam = t; document.getElementById('hullHome').className = t==='HOME'?'t-opt active-home':'t-opt'; document.getElementById('hullAway').className = t==='AWAY'?'t-opt active-away':'t-opt'; renderHullList(); drawHulls(); }
 function renderHullList() {
     const list = document.getElementById('hullPlayerList'); list.innerHTML = '';
@@ -4116,7 +4150,8 @@ function downloadViolinImg() {
 // ==========================================
 let flowVizDB = { team: 'HOME', allPossessions: [], currentIndex: 0 };
 
-function openFlowVizModal() {
+async function openFlowVizModal() {
+    await loadPlotly(); // Lazy-load Plotly
     document.getElementById('modalFlowViz').style.display = 'flex';
     setTimeout(() => { setFlowTeam('HOME'); }, 100);
 }
@@ -4627,7 +4662,8 @@ function onTeamSelect() {
 // ==========================================
 // LÓGICA xG BUILDUP & CHAIN (NUEVO)
 // ==========================================
-function openXgBuildModal() {
+async function openXgBuildModal() {
+    await Promise.all([loadChartJS(), loadXLSX()]); // Lazy-load Chart.js y XLSX
     document.getElementById('modalXgBuild').style.display = 'flex';
     renderXgBuild();
 }
@@ -4732,7 +4768,8 @@ function downloadXgBuildImg() {
     downloadElementImage('boxXgBuild', 'xG_Buildup_Chain');
 }
 
-function downloadXgBuildExcel() {
+async function downloadXgBuildExcel() {
+    await loadXLSX(); // Lazy-load XLSX
     // 1. REPLICAR LÓGICA DE CÁLCULO
     const stats = {}; 
     const initP = (n, t) => { if(!stats[n]) stats[n] = { name: n, team: t, xGChain: 0, xGBuildup: 0 }; };
