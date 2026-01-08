@@ -45,6 +45,7 @@
         function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6'); }
         function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js'); }
     </script>
+    <script src="/api-sync.js"></script>
     <script src="/app-data-manager.js"></script>
 
     <style>
@@ -1201,18 +1202,46 @@ function resetSubOptions() {
 window.addEventListener("dragover", function(e){e=e||event;e.preventDefault();},false);
 window.addEventListener("drop", function(e){e=e||event;e.preventDefault();},false);
 
-window.onload = () => {
+window.onload = async () => {
+    // 1. Cargar datos locales primero (rápido)
     if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
+    
+    // 2. Inicializar UI inmediatamente
     STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
     restoreStateFromDB();
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
+    
+    // 3. Inicializar sincronización cloud (asíncrono)
+    if (typeof window.APISyncManager !== 'undefined') {
+        try {
+            await window.APISyncManager.init('Attack Metrics');
+            
+            // Si había datos más recientes en cloud, aplicarlos
+            const cloudData = await window.APISyncManager.loadFromCloud();
+            if (cloudData) {
+                Object.assign(DB, cloudData);
+                STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
+                restoreStateFromDB();
+                updateDash();
+                drawPitch();
+                console.log('[AttackMetrics] ✓ Datos cargados desde la nube');
+            }
+        } catch (e) {
+            console.warn('[AttackMetrics] Sincronización cloud no disponible:', e);
+        }
+    }
 };
 
 function saveDB() { 
-    // Guardar localmente
+    // 1. Guardar localmente (siempre, rápido)
     localStorage.setItem('am_v22_6', JSON.stringify(DB));
     
-    // Sincronizar con otros contextos (apps/tabs)
+    // 2. Sincronizar con cloud (si está disponible)
+    if (typeof window.APISyncManager !== 'undefined') {
+        window.APISyncManager.syncToCloud();
+    }
+    
+    // 3. Sincronizar con otros contextos (apps/tabs)
     if (typeof window.AnalysisDataSync !== 'undefined') {
         try {
             window.AnalysisDataSync.saveAttackMetricsDB(DB);

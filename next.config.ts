@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Optimizaciones de producción
   compress: true, // Habilitar compresión Gzip/Brotli
-  swcMinify: true, // Minificación con SWC (más rápido que Terser)
+  // Note: swcMinify está habilitado por defecto en Next.js 16+
   
   // Optimización de imágenes
   images: {
