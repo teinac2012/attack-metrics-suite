@@ -1177,7 +1177,80 @@ window.onload = () => {
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
 };
 
-function saveDB() { localStorage.setItem('am_v22_6', JSON.stringify(DB)); }
+function saveDB() { 
+    // Guardar localmente
+    localStorage.setItem('am_v22_6', JSON.stringify(DB));
+    
+    // Sincronizar con otros contextos (apps/tabs)
+    if (typeof window.AnalysisDataSync !== 'undefined') {
+        try {
+            window.AnalysisDataSync.saveAttackMetricsDB(DB);
+        } catch (e) {
+            console.error('Error sincronizando datos:', e);
+        }
+    }
+}
+
+// ===== FUNCIÓN DE DESCARGA VÍA API =====
+function downloadFileViaAPI(blob, filename, onSuccess) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Extrae la parte base64
+        const payload = {
+            filename: filename,
+            data: base64Data,
+            mimeType: blob.type || 'application/octet-stream'
+        };
+        
+        fetch('/api/apps/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Crear un link temporal para descargar
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            if (typeof onSuccess === 'function') onSuccess();
+        })
+        .catch(error => {
+            console.error('Error en descarga:', error);
+            showToast('❌ Error descargando archivo: ' + error.message);
+            
+            // Fallback: descargar localmente si el API falla
+            fallbackDownload(blob, filename);
+        });
+    };
+    reader.readAsDataURL(blob);
+}
+
+// Fallback para descargas locales (sin API)
+function fallbackDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
 
 function downloadBackup() {
     // 1. Detener procesos para evitar conflictos
@@ -1223,14 +1296,14 @@ function downloadBackup() {
             rosters: DB.rosters || { HOME: [], AWAY: [] },
             config: DB.config || { homeName: "LOCAL", awayName: "RIVAL" },
             possession: DB.possession || { home: 0, away: 0, out: 0 },
+            state: DB.state || {},
             version: "3.1",
             savedAt: new Date().toISOString()
         };
 
-        // --- FASE 2: CONVERSIÓN SEGURA ---
+        // --- FASE 2: CONVERSIÓN A BLOB ---
         var dataStr = JSON.stringify(cleanDB, null, 2);
-        var blob = new Blob([dataStr], { type: "application/octet-stream" });
-        var url = URL.createObjectURL(blob);
+        var blob = new Blob([dataStr], { type: "application/json" });
 
         // Generar nombre de archivo limpio
         var hName = (cleanDB.config.homeName || "L").replace(/[^a-z0-9]/gi, '');
@@ -1238,20 +1311,10 @@ function downloadBackup() {
         var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         var fileName = "AttackMetrics_" + hName + "_vs_" + aName + "_" + dateStr + ".json";
 
-        // --- FASE 3: DESCARGA (en el mismo gesto del usuario) ---
-        var link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-
-        // Limpieza (después del clic)
-        setTimeout(function() {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+        // --- FASE 3: ENVIAR AL SERVIDOR Y DESCARGAR ---
+        downloadFileViaAPI(blob, fileName, function() {
             if (typeof showToast === "function") showToast("✅ Archivo guardado correctamente");
-        }, 0);
+        });
 
     } catch (err) {
         console.error(err);
@@ -1337,6 +1400,17 @@ function restoreBackup(input) {
                         const a = parseInt(DB.possession.away) || 0;
                         const o = parseInt(DB.possession.out) || 0;
                         totalPossessionTime = h + a + o;
+
+                        // ===== LIMPIAR VORONOI AL CARGAR ARCHIVO =====
+                        // Reinicializar state de Voronoi para evitar conflictos
+                        if (typeof voronoiState !== 'undefined') {
+                            voronoiState.points_HOME = [];
+                            voronoiState.points_AWAY = [];
+                            voronoiState.ball = null;
+                            voronoiState.dragTarget = null;
+                            voronoiState.currentMode = null;
+                            console.log('[Restore] Voronoi data cleared');
+                        }
 
                         setTimeout(function() {
                             try {
@@ -1986,12 +2060,24 @@ function drawPitch(dragS, dragE) {
 
 // --- VARIABLES GLOBALES PARA VORONOI ---
 let voronoiState = {
-    points: [],
-    ball: null,
+    points_HOME: [],    // Puntos azules (equipo local)
+    points_AWAY: [],    // Puntos rojos (equipo visitante)
+    ball: null,         // Posición del balón
     dragTarget: null,
     fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0,
-    currentMode: null  // 'HOME', 'AWAY', 'BALL' o null
+    currentMode: null   // 'HOME', 'AWAY', 'BALL' o null
 };
+
+// Compatibilidad: alias para acceso rápido a todos los puntos
+Object.defineProperty(voronoiState, 'points', {
+    get: function() {
+        return [...this.points_HOME, ...this.points_AWAY];
+    },
+    set: function(val) {
+        // Si recibe un array mezclado, no hacer nada
+        console.warn('voronoiState.points es de solo lectura. Use points_HOME o points_AWAY.');
+    }
+});
 
 function clampToFieldPercent(p) {
     return {
@@ -2009,7 +2095,7 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
     voronoiState.fieldY2 = h*0.95;
 
     // Extraer posiciones únicas de jugadores o usar estado anterior
-    if (voronoiState.points.length === 0) {
+    if (voronoiState.points_HOME.length === 0 && voronoiState.points_AWAY.length === 0) {
         const playerPositions = {};
         actions.forEach(a => {
             if (!playerPositions[a.player]) {
@@ -2017,10 +2103,18 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
                 playerPositions[a.player] = { x: pos.x, y: pos.y, team: a.team, name: a.player };
             }
         });
-        voronoiState.points = Object.values(playerPositions);
+        Object.values(playerPositions).forEach(p => {
+            if (p.team === 'HOME') voronoiState.points_HOME.push(p);
+            else voronoiState.points_AWAY.push(p);
+        });
     }
 
-    voronoiState.points = voronoiState.points.map(p => {
+    voronoiState.points_HOME = voronoiState.points_HOME.map(p => {
+        const pos = clampToFieldPercent(p);
+        return { ...p, x: pos.x, y: pos.y };
+    });
+    
+    voronoiState.points_AWAY = voronoiState.points_AWAY.map(p => {
         const pos = clampToFieldPercent(p);
         return { ...p, x: pos.x, y: pos.y };
     });
@@ -2243,14 +2337,16 @@ function voronoiSetMode(mode) {
 
 function voronoiClearAll() {
     if (confirm('¿Limpiar todos los jugadores y el balón?')) {
-        voronoiState.points = [];
+        voronoiState.points_HOME = [];
+        voronoiState.points_AWAY = [];
         voronoiState.ball = null;
         drawPitch();
     }
 }
 
 function voronoiAnalyze() {
-    if (voronoiState.points.length < 2) {
+    const allPlayers = voronoiState.points; // Usa el getter que combina ambas arrays
+    if (allPlayers.length < 2) {
         return alert('Necesitas al menos 2 jugadores');
     }
     
@@ -2258,7 +2354,7 @@ function voronoiAnalyze() {
     const canvas = document.getElementById('pitchCanvas');
     const w = canvas.width, h = canvas.height;
     
-    const formattedPoints = voronoiState.points.map(p => [
+    const formattedPoints = allPlayers.map(p => [
         (p.x / 100) * w,
         (p.y / 100) * h
     ]);
@@ -2267,7 +2363,7 @@ function voronoiAnalyze() {
     const voronoi = delaunay.voronoi([w*0.05, h*0.05, w*0.95, h*0.95]);
     
     const areas = [];
-    voronoiState.points.forEach((p, i) => {
+    allPlayers.forEach((p, i) => {
         const polygon = voronoi.cellPolygon(i);
         const area = polygon ? getPolygonArea(polygon) : 0;
         areas.push({ idx: i, player: p.name, team: p.team, area: area });
@@ -2297,14 +2393,16 @@ function voronoiInputStart(e) {
     
     // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
     let found = null;
-    voronoiState.points.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx }; });
+    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'HOME' }; });
+    if (!found) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'AWAY' }; });
     if (!found && voronoiState.ball && getDist(p, voronoiState.ball) < 5) found = { type: 'ball' };
     if (found) { voronoiState.dragTarget = found; return; }
 
     // Si no tocó un jugador/ball y hay modo de agregar
     if (mode === 'HOME' || mode === 'AWAY') {
-        const playerNum = voronoiState.points.filter(pt => pt.team === mode).length + 1;
-        voronoiState.points.push({ x: p.x, y: p.y, team: mode, name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}` });
+        const array = mode === 'HOME' ? voronoiState.points_HOME : voronoiState.points_AWAY;
+        const playerNum = array.length + 1;
+        array.push({ x: p.x, y: p.y, team: mode, name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}` });
         drawPitch();
         return;
     }
@@ -2326,7 +2424,8 @@ function voronoiInputMove(e) {
     // Cambiar cursor según hover
     const cv = document.getElementById('pitchCanvas');
     let hover = null;
-    voronoiState.points.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx }; });
+    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'HOME' }; });
+    if (!hover) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'AWAY' }; });
     if (!hover && voronoiState.ball && getDist(p, voronoiState.ball) < 5) hover = { type: 'ball' };
     if (hover || voronoiState.dragTarget) cv.style.cursor = 'grab';
     else if (voronoiState.currentMode) cv.style.cursor = 'crosshair';
@@ -2336,8 +2435,9 @@ function voronoiInputMove(e) {
     if (!voronoiState.dragTarget) return;
 
     if (voronoiState.dragTarget.type === 'player') {
-        voronoiState.points[voronoiState.dragTarget.idx].x = p.x;
-        voronoiState.points[voronoiState.dragTarget.idx].y = p.y;
+        const array = voronoiState.dragTarget.team === 'HOME' ? voronoiState.points_HOME : voronoiState.points_AWAY;
+        array[voronoiState.dragTarget.idx].x = p.x;
+        array[voronoiState.dragTarget.idx].y = p.y;
     } else if (voronoiState.dragTarget.type === 'ball') {
         voronoiState.ball.x = p.x;
         voronoiState.ball.y = p.y;
@@ -2355,13 +2455,21 @@ function voronoiInputDblClick(e) {
 
     const p = getPos(e);
     let delIdx = -1;
+    let team = null;
     
-    voronoiState.points.forEach((pt, idx) => { 
-        if (getDist(p, pt) < 5) delIdx = idx; 
+    voronoiState.points_HOME.forEach((pt, idx) => { 
+        if (getDist(p, pt) < 5) { delIdx = idx; team = 'HOME'; } 
     });
     
-    if (delIdx > -1) {
-        voronoiState.points.splice(delIdx, 1);
+    if (delIdx === -1) {
+        voronoiState.points_AWAY.forEach((pt, idx) => { 
+            if (getDist(p, pt) < 5) { delIdx = idx; team = 'AWAY'; } 
+        });
+    }
+    
+    if (delIdx > -1 && team) {
+        const array = team === 'HOME' ? voronoiState.points_HOME : voronoiState.points_AWAY;
+        array.splice(delIdx, 1);
         drawPitch();
         return;
     }
@@ -2997,15 +3105,23 @@ function downloadExcel() {
         }
     });
 
-    // 6. GENERAR ARCHIVO
+    // 6. GENERAR ARCHIVO Y DESCARGAR VÍA API
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(statsData), "Resumen");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logData), "Logs");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(playerData), "Jugadores");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(livData), "Metricas_Liverpool");
     
-    XLSX.writeFile(wb, "Reporte_Partido_Pro.xlsx");
-    if(typeof showToast === "function") showToast("📊 Excel Generado Correctamente");
+    // Generar blob del Excel
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    const filename = "Reporte_Partido_" + DB.config.homeName + "_vs_" + DB.config.awayName + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
+    
+    // Descargar vía API
+    downloadFileViaAPI(blob, filename, function() {
+        if(typeof showToast === "function") showToast("📊 Excel Descargado Correctamente");
+    });
 }
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
 function downloadPitchImg() { const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; const tCtx = tmp.getContext('2d'); tCtx.fillStyle = "#204a2e"; tCtx.fillRect(0,0,tmp.width, tmp.height); tCtx.drawImage(cv, 0, 0); const link = document.createElement('a'); link.download = `Pitch_${Date.now()}.png`; link.href = tmp.toDataURL(); link.click(); }
