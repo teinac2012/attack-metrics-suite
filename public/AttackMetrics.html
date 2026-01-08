@@ -1331,10 +1331,17 @@ function downloadBackup() {
         var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         var fileName = "AttackMetrics_" + hName + "_vs_" + aName + "_" + dateStr + ".json";
 
-        // --- FASE 3: ENVIAR AL SERVIDOR Y DESCARGAR ---
-        downloadFileViaAPI(blob, fileName, function() {
-            if (typeof showToast === "function") showToast("✅ Archivo guardado correctamente");
-        });
+        // --- FASE 3: DESCARGAR DIRECTAMENTE ---
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        if (typeof showToast === "function") showToast("✅ Archivo guardado correctamente");
 
     } catch (err) {
         console.error(err);
@@ -3196,10 +3203,17 @@ function downloadExcel() {
     
     const filename = "Reporte_Partido_" + DB.config.homeName + "_vs_" + DB.config.awayName + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
     
-    // Descargar vía API
-    downloadFileViaAPI(blob, filename, function() {
-        if(typeof showToast === "function") showToast("📊 Excel Descargado Correctamente");
-    });
+    // Descargar directamente
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    if(typeof showToast === "function") showToast("📊 Excel Descargado Correctamente");
 }
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
 function downloadPitchImg() { const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; const tCtx = tmp.getContext('2d'); tCtx.fillStyle = "#204a2e"; tCtx.fillRect(0,0,tmp.width, tmp.height); tCtx.drawImage(cv, 0, 0); const link = document.createElement('a'); link.download = `Pitch_${Date.now()}.png`; link.href = tmp.toDataURL(); link.click(); }
