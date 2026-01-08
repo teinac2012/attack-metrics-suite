@@ -2099,6 +2099,22 @@ function clampToFieldPercent(p) {
 
 // --- FUNCIÓN VORONOI MEJORADA ---
 function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
+    // Verificar si D3 está disponible
+    if (typeof d3 === 'undefined' || !d3.Delaunay) {
+        // Cargar D3 si no está disponible
+        if (!loadedScripts.delaunay) {
+            loadDelaunay().then(() => {
+                drawPitch(); // Re-dibujar una vez cargado
+            });
+        }
+        // Mostrar mensaje temporal
+        ctx.fillStyle = "rgba(200,200,200,0.3)"; 
+        ctx.font = "20px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Cargando biblioteca D3...", w/2, h/2);
+        return;
+    }
+
     // Guardar límites del campo para interacción
     voronoiState.fieldX1 = w*0.05;
     voronoiState.fieldY1 = h*0.05;
