@@ -44,6 +44,9 @@
         function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
         function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6/dist/d3-delaunay.js'); }
         function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js'); }
+        
+        // Precargar librerías críticas (sin lazy-load)
+        Promise.all([loadChartJS(), loadPlotly()]).catch(e => console.warn('Error precargando librerías críticas:', e));
     </script>
     <script src="/api-sync.js"></script>
     <script src="/app-data-manager.js"></script>
