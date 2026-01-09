@@ -44,29 +44,14 @@
         function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
         function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3@7'); }
         function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7'); }
-        
-        // Precargar librerías críticas ANTES de cargar app-data-manager
-        async function initializeApp() {
-            try {
-                await Promise.all([loadChartJS(), loadPlotly()]);
-                // Cargar app-data-manager solo después de que las librerías estén listas
-                const script = document.createElement('script');
-                script.src = '/app-data-manager.js';
-                document.head.appendChild(script);
-            } catch (e) {
-                console.error('Error cargando librerías críticas:', e);
-                alert('Error al cargar las librerías necesarias. Recarga la página.');
-            }
-        }
-        
-        // Llamar cuando el DOM esté listo
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
-        }
     </script>
+    
+    <!-- Cargar librerías críticas INMEDIATAMENTE en el <head> -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
     <script src="/api-sync.js"></script>
+    <script src="/app-data-manager.js"></script>
 
     <style>
         :root {
