@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import PDFDocument from 'pdfkit';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 // Configuración para aumentar el tiempo de ejecución en Vercel
 export const maxDuration = 60; // 60 segundos
@@ -21,146 +21,64 @@ interface MatchData {
   actions: MatchAction[];
 }
 
-function drawPitch(doc: typeof PDFDocument, x: number, y: number, width: number, height: number) {
+function drawPitch(page: any, x: number, y: number, width: number, height: number, color: [number, number, number]) {
   const scaleX = width / 100;
   const scaleY = height / 100;
   
-  doc.save();
-  doc.translate(x, y);
-  
-  // Fondo verde
-  doc.rect(0, 0, width, height).fillAndStroke('#2d5016', '#4CAF50');
-  
-  // Líneas del campo
-  doc.strokeColor('#4CAF50').lineWidth(2);
-  
-  // Contorno
-  doc.rect(0, 0, width, height).stroke();
+  // Fondo verde del campo
+  page.drawRectangle({
+    x,
+    y,
+    width,
+    height,
+    color: rgb(0.18, 0.31, 0.09),
+    borderColor: rgb(color[0], color[1], color[2]),
+    borderWidth: 2,
+  });
   
   // Línea de medio campo
-  doc.moveTo(width / 2, 0).lineTo(width / 2, height).stroke();
+  page.drawLine({
+    start: { x: x + width / 2, y },
+    end: { x: x + width / 2, y: y + height },
+    color: rgb(color[0], color[1], color[2]),
+    thickness: 2,
+  });
   
-  // Áreas grandes
-  doc.rect(0, 21.1 * scaleY, 17 * scaleX, 57.8 * scaleY).stroke();
-  doc.rect((100 - 17) * scaleX, 21.1 * scaleY, 17 * scaleX, 57.8 * scaleY).stroke();
+  // Áreas grandes (penalty area)
+  page.drawRectangle({
+    x,
+    y: y + 21.1 * scaleY,
+    width: 17 * scaleX,
+    height: 57.8 * scaleY,
+    borderColor: rgb(color[0], color[1], color[2]),
+    borderWidth: 2,
+  });
   
-  // Áreas pequeñas
-  doc.rect(0, 36.8 * scaleY, 5.8 * scaleX, 26.4 * scaleY).stroke();
-  doc.rect((100 - 5.8) * scaleX, 36.8 * scaleY, 5.8 * scaleX, 26.4 * scaleY).stroke();
+  page.drawRectangle({
+    x: x + (100 - 17) * scaleX,
+    y: y + 21.1 * scaleY,
+    width: 17 * scaleX,
+    height: 57.8 * scaleY,
+    borderColor: rgb(color[0], color[1], color[2]),
+    borderWidth: 2,
+  });
   
   // Círculo central
-  doc.circle(width / 2, height / 2, 8.7 * scaleX).stroke();
-  
-  // Puntos
-  doc.fillColor('#4CAF50');
-  doc.circle(width / 2, height / 2, 3).fill();
-  doc.circle(11 * scaleX, height / 2, 3).fill();
-  doc.circle((100 - 11) * scaleX, height / 2, 3).fill();
-  
-  doc.restore();
-}
-
-function generateCoverPage(doc: typeof PDFDocument, matchData: MatchData, homeActions: MatchAction[]) {
-  const { homeName, awayName } = matchData.config;
-  
-  // Fondo negro
-  doc.rect(0, 0, doc.page.width, doc.page.height).fill('#0a0a0a');
-  
-  // Título principal
-  doc.fillColor('#4CAF50')
-     .fontSize(36)
-     .font('Helvetica-Bold')
-     .text('📊 INFORME DE ANÁLISIS', 50, 80, { align: 'center', width: doc.page.width - 100 });
-  
-  doc.fillColor('white')
-     .fontSize(28)
-     .text(`${homeName.toUpperCase()} vs ${awayName.toUpperCase()}`, 50, 140, { align: 'center', width: doc.page.width - 100 });
-  
-  doc.fillColor('#888888')
-     .fontSize(14)
-     .font('Helvetica')
-     .text(new Date().toLocaleString('es-ES'), 50, 190, { align: 'center', width: doc.page.width - 100 });
-  
-  // Estadísticas principales
-  const totalActions = homeActions.length;
-  const uniquePlayers = new Set(homeActions.map(a => a.player)).size;
-  const actionCounts = homeActions.reduce((acc, a) => {
-    acc[a.type] = (acc[a.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
-  
-  // Cajas de métricas
-  const metrics = [
-    { label: '📈 Total Acciones', value: totalActions, x: 70 },
-    { label: '👥 Jugadores', value: uniquePlayers, x: 250 },
-    { label: '⭐ Acción Principal', value: topAction?.[0] || 'N/A', x: 410 }
-  ];
-  
-  metrics.forEach(({ label, value, x }) => {
-    doc.rect(x, 250, 140, 80).fillAndStroke('#1e1e1e', '#4CAF50');
-    doc.fillColor('#cccccc').fontSize(12).font('Helvetica').text(label, x + 10, 270, { width: 120, align: 'center' });
-    doc.fillColor('#4CAF50').fontSize(20).font('Helvetica-Bold').text(String(value), x + 10, 295, { width: 120, align: 'center' });
+  page.drawCircle({
+    x: x + width / 2,
+    y: y + height / 2,
+    size: 8.7 * scaleX,
+    borderColor: rgb(color[0], color[1], color[2]),
+    borderWidth: 2,
   });
   
-  // Top 5 jugadores
-  const playerCounts = homeActions.reduce((acc, a) => {
-    acc[a.player] = (acc[a.player] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const topPlayers = Object.entries(playerCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-  
-  doc.fillColor('white').fontSize(18).font('Helvetica-Bold').text('🏆 TOP 5 JUGADORES', 70, 380);
-  
-  topPlayers.forEach(([player, count], i) => {
-    const y = 420 + i * 40;
-    doc.rect(70, y, 450, 30).fillAndStroke('#1a1a1a', '#2196F3');
-    doc.fillColor('white').fontSize(14).font('Helvetica').text(`${i + 1}. ${player}`, 85, y + 8);
-    doc.fillColor('#4CAF50').fontSize(14).font('Helvetica-Bold').text(`${count} acciones`, 400, y + 8);
+  // Punto central
+  page.drawCircle({
+    x: x + width / 2,
+    y: y + height / 2,
+    size: 3,
+    color: rgb(color[0], color[1], color[2]),
   });
-  
-  // Pie de página
-  doc.fillColor('#666666').fontSize(10).font('Helvetica').text('Attack Metrics Suite © 2026', 0, doc.page.height - 50, { align: 'center', width: doc.page.width });
-}
-
-function generateHeatmapPage(doc: typeof PDFDocument, matchData: MatchData, homeActions: MatchAction[]) {
-  doc.addPage();
-  
-  // Fondo
-  doc.rect(0, 0, doc.page.width, doc.page.height).fill('#0a0a0a');
-  
-  // Título
-  doc.fillColor('#4CAF50')
-     .fontSize(24)
-     .font('Helvetica-Bold')
-     .text(`🔥 MAPA DE ACTIVIDAD - ${matchData.config.homeName.toUpperCase()}`, 50, 50, { align: 'center', width: doc.page.width - 100 });
-  
-  doc.fillColor('white')
-     .fontSize(14)
-     .text(`${homeActions.length} acciones registradas`, 50, 85, { align: 'center', width: doc.page.width - 100 });
-  
-  // Campo
-  const fieldWidth = 500;
-  const fieldHeight = 350;
-  const fieldX = (doc.page.width - fieldWidth) / 2;
-  const fieldY = 130;
-  
-  drawPitch(doc, fieldX, fieldY, fieldWidth, fieldHeight);
-  
-  // Puntos de acciones (invertir Y)
-  doc.fillColor('#ffeb3b').opacity(0.6);
-  homeActions.forEach(action => {
-    const px = fieldX + (action.x / 100) * fieldWidth;
-    const py = fieldY + ((100 - action.y) / 100) * fieldHeight;
-    doc.circle(px, py, 4).fill();
-  });
-  
-  doc.opacity(1);
-  
-  // Leyenda
-  doc.fillColor('white').fontSize(12).font('Helvetica').text('Zonas de mayor actividad indicadas por concentración de puntos', 50, fieldY + fieldHeight + 30, { align: 'center', width: doc.page.width - 100 });
 }
 
 export async function POST(req: NextRequest) {
@@ -182,36 +100,219 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Datos del partido inválidos' }, { status: 400 });
     }
 
-    console.log('[REPORTS] Generando PDF con Node.js...');
+    console.log('[REPORTS] Generando PDF con pdf-lib...');
 
     // Filtrar acciones del equipo local
     const homeActions = matchData.actions.filter(a => a.team === 'HOME');
 
     // Crear PDF
-    const doc = new PDFDocument({ size: 'A4', margin: 0 });
-    const chunks: Buffer[] = [];
+    const pdfDoc = await PDFDocument.create();
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    
-    const pdfPromise = new Promise<Buffer>((resolve, reject) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+    // === PÁGINA 1: PORTADA ===
+    const page1 = pdfDoc.addPage([595, 842]); // A4
+    const { width: pageWidth, height: pageHeight } = page1.getSize();
+
+    // Fondo negro
+    page1.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: pageHeight,
+      color: rgb(0.04, 0.04, 0.04),
     });
 
-    // Generar páginas
-    generateCoverPage(doc, matchData, homeActions);
-    generateHeatmapPage(doc, matchData, homeActions);
+    // Título principal
+    page1.drawText('📊 INFORME DE ANÁLISIS', {
+      x: 50,
+      y: pageHeight - 100,
+      size: 32,
+      font: helveticaBold,
+      color: rgb(0.3, 0.69, 0.31),
+    });
 
-    // Finalizar PDF
-    doc.end();
+    page1.drawText(`${matchData.config.homeName.toUpperCase()} vs ${matchData.config.awayName.toUpperCase()}`, {
+      x: 50,
+      y: pageHeight - 140,
+      size: 24,
+      font: helveticaBold,
+      color: rgb(1, 1, 1),
+    });
 
-    const pdfBuffer = await pdfPromise;
-    console.log('[REPORTS] PDF generado, tamaño:', pdfBuffer.length, 'bytes');
+    page1.drawText(new Date().toLocaleDateString('es-ES'), {
+      x: 50,
+      y: pageHeight - 170,
+      size: 12,
+      font: helvetica,
+      color: rgb(0.53, 0.53, 0.53),
+    });
+
+    // Estadísticas principales
+    const totalActions = homeActions.length;
+    const uniquePlayers = new Set(homeActions.map(a => a.player)).size;
+    const actionCounts = homeActions.reduce((acc, a) => {
+      acc[a.type] = (acc[a.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const topActionEntry = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
+    const topAction = topActionEntry ? topActionEntry[0] : 'N/A';
+
+    // Cajas de métricas
+    const boxY = pageHeight - 280;
+    const boxes = [
+      { label: 'Total Acciones', value: String(totalActions), x: 70 },
+      { label: 'Jugadores', value: String(uniquePlayers), x: 240 },
+      { label: 'Acción Principal', value: topAction.substring(0, 10), x: 410 }
+    ];
+
+    boxes.forEach(({ label, value, x }) => {
+      page1.drawRectangle({
+        x,
+        y: boxY,
+        width: 140,
+        height: 80,
+        color: rgb(0.12, 0.12, 0.12),
+        borderColor: rgb(0.3, 0.69, 0.31),
+        borderWidth: 2,
+      });
+      page1.drawText(label, {
+        x: x + 10,
+        y: boxY + 55,
+        size: 10,
+        font: helvetica,
+        color: rgb(0.8, 0.8, 0.8),
+      });
+      page1.drawText(value, {
+        x: x + 10,
+        y: boxY + 30,
+        size: 18,
+        font: helveticaBold,
+        color: rgb(0.3, 0.69, 0.31),
+      });
+    });
+
+    // Top 5 jugadores
+    page1.drawText('🏆 TOP 5 JUGADORES', {
+      x: 70,
+      y: boxY - 60,
+      size: 16,
+      font: helveticaBold,
+      color: rgb(1, 1, 1),
+    });
+
+    const playerCounts = homeActions.reduce((acc, a) => {
+      acc[a.player] = (acc[a.player] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const topPlayers = Object.entries(playerCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    topPlayers.forEach(([player, count], i) => {
+      const yPos = boxY - 100 - i * 40;
+      page1.drawRectangle({
+        x: 70,
+        y: yPos,
+        width: 450,
+        height: 30,
+        color: rgb(0.1, 0.1, 0.1),
+        borderColor: rgb(0.13, 0.59, 0.95),
+        borderWidth: 1,
+      });
+      page1.drawText(`${i + 1}. ${player}`, {
+        x: 85,
+        y: yPos + 8,
+        size: 12,
+        font: helvetica,
+        color: rgb(1, 1, 1),
+      });
+      page1.drawText(`${count} acciones`, {
+        x: 400,
+        y: yPos + 8,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0.3, 0.69, 0.31),
+      });
+    });
+
+    // === PÁGINA 2: MAPA DE ACTIVIDAD ===
+    const page2 = pdfDoc.addPage([595, 842]);
+    
+    // Fondo
+    page2.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: pageHeight,
+      color: rgb(0.04, 0.04, 0.04),
+    });
+
+    // Título
+    page2.drawText(`🔥 MAPA DE ACTIVIDAD - ${matchData.config.homeName.toUpperCase()}`, {
+      x: 50,
+      y: pageHeight - 80,
+      size: 20,
+      font: helveticaBold,
+      color: rgb(0.3, 0.69, 0.31),
+    });
+
+    page2.drawText(`${homeActions.length} acciones registradas`, {
+      x: 50,
+      y: pageHeight - 110,
+      size: 12,
+      font: helvetica,
+      color: rgb(1, 1, 1),
+    });
+
+    // Dibujar campo
+    const fieldWidth = 450;
+    const fieldHeight = 300;
+    const fieldX = (pageWidth - fieldWidth) / 2;
+    const fieldY = pageHeight - 500;
+
+    drawPitch(page2, fieldX, fieldY, fieldWidth, fieldHeight, [0.3, 0.69, 0.31]);
+
+    // Dibujar puntos de acciones (invertir Y)
+    homeActions.forEach(action => {
+      const px = fieldX + (action.x / 100) * fieldWidth;
+      const py = fieldY + ((100 - action.y) / 100) * fieldHeight;
+      
+      page2.drawCircle({
+        x: px,
+        y: py,
+        size: 3,
+        color: rgb(1, 0.92, 0.23),
+        opacity: 0.7,
+      });
+    });
+
+    // Leyenda
+    page2.drawText('Zonas de mayor actividad indicadas por concentración de puntos', {
+      x: 50,
+      y: fieldY - 50,
+      size: 10,
+      font: helvetica,
+      color: rgb(0.8, 0.8, 0.8),
+    });
+
+    // Pie de página
+    page2.drawText('Attack Metrics Suite © 2026', {
+      x: pageWidth / 2 - 80,
+      y: 30,
+      size: 9,
+      font: helvetica,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+
+    // Guardar PDF
+    const pdfBytes = await pdfDoc.save();
+    console.log('[REPORTS] PDF generado, tamaño:', pdfBytes.length, 'bytes');
 
     // Nombre del archivo
     const fileName = `Informe_${matchData.config.homeName}_vs_${matchData.config.awayName}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,
