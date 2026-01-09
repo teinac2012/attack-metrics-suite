@@ -799,6 +799,7 @@
     
     <button class="btn-tool" style="background:#3498db" onclick="downloadPitchImg()">📷</button>
     <button class="btn-tool" style="background:#2ecc71" onclick="downloadExcel()">📊</button>
+    <button class="btn-tool" style="background:#e74c3c" onclick="generatePDFReport()">📄 PDF</button>
 </header>
 
 <div class="layout">
@@ -3223,6 +3224,51 @@ function downloadExcel() {
     
     if(typeof showToast === "function") showToast("📊 Excel Descargado Correctamente");
 }
+
+async function generatePDFReport() {
+    try {
+        // Mostrar indicador de carga
+        if(typeof showToast === "function") showToast("⏳ Generando informe PDF...");
+        
+        // Preparar datos del partido
+        const matchData = {
+            config: DB.config,
+            actions: DB.actions,
+            rosters: DB.rosters
+        };
+        
+        // Llamar al endpoint
+        const response = await fetch('/api/reports/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ matchData })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error generando el informe');
+        }
+        
+        // Descargar el PDF
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Informe_${DB.config.homeName}_vs_${DB.config.awayName}_${new Date().toISOString().slice(0,10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        if(typeof showToast === "function") showToast("✅ Informe PDF generado exitosamente");
+    } catch (error) {
+        console.error('Error generando PDF:', error);
+        if(typeof showToast === "function") showToast("❌ Error generando informe: " + error.message);
+    }
+}
+
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
 function downloadPitchImg() { const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; const tCtx = tmp.getContext('2d'); tCtx.fillStyle = "#204a2e"; tCtx.fillRect(0,0,tmp.width, tmp.height); tCtx.drawImage(cv, 0, 0); const link = document.createElement('a'); link.download = `Pitch_${Date.now()}.png`; link.href = tmp.toDataURL(); link.click(); }
 
