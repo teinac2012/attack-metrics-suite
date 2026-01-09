@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Lanzar navegador
     console.log('[REPORTS] Iniciando Chromium...');
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [...chromium.args, '--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
       defaultViewport: { width: 1920, height: 1080 },
       executablePath: await chromium.executablePath(),
       headless: true,
