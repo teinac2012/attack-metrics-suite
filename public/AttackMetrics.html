@@ -765,7 +765,6 @@
         <option value="ALL">🏹 TAC</option>
         <option value="HEAT">🔥 MAP</option>
         <option value="XBUILD">🏗 xBUILD</option>
-        <option value="VORONOI">🗺️ VOR</option>
     </select>
     
     <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
@@ -2104,26 +2103,13 @@ function clampToFieldPercent(p) {
 
 // --- FUNCIÓN VORONOI MEJORADA ---
 function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
-    // Verificar si D3 está disponible
-    if (typeof d3 === 'undefined' || !d3.Delaunay) {
-        // Cargar D3 si no está disponible
-        if (!loadedScripts.delaunay) {
-            loadDelaunay()
-                .then(() => {
-                    drawPitch(); // Re-dibujar una vez cargado
-                })
-                .catch(error => {
-                    console.warn('No se pudo cargar D3 para Voronoi. Mostrando modo normal.', error);
-                    // Fallback: mostrar sin Voronoi
-                });
-        }
-        // Mostrar mensaje temporal
-        ctx.fillStyle = "rgba(200,200,200,0.3)"; 
-        ctx.font = "20px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Cargando biblioteca D3...", w/2, h/2);
-        return;
-    }
+    // Nota: VORONOI está deshabilitado actualmente
+    // Si se necesita, cambiar URL de loadDelaunay a una confiable
+    ctx.fillStyle = "rgba(100,100,100,0.3)"; 
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Modo VORONOI deshabilitado", w/2, h/2);
+    return;
 
     // Guardar límites del campo para interacción
     voronoiState.fieldX1 = w*0.05;
