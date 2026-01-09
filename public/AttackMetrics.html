@@ -42,8 +42,8 @@
         function loadXLSX() { return loadScript('xlsx', 'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'); }
         function loadHTML2Canvas() { return loadScript('html2canvas', 'https://html2canvas.hertzen.com/dist/html2canvas.min.js'); }
         function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
-        function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6/dist/d3-delaunay.js'); }
-        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'); }
+        function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3@7'); }
+        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7'); }
         
         // Precargar librerías críticas ANTES de cargar app-data-manager
         async function initializeApp() {
@@ -2123,9 +2123,14 @@ function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
     if (typeof d3 === 'undefined' || !d3.Delaunay) {
         // Cargar D3 si no está disponible
         if (!loadedScripts.delaunay) {
-            loadDelaunay().then(() => {
-                drawPitch(); // Re-dibujar una vez cargado
-            });
+            loadDelaunay()
+                .then(() => {
+                    drawPitch(); // Re-dibujar una vez cargado
+                })
+                .catch(error => {
+                    console.warn('No se pudo cargar D3 para Voronoi. Mostrando modo normal.', error);
+                    // Fallback: mostrar sin Voronoi
+                });
         }
         // Mostrar mensaje temporal
         ctx.fillStyle = "rgba(200,200,200,0.3)"; 
