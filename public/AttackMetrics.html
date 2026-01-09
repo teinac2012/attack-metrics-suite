@@ -1906,7 +1906,7 @@ function setupCanvas() {
 
 function getPos(e) {
     const r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left)/cv.width*100, y: (e.clientY - r.top)/cv.height*100 };
+    return { x: (e.clientX - r.left)/r.width*100, y: (e.clientY - r.top)/r.height*100 };
 }
 
 function finishDrag(e) {
