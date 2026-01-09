@@ -2968,6 +2968,11 @@ function getStats(name, isTeam=false) {
 
 let radarChart = null;
 function updateRadar() {
+    // Cargar Chart.js si es necesario
+    if (!window.Chart) {
+        loadChartJS().then(() => updateRadar()).catch(e => console.error('Error cargando Chart.js:', e));
+        return;
+    }
     const ctxR = document.getElementById('radarCanvas').getContext('2d');
     if(radarChart) radarChart.destroy();
     
@@ -3427,6 +3432,11 @@ function updateLaneChart(actions, elId, team) {
 function openViolinModal() { document.getElementById('modalViolin').style.display = 'flex'; setTimeout(updateViolin, 200); }
 
 function updateViolin() {
+    // Cargar Plotly si es necesario
+    if (!window.Plotly) {
+        loadPlotly().then(() => updateViolin()).catch(e => console.error('Error cargando Plotly:', e));
+        return;
+    }
     const metric = document.getElementById('violinMetric').value;
     const viewTeam = document.getElementById('violinTeam').value;
     const container = document.getElementById('violinChartContainer');
