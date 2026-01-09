@@ -49,6 +49,7 @@
     <!-- Cargar librerías críticas INMEDIATAMENTE en el <head> -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     
     <script src="/api-sync.js"></script>
     <script src="/app-data-manager.js"></script>
@@ -765,6 +766,7 @@
         <option value="ALL">🏹 TAC</option>
         <option value="HEAT">🔥 MAP</option>
         <option value="XBUILD">🏗 xBUILD</option>
+        <option value="VORONOI">🗺️ VOR</option>
     </select>
     
     <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
@@ -2103,13 +2105,14 @@ function clampToFieldPercent(p) {
 
 // --- FUNCIÓN VORONOI MEJORADA ---
 function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
-    // Nota: VORONOI está deshabilitado actualmente
-    // Si se necesita, cambiar URL de loadDelaunay a una confiable
-    ctx.fillStyle = "rgba(100,100,100,0.3)"; 
-    ctx.font = "16px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Modo VORONOI deshabilitado", w/2, h/2);
-    return;
+    // Verificar si D3 está disponible
+    if (typeof d3 === 'undefined' || !d3.Delaunay) {
+        ctx.fillStyle = "rgba(200,200,200,0.3)"; 
+        ctx.font = "20px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Cargando D3...", w/2, h/2);
+        return;
+    }
 
     // Guardar límites del campo para interacción
     voronoiState.fieldX1 = w*0.05;
