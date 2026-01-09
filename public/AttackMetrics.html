@@ -45,11 +45,28 @@
         function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6/dist/d3-delaunay.js'); }
         function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'); }
         
-        // Precargar librerías críticas (sin lazy-load)
-        Promise.all([loadChartJS(), loadPlotly()]).catch(e => console.warn('Error precargando librerías críticas:', e));
+        // Precargar librerías críticas ANTES de cargar app-data-manager
+        async function initializeApp() {
+            try {
+                await Promise.all([loadChartJS(), loadPlotly()]);
+                // Cargar app-data-manager solo después de que las librerías estén listas
+                const script = document.createElement('script');
+                script.src = '/app-data-manager.js';
+                document.head.appendChild(script);
+            } catch (e) {
+                console.error('Error cargando librerías críticas:', e);
+                alert('Error al cargar las librerías necesarias. Recarga la página.');
+            }
+        }
+        
+        // Llamar cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
     </script>
     <script src="/api-sync.js"></script>
-    <script src="/app-data-manager.js"></script>
 
     <style>
         :root {
