@@ -43,7 +43,7 @@
         function loadHTML2Canvas() { return loadScript('html2canvas', 'https://html2canvas.hertzen.com/dist/html2canvas.min.js'); }
         function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
         function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3-delaunay@6/dist/d3-delaunay.js'); }
-        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js'); }
+        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'); }
         
         // Precargar librerías críticas (sin lazy-load)
         Promise.all([loadChartJS(), loadPlotly()]).catch(e => console.warn('Error precargando librerías críticas:', e));
@@ -4067,13 +4067,14 @@ const HULL_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#91
 async function openHullModal() { 
     try {
         await loadDelaunay(); 
-        await loadVoronoi(); 
+        // Voronoi no es estrictamente necesario, d3-delaunay tiene convex hull
         document.getElementById('modalHulls').style.display = 'flex'; 
         document.getElementById('hullHome').innerText = DB.config.homeName; 
         document.getElementById('hullAway').innerText = DB.config.awayName; 
         setHullTeam('HOME');
     } catch (error) {
         console.error('Error cargando librerías para Convex Hull:', error);
+        alert('Error al cargar el modal de Convex Hull. Revisa la consola.');
     }
 }
 function setHullTeam(t) { hullTeam = t; document.getElementById('hullHome').className = t==='HOME'?'t-opt active-home':'t-opt'; document.getElementById('hullAway').className = t==='AWAY'?'t-opt active-away':'t-opt'; renderHullList(); drawHulls(); }
