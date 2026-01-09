@@ -1911,7 +1911,9 @@ function getPos(e) {
 
 function finishDrag(e) {
     if(!isDrag) return; isDrag=false;
-    const endP = getPos(e);
+    // Obtener posición correcta para touch o mouse
+    const eventPos = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+    const endP = getPos(eventPos);
     const dist = Math.hypot(endP.x-startP.x, endP.y-startP.y);
     DB.lastClick = startP;
     DB.lastEnd = dist > 2 ? endP : null;
@@ -2467,7 +2469,9 @@ function voronoiInputStart(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
     
-    const p = clampToFieldPercent(getPos(e));
+    // Obtener posición correcta para touch o mouse
+    const eventPos = e.touches ? e.touches[0] : e;
+    const p = clampToFieldPercent(getPos(eventPos));
     const mode = voronoiState.currentMode;
     
     // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
@@ -2498,7 +2502,9 @@ function voronoiInputMove(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
 
-    const p = clampToFieldPercent(getPos(e));
+    // Obtener posición correcta para touch o mouse
+    const eventPos = e.touches ? e.touches[0] : e;
+    const p = clampToFieldPercent(getPos(eventPos));
 
     // Cambiar cursor según hover
     const cv = document.getElementById('pitchCanvas');
@@ -2532,7 +2538,9 @@ function voronoiInputDblClick(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
 
-    const p = getPos(e);
+    // Obtener posición correcta para touch o mouse
+    const eventPos = e.touches ? e.touches[0] : e;
+    const p = getPos(eventPos);
     let delIdx = -1;
     let team = null;
     
