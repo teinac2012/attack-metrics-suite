@@ -1,0 +1,11 @@
+﻿{
+  "config": {
+    "homeName": "TEST HOME",
+    "awayName": "TEST AWAY"
+  },
+  "actions": [
+    {"x": 50, "y": 50, "type": "Pass", "player": "Player1", "team": "HOME"},
+    {"x": 60, "y": 40, "type": "Shot", "player": "Player2", "team": "HOME"},
+    {"x": 55, "y": 55, "type": "Pass", "player": "Player1", "team": "HOME"}
+  ]
+}

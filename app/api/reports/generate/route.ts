@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-// Configuración para aumentar el tiempo de ejecución en Vercel
+// Configuración para Vercel
+export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 segundos
+export const dynamic = 'force-dynamic';
 
 interface MatchAction {
   x: number;
@@ -83,34 +85,66 @@ function drawPitch(page: any, x: number, y: number, width: number, height: numbe
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('[REPORTS] Iniciando generación de informe...');
+    console.log('[REPORTS] === Iniciando generación de informe ===');
     
     // Verificar autenticación
+    console.log('[REPORTS] Verificando autenticación...');
     const session = await auth();
+    
     if (!session?.user) {
       console.log('[REPORTS] No autorizado - sin sesión');
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+    
+    console.log('[REPORTS] Usuario autenticado:', session.user.name);
 
     // Obtener datos del partido
-    const body = await req.json();
+    console.log('[REPORTS] Parseando body...');
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('[REPORTS] Error parseando JSON:', parseError);
+      return NextResponse.json({ error: 'JSON inválido', details: String(parseError) }, { status: 400 });
+    }
+    
     const { matchData } = body as { matchData: MatchData };
+    console.log('[REPORTS] Body parseado. Tiene matchData:', !!matchData);
 
     if (!matchData || !matchData.actions || !matchData.config) {
+      console.error('[REPORTS] Datos inválidos:', {
+        hasMatchData: !!matchData,
+        hasActions: !!matchData?.actions,
+        hasConfig: !!matchData?.config
+      });
       return NextResponse.json({ error: 'Datos del partido inválidos' }, { status: 400 });
     }
 
-    console.log('[REPORTS] Generando PDF con pdf-lib...');
+    console.log('[REPORTS] Validación OK - Config:', matchData.config.homeName, 'vs', matchData.config.awayName);
+    console.log('[REPORTS] Total acciones:', matchData.actions.length);
 
     // Filtrar acciones del equipo local
     const homeActions = matchData.actions.filter(a => a.team === 'HOME');
+    console.log('[REPORTS] Acciones HOME:', homeActions.length);
 
     // Crear PDF
-    const pdfDoc = await PDFDocument.create();
+    console.log('[REPORTS] Creando documento PDF...');
+    let pdfDoc;
+    try {
+      pdfDoc = await PDFDocument.create();
+      console.log('[REPORTS] PDF Document creado');
+    } catch (pdfError) {
+      console.error('[REPORTS] Error creando PDFDocument:', pdfError);
+      return NextResponse.json({ error: 'Error creando PDF', details: String(pdfError) }, { status: 500 });
+    }
+    
+    console.log('[REPORTS] Cargando fuentes...');
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    console.log('[REPORTS] Fuentes cargadas');
 
     // === PÁGINA 1: PORTADA ===
+    console.log('[REPORTS] Generando página 1...');
     const page1 = pdfDoc.addPage([595, 842]); // A4
     const { width: pageWidth, height: pageHeight } = page1.getSize();
 
@@ -124,7 +158,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Título principal
-    page1.drawText('📊 INFORME DE ANÁLISIS', {
+    page1.drawText('INFORME DE ANALISIS', {
       x: 50,
       y: pageHeight - 100,
       size: 32,
@@ -158,12 +192,14 @@ export async function POST(req: NextRequest) {
     const topActionEntry = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
     const topAction = topActionEntry ? topActionEntry[0] : 'N/A';
 
+    console.log('[REPORTS] Stats calculadas - Total:', totalActions, 'Jugadores:', uniquePlayers);
+
     // Cajas de métricas
     const boxY = pageHeight - 280;
     const boxes = [
       { label: 'Total Acciones', value: String(totalActions), x: 70 },
       { label: 'Jugadores', value: String(uniquePlayers), x: 240 },
-      { label: 'Acción Principal', value: topAction.substring(0, 10), x: 410 }
+      { label: 'Accion Principal', value: topAction.substring(0, 10), x: 410 }
     ];
 
     boxes.forEach(({ label, value, x }) => {
@@ -193,7 +229,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Top 5 jugadores
-    page1.drawText('🏆 TOP 5 JUGADORES', {
+    page1.drawText('TOP 5 JUGADORES', {
       x: 70,
       y: boxY - 60,
       size: 16,
@@ -236,7 +272,10 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    console.log('[REPORTS] Página 1 completada');
+
     // === PÁGINA 2: MAPA DE ACTIVIDAD ===
+    console.log('[REPORTS] Generando página 2...');
     const page2 = pdfDoc.addPage([595, 842]);
     
     // Fondo
@@ -249,7 +288,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Título
-    page2.drawText(`🔥 MAPA DE ACTIVIDAD - ${matchData.config.homeName.toUpperCase()}`, {
+    page2.drawText(`MAPA DE ACTIVIDAD - ${matchData.config.homeName.toUpperCase()}`, {
       x: 50,
       y: pageHeight - 80,
       size: 20,
@@ -271,9 +310,11 @@ export async function POST(req: NextRequest) {
     const fieldX = (pageWidth - fieldWidth) / 2;
     const fieldY = pageHeight - 500;
 
+    console.log('[REPORTS] Dibujando campo...');
     drawPitch(page2, fieldX, fieldY, fieldWidth, fieldHeight, [0.3, 0.69, 0.31]);
 
     // Dibujar puntos de acciones (invertir Y)
+    console.log('[REPORTS] Dibujando', homeActions.length, 'puntos...');
     homeActions.forEach(action => {
       const px = fieldX + (action.x / 100) * fieldWidth;
       const py = fieldY + ((100 - action.y) / 100) * fieldHeight;
@@ -288,7 +329,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Leyenda
-    page2.drawText('Zonas de mayor actividad indicadas por concentración de puntos', {
+    page2.drawText('Zonas de mayor actividad indicadas por concentracion de puntos', {
       x: 50,
       y: fieldY - 50,
       size: 10,
@@ -297,7 +338,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Pie de página
-    page2.drawText('Attack Metrics Suite © 2026', {
+    page2.drawText('Attack Metrics Suite 2026', {
       x: pageWidth / 2 - 80,
       y: 30,
       size: 9,
@@ -305,12 +346,22 @@ export async function POST(req: NextRequest) {
       color: rgb(0.4, 0.4, 0.4),
     });
 
+    console.log('[REPORTS] Página 2 completada');
+
     // Guardar PDF
-    const pdfBytes = await pdfDoc.save();
-    console.log('[REPORTS] PDF generado, tamaño:', pdfBytes.length, 'bytes');
+    console.log('[REPORTS] Guardando PDF...');
+    let pdfBytes;
+    try {
+      pdfBytes = await pdfDoc.save();
+      console.log('[REPORTS] PDF generado exitosamente, tamaño:', pdfBytes.length, 'bytes');
+    } catch (saveError) {
+      console.error('[REPORTS] Error guardando PDF:', saveError);
+      return NextResponse.json({ error: 'Error guardando PDF', details: String(saveError) }, { status: 500 });
+    }
 
     // Nombre del archivo
     const fileName = `Informe_${matchData.config.homeName}_vs_${matchData.config.awayName}_${new Date().toISOString().split('T')[0]}.pdf`;
+    console.log('[REPORTS] Enviando PDF al cliente:', fileName);
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
@@ -319,9 +370,17 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[REPORTS] Error en generate report:', error);
+    console.error('[REPORTS] === ERROR FATAL ===');
+    console.error('[REPORTS] Tipo:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[REPORTS] Mensaje:', error instanceof Error ? error.message : String(error));
+    console.error('[REPORTS] Stack:', error instanceof Error ? error.stack : 'N/A');
+    
     return NextResponse.json(
-      { error: 'Error interno del servidor', details: String(error) },
+      { 
+        error: 'Error interno del servidor', 
+        details: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.constructor.name : typeof error
+      },
       { status: 500 }
     );
   }
