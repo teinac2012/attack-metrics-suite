@@ -4083,15 +4083,13 @@ let hullTeam = 'HOME';
 const HULL_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3'];
 async function openHullModal() { 
     try {
-        await loadDelaunay(); 
-        // Voronoi no es estrictamente necesario, d3-delaunay tiene convex hull
+        // No necesitamos cargar librerías externas, usamos convex hull nativo
         document.getElementById('modalHulls').style.display = 'flex'; 
         document.getElementById('hullHome').innerText = DB.config.homeName; 
         document.getElementById('hullAway').innerText = DB.config.awayName; 
         setHullTeam('HOME');
     } catch (error) {
-        console.error('Error cargando librerías para Convex Hull:', error);
-        alert('Error al cargar el modal de Convex Hull. Revisa la consola.');
+        console.error('Error abriendo modal de Convex Hull:', error);
     }
 }
 function setHullTeam(t) { hullTeam = t; document.getElementById('hullHome').className = t==='HOME'?'t-opt active-home':'t-opt'; document.getElementById('hullAway').className = t==='AWAY'?'t-opt active-away':'t-opt'; renderHullList(); drawHulls(); }
