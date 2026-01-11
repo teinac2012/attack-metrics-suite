@@ -1889,11 +1889,11 @@ function drawPitch(dragS, dragE) {
     ctx.beginPath(); ctx.arc(w*0.16, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
     ctx.beginPath(); ctx.arc(w*0.84, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
     
-    // Calcular ángulos de arcos (igual que en drawPitch)
-    const arcRad_flow = h * 0.1;
-    const penBoxLeft_flow = w * 0.05;
-    const penBoxRight_flow = w * 0.2;
-    const distToBoxEdge_flow = penBoxRight_flow - (w * 0.16);
+    // Calcular ángulos de arcos (proporcional al ancho del área)
+    const penBoxW_flow = w * 0.15;  // Ancho del área del portero
+    const arcRad_flow = penBoxW_flow * 0.667;  // Radio = 2/3 del ancho del área
+    const penBoxRight_flow = w * 0.2;  // Borde derecho del área izquierda
+    const distToBoxEdge_flow = penBoxRight_flow - (w * 0.16);  // Distancia del punto al borde
     
     if (arcRad_flow > distToBoxEdge_flow) {
         const angleOffset_flow = Math.acos(distToBoxEdge_flow / arcRad_flow);
