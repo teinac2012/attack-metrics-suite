@@ -1,109 +1,94 @@
 """
 API de Python para Vercel - Generación de PDF con heatmaps
 """
-from http.server import BaseHTTPRequestHandler
 import json
 import sys
 import os
 import tempfile
 from datetime import datetime
+import subprocess
 
-# Agregar el directorio scripts al path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-scripts_dir = os.path.join(os.path.dirname(current_dir), 'scripts')
-sys.path.insert(0, scripts_dir)
-
-try:
-    from generate_heatmap_report import generate_pdf_report
-    DEPENDENCIES_OK = True
-except ImportError as e:
-    DEPENDENCIES_OK = False
-    IMPORT_ERROR = str(e)
-
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        try:
-            # Verificar dependencias
-            if not DEPENDENCIES_OK:
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    'error': 'Dependencias de Python no disponibles',
-                    'details': IMPORT_ERROR
-                }).encode())
-                return
-            
-            # Leer el body
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode('utf-8'))
-            
-            # Validar datos
-            if 'actions' not in data or not data['actions']:
-                self.send_response(400)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    'error': 'No hay datos válidos para generar el informe'
-                }).encode())
-                return
-            
-            # Crear archivos temporales
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as json_file:
-                json.dump(data, json_file)
-                json_path = json_file.name
-            
-            pdf_path = tempfile.mktemp(suffix='.pdf')
-            
-            # Generar PDF
-            success = generate_pdf_report(json_path, pdf_path)
-            
-            if not success:
-                os.unlink(json_path)
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    'error': 'Error al generar el informe PDF'
-                }).encode())
-                return
-            
-            # Leer el PDF
-            with open(pdf_path, 'rb') as pdf_file:
-                pdf_data = pdf_file.read()
-            
-            # Limpiar archivos temporales
-            try:
-                os.unlink(json_path)
-                os.unlink(pdf_path)
-            except:
-                pass
-            
-            # Enviar PDF
-            home_team = data.get('config', {}).get('homeTeam', 'LOCAL')
-            away_team = data.get('config', {}).get('awayTeam', 'VISITANTE')
-            date = data.get('config', {}).get('date', datetime.now().strftime('%Y-%m-%d'))
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/pdf')
-            self.send_header('Content-Disposition', 
-                           f'attachment; filename="Informe_{home_team}_vs_{away_team}_{date}.pdf"')
-            self.end_headers()
-            self.wfile.write(pdf_data)
-            
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                'error': 'Error interno del servidor',
-                'details': str(e)
-            }).encode())
+def handler(request):
+    """Handler para Vercel Python Functions"""
     
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+    try:
+        # Procesar POST
+        if request.method != 'POST':
+            return {'statusCode': 405, 'body': json.dumps({'error': 'Method not allowed'})}
+        
+        # Leer body
+        try:
+            data = json.loads(request.body) if isinstance(request.body, str) else request.body
+        except:
+            return {'statusCode': 400, 'body': json.dumps({'error': 'Invalid JSON'})}
+        
+        # Validar datos
+        if 'actions' not in data or not data['actions']:
+            return {'statusCode': 400, 'body': json.dumps({'error': 'No hay datos válidos'})}
+        
+        # Crear archivos temporales
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as json_file:
+            json.dump(data, json_file)
+            json_path = json_file.name
+        
+        pdf_path = tempfile.mktemp(suffix='.pdf')
+        
+        # Ejecutar script Python de generación
+        script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'generate-heatmap-report.py')
+        
+        result = subprocess.run(
+            [sys.executable, script_path, json_path, pdf_path],
+            capture_output=True,
+            text=True,
+            timeout=50
+        )
+        
+        if result.returncode != 0:
+            os.unlink(json_path)
+            return {
+                'statusCode': 500,
+                'body': json.dumps({
+                    'error': 'Error al generar PDF',
+                    'details': result.stderr
+                })
+            }
+        
+        # Leer el PDF
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_data = pdf_file.read()
+        
+        # Limpiar archivos
+        try:
+            os.unlink(json_path)
+            os.unlink(pdf_path)
+        except:
+            pass
+        
+        # Retornar PDF
+        home_team = data.get('config', {}).get('homeTeam', 'LOCAL')
+        away_team = data.get('config', {}).get('awayTeam', 'VISITANTE')
+        date_str = data.get('config', {}).get('date', datetime.now().strftime('%Y-%m-%d'))
+        
+        return {
+            'statusCode': 200,
+            'body': pdf_data,
+            'headers': {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': f'attachment; filename="Informe_{home_team}_vs_{away_team}_{date_str}.pdf"'
+            },
+            'isBase64Encoded': True
+        }
+        
+    except subprocess.TimeoutExpired:
+        return {
+            'statusCode': 504,
+            'body': json.dumps({'error': 'Timeout generando PDF (>50s)'})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': 'Error interno',
+                'details': str(e)
+            })
+        }
