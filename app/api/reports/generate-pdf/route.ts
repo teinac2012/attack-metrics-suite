@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 export const maxDuration = 60;
 
@@ -18,85 +18,6 @@ interface MatchData {
     date: string;
   };
   actions: Action[];
-}
-
-function drawPitchOnPDF(pdfPage: any, x: number, y: number, width: number, height: number) {
-  const ratio = width / 100;
-
-  // Contorno del campo
-  pdfPage.drawRectangle({
-    x,
-    y: y - height,
-    width,
-    height,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 2,
-  });
-
-  // Línea de medio campo
-  pdfPage.drawLine({
-    start: { x: x + 50 * ratio, y: y - height },
-    end: { x: x + 50 * ratio, y: y },
-    color: rgb(0, 0, 0),
-    thickness: 1,
-  });
-
-  // Círculo central
-  pdfPage.drawCircle({
-    x: x + 50 * ratio,
-    y: y - 50 * ratio,
-    size: 9.15 * ratio * 2,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
-
-  // Punto central
-  pdfPage.drawCircle({
-    x: x + 50 * ratio,
-    y: y - 50 * ratio,
-    size: 1 * ratio,
-    color: rgb(0, 0, 0),
-  });
-
-  // Área de penalty izquierda
-  pdfPage.drawRectangle({
-    x: x,
-    y: y - (21.1 + 57.8) * ratio,
-    width: 16.5 * ratio,
-    height: 57.8 * ratio,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
-
-  // Área de portería izquierda
-  pdfPage.drawRectangle({
-    x: x,
-    y: y - (36.8 + 26.4) * ratio,
-    width: 5.5 * ratio,
-    height: 26.4 * ratio,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
-
-  // Área de penalty derecha
-  pdfPage.drawRectangle({
-    x: x + width - 16.5 * ratio,
-    y: y - (21.1 + 57.8) * ratio,
-    width: 16.5 * ratio,
-    height: 57.8 * ratio,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
-
-  // Área de portería derecha
-  pdfPage.drawRectangle({
-    x: x + width - 5.5 * ratio,
-    y: y - (36.8 + 26.4) * ratio,
-    width: 5.5 * ratio,
-    height: 26.4 * ratio,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
 }
 
 function createHeatmapData(actions: Action[], team: string): number[][] {
@@ -118,37 +39,6 @@ function createHeatmapData(actions: Action[], team: string): number[][] {
   return grid;
 }
 
-function drawHeatmapOnPDF(pdfPage: any, x: number, y: number, width: number, height: number, grid: number[][]) {
-  const cellWidth = width / 10;
-  const cellHeight = height / 10;
-  const maxValue = Math.max(...grid.flat());
-
-  for (let row = 0; row < 10; row++) {
-    for (let col = 0; col < 10; col++) {
-      const value = grid[row]?.[col] || 0;
-      const intensity = maxValue > 0 ? value / maxValue : 0;
-
-      // Escala de color: azul (frío) a rojo (caliente)
-      const r = Math.floor(255 * intensity) / 255;
-      const g = Math.floor(128 * (1 - intensity)) / 255;
-      const b = Math.floor(255 * (1 - intensity)) / 255;
-
-      const cellX = x + col * cellWidth;
-      const cellY = y - (row + 1) * cellHeight;
-
-      pdfPage.drawRectangle({
-        x: cellX,
-        y: cellY,
-        width: cellWidth,
-        height: cellHeight,
-        color: rgb(r, g, b),
-        borderColor: rgb(200, 200, 200),
-        borderWidth: 0.5,
-      });
-    }
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const data: MatchData = await request.json();
@@ -163,64 +53,86 @@ export async function POST(request: NextRequest) {
     const pdfDoc = await PDFDocument.create();
 
     // Página 1: Equipo local
-    let page = pdfDoc.addPage([595, 842]); // A4
-    const pageWidth = 595;
-    const pageHeight = 842;
-    let yPosition = pageHeight - 40;
+    const page1 = pdfDoc.addPage([595, 842]); // A4
+    let yPos = 800;
 
     // Título
-    page.drawText(`${homeTeam} - Informe de Análisis`, {
+    page1.drawText(`${homeTeam} - Informe de Análisis`, {
       x: 50,
-      y: yPosition,
-      size: 20,
+      y: yPos,
+      size: 18,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 25;
-    page.drawText(`Fecha: ${date}`, {
+    yPos -= 25;
+    page1.drawText(`Fecha: ${date}`, {
       x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 30;
-    page.drawText('Mapa de Calor de Acciones', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 20;
-
-    // Dibujar campo
-    drawPitchOnPDF(page, 50, yPosition, 200, 200);
-
-    // Dibujar heatmap
-    const homeGrid = createHeatmapData(data.actions, homeTeam);
-    drawHeatmapOnPDF(page, 55, yPosition - 5, 190, 190, homeGrid);
-
-    yPosition -= 220;
-
-    // Estadísticas
-    const homeActions = data.actions.filter((a) => a.team === homeTeam);
-    page.drawText(`Total de acciones: ${homeActions.length}`, {
-      x: 50,
-      y: yPosition,
+      y: yPos,
       size: 11,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 15;
-    page.drawText('Acciones por jugador (Top 10):', {
+    yPos -= 30;
+    page1.drawText('Mapa de Calor de Acciones', {
       x: 50,
-      y: yPosition,
+      y: yPos,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+
+    yPos -= 30;
+
+    // Dibujar heatmap simple para equipo local
+    const homeGrid = createHeatmapData(data.actions, homeTeam);
+    const cellSize = 15;
+    const startX = 50;
+
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 10; col++) {
+        const value = homeGrid[row]?.[col] || 0;
+        const maxValue = Math.max(...homeGrid.flat());
+        const intensity = maxValue > 0 ? value / maxValue : 0;
+
+        // Escala de color azul -> rojo
+        const r = Math.round(255 * intensity);
+        const g = Math.round(128 * (1 - intensity));
+        const b = Math.round(255 * (1 - intensity));
+
+        const cellX = startX + col * cellSize;
+        const cellY = yPos - row * cellSize;
+
+        page1.drawRectangle({
+          x: cellX,
+          y: cellY - cellSize,
+          width: cellSize,
+          height: cellSize,
+          color: rgb(r / 255, g / 255, b / 255),
+          borderColor: rgb(0.8, 0.8, 0.8),
+          borderWidth: 0.5,
+        });
+      }
+    }
+
+    yPos -= 180;
+
+    // Estadísticas
+    const homeActions = data.actions.filter((a) => a.team === homeTeam);
+    page1.drawText(`Total de acciones: ${homeActions.length}`, {
+      x: 50,
+      y: yPos,
       size: 10,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 12;
+    yPos -= 15;
+    page1.drawText('Acciones por jugador (Top 5):', {
+      x: 50,
+      y: yPos,
+      size: 9,
+      color: rgb(0, 0, 0),
+    });
+
+    yPos -= 12;
 
     const players = new Map<string, number>();
     homeActions.forEach((action) => {
@@ -230,73 +142,95 @@ export async function POST(request: NextRequest) {
 
     Array.from(players.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 5)
       .forEach(([player, count]) => {
-        page.drawText(`  ${player}: ${count}`, {
+        page1.drawText(`  ${player}: ${count}`, {
           x: 60,
-          y: yPosition,
-          size: 9,
+          y: yPos,
+          size: 8,
           color: rgb(0, 0, 0),
         });
-        yPosition -= 12;
+        yPos -= 11;
       });
 
     // Página 2: Equipo visitante
-    page = pdfDoc.addPage([595, 842]); // A4
-    yPosition = pageHeight - 40;
+    const page2 = pdfDoc.addPage([595, 842]); // A4
+    yPos = 800;
 
-    page.drawText(`${awayTeam} - Informe de Análisis`, {
+    page2.drawText(`${awayTeam} - Informe de Análisis`, {
       x: 50,
-      y: yPosition,
-      size: 20,
+      y: yPos,
+      size: 18,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 25;
-    page.drawText(`Fecha: ${date}`, {
+    yPos -= 25;
+    page2.drawText(`Fecha: ${date}`, {
       x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 30;
-    page.drawText('Mapa de Calor de Acciones', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 20;
-
-    // Dibujar campo
-    drawPitchOnPDF(page, 50, yPosition, 200, 200);
-
-    // Dibujar heatmap
-    const awayGrid = createHeatmapData(data.actions, awayTeam);
-    drawHeatmapOnPDF(page, 55, yPosition - 5, 190, 190, awayGrid);
-
-    yPosition -= 220;
-
-    // Estadísticas
-    const awayActions = data.actions.filter((a) => a.team === awayTeam);
-    page.drawText(`Total de acciones: ${awayActions.length}`, {
-      x: 50,
-      y: yPosition,
+      y: yPos,
       size: 11,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 15;
-    page.drawText('Acciones por jugador (Top 10):', {
+    yPos -= 30;
+    page2.drawText('Mapa de Calor de Acciones', {
       x: 50,
-      y: yPosition,
+      y: yPos,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+
+    yPos -= 30;
+
+    // Dibujar heatmap para equipo visitante
+    const awayGrid = createHeatmapData(data.actions, awayTeam);
+
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 10; col++) {
+        const value = awayGrid[row]?.[col] || 0;
+        const maxValue = Math.max(...awayGrid.flat());
+        const intensity = maxValue > 0 ? value / maxValue : 0;
+
+        // Escala de color azul -> rojo
+        const r = Math.round(255 * intensity);
+        const g = Math.round(128 * (1 - intensity));
+        const b = Math.round(255 * (1 - intensity));
+
+        const cellX = startX + col * cellSize;
+        const cellY = yPos - row * cellSize;
+
+        page2.drawRectangle({
+          x: cellX,
+          y: cellY - cellSize,
+          width: cellSize,
+          height: cellSize,
+          color: rgb(r / 255, g / 255, b / 255),
+          borderColor: rgb(0.8, 0.8, 0.8),
+          borderWidth: 0.5,
+        });
+      }
+    }
+
+    yPos -= 180;
+
+    // Estadísticas
+    const awayActions = data.actions.filter((a) => a.team === awayTeam);
+    page2.drawText(`Total de acciones: ${awayActions.length}`, {
+      x: 50,
+      y: yPos,
       size: 10,
       color: rgb(0, 0, 0),
     });
 
-    yPosition -= 12;
+    yPos -= 15;
+    page2.drawText('Acciones por jugador (Top 5):', {
+      x: 50,
+      y: yPos,
+      size: 9,
+      color: rgb(0, 0, 0),
+    });
+
+    yPos -= 12;
 
     const awayPlayers = new Map<string, number>();
     awayActions.forEach((action) => {
@@ -306,15 +240,15 @@ export async function POST(request: NextRequest) {
 
     Array.from(awayPlayers.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 5)
       .forEach(([player, count]) => {
-        page.drawText(`  ${player}: ${count}`, {
+        page2.drawText(`  ${player}: ${count}`, {
           x: 60,
-          y: yPosition,
-          size: 9,
+          y: yPos,
+          size: 8,
           color: rgb(0, 0, 0),
         });
-        yPosition -= 12;
+        yPos -= 11;
       });
 
     // Generar PDF
