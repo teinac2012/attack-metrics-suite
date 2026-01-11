@@ -761,6 +761,7 @@
     
     <button class="btn-tool" style="background:#3498db" onclick="downloadPitchImg()">📷</button>
     <button class="btn-tool" style="background:#2ecc71" onclick="downloadExcel()">📊</button>
+    <button class="btn-tool" style="background:#e74c3c" onclick="generatePDFReport()">📄 PDF</button>
 </header>
 
 <div class="layout">
@@ -5002,6 +5003,71 @@ function calculateLiverpoolMetrics() {
     });
 
     return Object.values(stats);
+}
+
+// ========== GENERAR INFORME PDF ==========
+function generatePDFReport() {
+    if (!DB.actions || DB.actions.length === 0) {
+        showToast("⚠️ No hay datos para generar informe");
+        return;
+    }
+
+    showToast("🔄 Generando informe PDF...");
+
+    // Preparar datos para enviar
+    const matchData = {
+        config: {
+            homeTeam: DB.homeTeam || "LOCAL",
+            awayTeam: DB.awayTeam || "VISITANTE",
+            date: new Date().toISOString().split('T')[0]
+        },
+        actions: DB.actions.map(a => ({
+            id: a.id,
+            min: a.min,
+            period: a.period,
+            team: a.team,
+            player: a.player,
+            type: a.type,
+            res: a.res,
+            x: a.x,
+            y: a.y,
+            endX: a.endX,
+            endY: a.endY,
+            xg: a.xg,
+            xt: a.xt
+        }))
+    };
+
+    // Enviar al backend
+    fetch('/api/reports/generate-pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(matchData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al generar el informe');
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        // Descargar el PDF
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Informe_${matchData.config.homeTeam}_vs_${matchData.config.awayTeam}_${matchData.config.date}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast("✅ Informe PDF generado correctamente");
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast("❌ Error al generar el informe PDF");
+    });
 }
 </script>
 </body>

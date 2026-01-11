@@ -3,9 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-export const config = {
-  maxDuration: 60, // 60 segundos para Vercel Pro
-};
+export const maxDuration = 60; // 60 segundos para Vercel Pro
 
 export async function POST(request: NextRequest) {
   try {
