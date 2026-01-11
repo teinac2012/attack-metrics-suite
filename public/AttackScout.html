@@ -210,21 +210,34 @@
 <script>
 // --- CONFIGURACIÓN DE MÉTRICAS ---
 const METRICS = ['xG', 'xBuild', 'xThreat', 'Creacion', 'Ataque', 'Defensa', 'Pases'];
+
+// --- [MAPEO DE EXCEL] CONFIGURACIÓN DE COLUMNAS ---
+// Aquí le decimos al programa cómo se llaman tus columnas en el Excel.
+// Basado en tus archivos: la columna de pases se llama "Pases OK".
+const EXCEL_MAP = {
+    'xG': 'xG',
+    'xBuild': 'xBuild',
+    'xThreat': 'xThreat',
+    'Creacion': 'Creacion',
+    'Ataque': 'Ataque',
+    'Defensa': 'Defensa',
+    'Pases': 'Pases OK'   // <--- CORREGIDO: Busca la columna "Pases OK"
+};
+
 const METRIC_LABELS = {
     'xG': 'Goles Esp.', 'xBuild': 'Construcción', 'xThreat': 'Amenaza (xT)',
     'Creacion': 'Creación', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
 };
 
-// --- [CALIBRADO] LÍMITES "NIVEL DIOS" PARA EL RADAR (v5.3) ---
-// Ajustados para evitar saturación (100%) en jugadores como Bellido o Angel.
-const MAX_LIMITS = {
-    'xG': 1.2,         // Margen seguro.
-    'xBuild': 1.5,     // Correcto para tus datos.
-    'xThreat': 1.0,    // Correcto.
-    'Creacion': 30.0,  // AJUSTADO: Cubre los 24.0 de Bellido (será ~80%).
-    'Ataque': 15.0,    // AJUSTADO: Cubre los 10.0 de Angel (será ~66%).
-    'Defensa': 15.0,   // AJUSTADO: Cubre los 10.0 de Bellido (será ~66%).
-    'Pases': 60.0      // Estándar.
+// --- LÍMITES FIJOS (Escalas máximas) ---
+const MAX_LIMITS = { 
+    'xG': 1.2, 
+    'xBuild': 1.5, 
+    'xThreat': 1.0, 
+    'Creacion': 30.0, 
+    'Ataque': 15.0, 
+    'Defensa': 15.0, 
+    'Pases': 60.0 
 };
 
 // Variables globales
@@ -280,7 +293,12 @@ async function loadDatabase() {
                     const wb = XLSX.read(e.target.result, {type:'array'});
                     const ws = wb.Sheets["Jugadores"] || Object.values(wb.Sheets)[0];
                     if(ws) {
-                        XLSX.utils.sheet_to_json(ws).forEach(row => {
+                        const jsonData = XLSX.utils.sheet_to_json(ws);
+                        
+                        // [DEBUG] Para ver en consola (F12) qué lee realmente
+                        if(jsonData.length > 0) console.log("Columnas detectadas:", Object.keys(jsonData[0]));
+
+                        jsonData.forEach(row => {
                             const name = row["Jugador"];
                             if(!name) return;
                             const team = row["Equipo"] || "Free Agent";
@@ -291,9 +309,31 @@ async function loadDatabase() {
                             const id = `${name}|${team}`;
                             if(!pMap[id]) pMap[id] = { id, name, team, pos, age, matches:0, stats:{} };
                             pMap[id].matches++;
+                            
                             METRICS.forEach(m => {
                                 if(!pMap[id].stats[m]) pMap[id].stats[m] = 0;
-                                pMap[id].stats[m] += (row[m] || 0);
+                                
+                                // --- CORRECCIÓN DE PARSEO DE DATOS ---
+                                // 1. Buscamos el nombre de columna definido en EXCEL_MAP
+                                const colName = EXCEL_MAP[m] || m;
+                                let val = row[colName];
+
+                                // 2. Si el valor es texto (ej: "6/13" o "13/14"), lo arreglamos
+                                if (typeof val === 'string') {
+                                    // Si tiene barra, tomamos el primer número (ej: "6/13" -> "6")
+                                    if(val.includes('/')) {
+                                        val = val.split('/')[0];
+                                    }
+                                    // Intentamos convertir a número
+                                    val = parseFloat(val);
+                                }
+
+                                // 3. Si no es un número válido, usamos 0
+                                if (typeof val !== 'number' || isNaN(val)) {
+                                    val = 0;
+                                }
+
+                                pMap[id].stats[m] += val;
                             });
                         });
                     }
@@ -306,26 +346,27 @@ async function loadDatabase() {
 
     RAW_DB = Object.values(pMap).map(p => {
         const obj = { id:p.id, name:p.name, team:p.team, pos:p.pos, age:p.age };
+        // Calculamos el promedio (aunque sea 1 partido)
         METRICS.forEach(m => obj[m] = p.stats[m] / p.matches);
         return obj;
     });
 
-    normalizeData(); // AQUI SE APLICAN LOS LIMITES FIJOS
+    normalizeData(); 
     populateUI();
     document.getElementById('loader').style.display = 'none';
     document.getElementById('targetSelect').disabled = false;
     document.getElementById('btnSearch').disabled = false;
 }
 
-// --- NORMALIZACIÓN CON LÍMITES FIJOS ---
+// --- NORMALIZACIÓN ---
 function normalizeData() {
     NORMALIZED_DB = RAW_DB.map(p => {
-        const n = { ...p, raw: { ...p } }; // Guardar raw dentro
+        const n = { ...p, raw: { ...p } }; // Guardar valores originales
         METRICS.forEach(m => {
             const val = p[m] || 0;
-            const max = MAX_LIMITS[m] || 1; // Usar el límite definido arriba
+            const max = MAX_LIMITS[m] || 1; 
             let norm = val / max;
-            if(norm > 1) norm = 1; // Tope máximo 100%
+            if(norm > 1) norm = 1; 
             n[m] = norm;
         });
         return n;
@@ -356,7 +397,7 @@ function populateUI() {
     });
 }
 
-// --- BÚSQUEDA ---
+// --- BÚSQUEDA Y CÁLCULO DE SIMILITUD ---
 function onTargetChange() { document.getElementById('btnSearch').click(); }
 
 function findSimilars() {
@@ -385,6 +426,7 @@ function findSimilars() {
             sumW += WEIGHTS[m];
         });
         const dist = sumW > 0 ? Math.sqrt(sumSq/sumW) : 1;
+        // Escala de similitud ajustada
         const sim = Math.max(0, 100 - (dist*100*1.5));
         return { ...other, similarity: sim };
     });
@@ -414,7 +456,7 @@ function renderResults(list) {
     });
 }
 
-// --- GRÁFICO RADAR ---
+// --- GRÁFICOS ---
 function updateProfile(target, comparison) {
     currentComparison = comparison;
     
@@ -472,13 +514,13 @@ function updateProfile(target, comparison) {
         }
     });
 
-    // 2. BARRAS (Ahora muestran % respecto a tu límite fijo)
+    // 2. BARRAS (con valores originales RAW)
     const container = document.getElementById('statsBarsContainer');
     container.innerHTML = '';
 
     METRICS.forEach(m => {
-        const tVal = target.raw[m];
-        const tPct = (target[m] * 100).toFixed(0); // Porcentaje directo del valor normalizado
+        const tVal = target.raw[m]; // Valor real
+        const tPct = (target[m] * 100).toFixed(0); // Porcentaje normalizado
         
         let compMarker = '';
         if(comparison) {

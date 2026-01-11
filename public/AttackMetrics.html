@@ -7,51 +7,12 @@
     <meta name="theme-color" content="#121212">
     <title>Attack Metrics v3.1 - Red Filtrada</title>
     
-    <!-- Lazy-load: Scripts cargados solo cuando se necesitan -->
-    <script>
-        // Estado de scripts cargados
-        const loadedScripts = {
-            chart: false,
-            xlsx: false,
-            html2canvas: false,
-            plotly: false,
-            delaunay: false,
-            voronoi: false
-        };
-
-        // Función genérica para cargar scripts
-        function loadScript(name, url) {
-            return new Promise((resolve, reject) => {
-                if (loadedScripts[name]) {
-                    resolve();
-                    return;
-                }
-                const script = document.createElement('script');
-                script.src = url;
-                script.onload = () => {
-                    loadedScripts[name] = true;
-                    resolve();
-                };
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-        }
-
-        // Funciones específicas
-        function loadChartJS() { return loadScript('chart', 'https://cdn.jsdelivr.net/npm/chart.js'); }
-        function loadXLSX() { return loadScript('xlsx', 'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'); }
-        function loadHTML2Canvas() { return loadScript('html2canvas', 'https://html2canvas.hertzen.com/dist/html2canvas.min.js'); }
-        function loadPlotly() { return loadScript('plotly', 'https://cdn.plot.ly/plotly-2.27.0.min.js'); }
-        function loadDelaunay() { return loadScript('delaunay', 'https://cdn.jsdelivr.net/npm/d3@7'); }
-        function loadVoronoi() { return loadScript('voronoi', 'https://cdn.jsdelivr.net/npm/d3@7'); }
-    </script>
-    
-    <!-- Cargar librerías críticas INMEDIATAMENTE en el <head> -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-    
-    <script src="/api-sync.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/voronoi@1.0.2/rhill-voronoi-core.min.js"></script>
     <script src="/app-data-manager.js"></script>
 
     <style>
@@ -680,8 +641,8 @@
                 </div>
                 
                 <div style="display:flex; gap:5px;">
-                    <button class="btn-res" style="font-size:0.7rem; padding:5px; background:#27ae60; color:#fff;" onclick="toggleHullAll(true)">Marcar Todos</button>
-                    <button class="btn-res" style="font-size:0.7rem; padding:5px; background:#e74c3c; color:#fff;" onclick="toggleHullAll(false)">Desmarcar</button>
+                    <button class="btn-res" style="font-size:0.7rem; padding:5px;" onclick="toggleHullAll(true)">Marcar Todos</button>
+                    <button class="btn-res" style="font-size:0.7rem; padding:5px; background:#444;" onclick="toggleHullAll(false)">Desmarcar</button>
                 </div>
 
                 <div class="check-list" id="hullPlayerList" style="flex:1;"></div>
@@ -759,6 +720,7 @@
         <option value="Falta">Faltas</option>
         <option value="Corner">Corner</option>
         <option value="Banda">Banda</option>
+        <option value="Centro">Centro</option>
     </select>
     
     <select class="header-select" id="viewMode" onchange="drawPitch()" style="background:#2c3e50;color:#fff;width:85px">
@@ -788,7 +750,7 @@
     <button class="btn-tool" style="background:#e67e22" onclick="openZScoreModal()">Z</button>
     <button class="btn-tool" style="background:#e74c3c" onclick="openFieldTilt()">FT</button>
     <button class="btn-tool" style="background:#8e44ad" onclick="openZonesModal()">Zn</button>
-    <button class="btn-tool" style="background:#27ae60" onclick="openHullModal()">⬠</button>
+    <button class="btn-tool" style="background:#16a085" onclick="openHullModal()">⬠</button>
     <button class="btn-tool" style="background:#f39c12" onclick="openAvgPosModal()">📍</button>
     <button class="btn-tool" style="background:#9b59b6" onclick="openViolinModal()">🎻</button>
     <button class="btn-tool" style="background:#d35400" onclick="openFootprintModal()">👣</button>
@@ -799,7 +761,6 @@
     
     <button class="btn-tool" style="background:#3498db" onclick="downloadPitchImg()">📷</button>
     <button class="btn-tool" style="background:#2ecc71" onclick="downloadExcel()">📊</button>
-    <button class="btn-tool" style="background:#e74c3c" onclick="generatePDFReport()">📄 PDF</button>
 </header>
 
 <div class="layout">
@@ -1209,46 +1170,18 @@ function resetSubOptions() {
 window.addEventListener("dragover", function(e){e=e||event;e.preventDefault();},false);
 window.addEventListener("drop", function(e){e=e||event;e.preventDefault();},false);
 
-window.onload = async () => {
-    // 1. Cargar datos locales primero (rápido)
+window.onload = () => {
     if(localStorage.getItem('am_v22_6')) Object.assign(DB, JSON.parse(localStorage.getItem('am_v22_6')));
-    
-    // 2. Inicializar UI inmediatamente
     STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
     restoreStateFromDB();
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
-    
-    // 3. Inicializar sincronización cloud (asíncrono)
-    if (typeof window.APISyncManager !== 'undefined') {
-        try {
-            await window.APISyncManager.init('Attack Metrics');
-            
-            // Si había datos más recientes en cloud, aplicarlos
-            const cloudData = await window.APISyncManager.loadFromCloud();
-            if (cloudData) {
-                Object.assign(DB, cloudData);
-                STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
-                restoreStateFromDB();
-                updateDash();
-                drawPitch();
-                console.log('[AttackMetrics] ✓ Datos cargados desde la nube');
-            }
-        } catch (e) {
-            console.warn('[AttackMetrics] Sincronización cloud no disponible:', e);
-        }
-    }
 };
 
 function saveDB() { 
-    // 1. Guardar localmente (siempre, rápido)
+    // Guardar localmente
     localStorage.setItem('am_v22_6', JSON.stringify(DB));
     
-    // 2. Sincronizar con cloud (si está disponible)
-    if (typeof window.APISyncManager !== 'undefined') {
-        window.APISyncManager.syncToCloud();
-    }
-    
-    // 3. Sincronizar con otros contextos (apps/tabs)
+    // Sincronizar con otros contextos (apps/tabs)
     if (typeof window.AnalysisDataSync !== 'undefined') {
         try {
             window.AnalysisDataSync.saveAttackMetricsDB(DB);
@@ -1907,14 +1840,12 @@ function setupCanvas() {
 
 function getPos(e) {
     const r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left)/r.width*100, y: (e.clientY - r.top)/r.height*100 };
+    return { x: (e.clientX - r.left)/cv.width*100, y: (e.clientY - r.top)/cv.height*100 };
 }
 
 function finishDrag(e) {
     if(!isDrag) return; isDrag=false;
-    // Obtener posición correcta para touch o mouse
-    const eventPos = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
-    const endP = getPos(eventPos);
+    const endP = getPos(e);
     const dist = Math.hypot(endP.x-startP.x, endP.y-startP.y);
     DB.lastClick = startP;
     DB.lastEnd = dist > 2 ? endP : null;
@@ -2005,18 +1936,68 @@ function drawPitch(dragS, dragE) {
     // Lógica para invertir visualización de acciones pasadas
     const shouldInvertVisuals = (STATE.invertSides !== STATE.isSecondHalf);
 
-    // PINTAR HEATMAP (Si está activo)
+   // PINTAR HEATMAP (Si está activo)
     if(viewMode === 'HEAT') {
+        const heatCanvas = document.createElement('canvas');
+        heatCanvas.width = w;
+        heatCanvas.height = h;
+        const hCtx = heatCanvas.getContext('2d');
+
+        // 1. Dibujar sombras para acumular densidad
         filtered.forEach(a => {
-            let ax = a.x, ay = a.y; 
+            let ax = a.x, ay = a.y;
             if (shouldInvertVisuals) { ax = 100 - ax; ay = 100 - ay; }
             const x = (ax/100)*w, y = (ay/100)*h;
-            const grd = ctx.createRadialGradient(x, y, 2, x, y, 40);
-            grd.addColorStop(0, "rgba(231, 76, 60, 0.6)"); grd.addColorStop(1, "rgba(231, 76, 60, 0)");
-            ctx.fillStyle = grd; ctx.globalCompositeOperation = 'screen'; 
-            ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.fill();
+
+            const radius = 45; // Radio un poco más amplio para mejor difusión
+            
+            const grd = hCtx.createRadialGradient(x, y, 2, x, y, radius);
+            grd.addColorStop(0, "rgba(0, 0, 0, 0.12)"); // Un poco menos de opacidad base
+            grd.addColorStop(1, "rgba(0, 0, 0, 0)");
+            
+            hCtx.fillStyle = grd;
+            hCtx.beginPath();
+            hCtx.arc(x, y, radius, 0, 2 * Math.PI);
+            hCtx.fill();
         });
-        ctx.globalCompositeOperation = 'source-over';
+
+        // 2. Colorear píxeles y aplicar TRANSPARENCIA
+        const imageData = hCtx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const alpha = data[i + 3];
+
+            if (alpha > 0) {
+                let r, g, b;
+                const t = alpha / 255; 
+
+                // Escala de color: Amarillo -> Naranja -> Rojo
+                if (t < 0.35) {
+                    // Amarillo (#f1c40f)
+                    r = 241; g = 196; b = 15; 
+                } else if (t < 0.65) {
+                    // Naranja (#e67e22)
+                    r = 230; g = 126; b = 34;
+                } else {
+                    // Rojo (#e74c3c)
+                    r = 231; g = 76; b = 60;
+                }
+
+                data[i] = r;
+                data[i + 1] = g;
+                data[i + 2] = b;
+                
+                // --- AJUSTE CLAVE DE TRANSPARENCIA ---
+                // Antes estaba en 230 (muy opaco). 
+                // Lo bajamos a 140 (aprox 55% de opacidad máxima).
+                // Esto garantiza que el césped y las líneas se vean siempre.
+                data[i + 3] = Math.min(alpha * 2.0, 140); 
+            }
+        }
+
+        hCtx.putImageData(imageData, 0, 0);
+        ctx.drawImage(heatCanvas, 0, 0);
     }
 
     // PINTAR VORONOI (Si está activo)
@@ -2108,15 +2089,6 @@ function clampToFieldPercent(p) {
 
 // --- FUNCIÓN VORONOI MEJORADA ---
 function drawVoronoiDiagram(ctx, w, h, actions, shouldInvert) {
-    // Verificar si D3 está disponible
-    if (typeof d3 === 'undefined' || !d3.Delaunay) {
-        ctx.fillStyle = "rgba(200,200,200,0.3)"; 
-        ctx.font = "20px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Cargando D3...", w/2, h/2);
-        return;
-    }
-
     // Guardar límites del campo para interacción
     voronoiState.fieldX1 = w*0.05;
     voronoiState.fieldY1 = h*0.05;
@@ -2470,9 +2442,7 @@ function voronoiInputStart(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
     
-    // Obtener posición correcta para touch o mouse
-    const eventPos = e.touches ? e.touches[0] : e;
-    const p = clampToFieldPercent(getPos(eventPos));
+    const p = clampToFieldPercent(getPos(e));
     const mode = voronoiState.currentMode;
     
     // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
@@ -2503,9 +2473,7 @@ function voronoiInputMove(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
 
-    // Obtener posición correcta para touch o mouse
-    const eventPos = e.touches ? e.touches[0] : e;
-    const p = clampToFieldPercent(getPos(eventPos));
+    const p = clampToFieldPercent(getPos(e));
 
     // Cambiar cursor según hover
     const cv = document.getElementById('pitchCanvas');
@@ -2539,9 +2507,7 @@ function voronoiInputDblClick(e) {
     const viewMode = document.getElementById('viewMode').value;
     if (viewMode !== 'VORONOI') return;
 
-    // Obtener posición correcta para touch o mouse
-    const eventPos = e.touches ? e.touches[0] : e;
-    const p = getPos(eventPos);
+    const p = getPos(e);
     let delIdx = -1;
     let team = null;
     
@@ -2623,20 +2589,70 @@ function getLaneZone(x, y) {
     return { lane, zone };
 }
 
-// --- FUNCIÓN SAVE CON INVERSIÓN ---
+// --- FUNCIÓN AUTOMÁTICA DE POSESIÓN ---
+function autoManagePossession(team, type, res) {
+    // 1. DISPAROS: Detener si es Gol o Fuera
+    if (type === 'Disparo') {
+        const detalle = STATE.subShot || ''; // Obtiene si fue 'Fuera', 'Gol', etc.
+        
+        if (res === 'Gol' || detalle === 'Gol' || detalle === 'Fuera') {
+            setMatchState('STOP'); // Balón sale del campo o gol -> STOP
+        } else {
+            setMatchState('STOP'); // Parada/Bloqueo -> STOP (esperar rebote)
+        }
+        return;
+    }
+
+    // 2. BALÓN PARADO: Detener siempre (esperar siguiente acción para arrancar)
+    if (['Falta', 'Corner', 'Banda', 'Penalti', 'Fuera de Juego'].includes(type)) {
+        setMatchState('STOP');
+        return;
+    }
+
+    // 3. PÉRDIDAS: Detener (balón suelto o recuperado por rival después)
+    if (type === 'Perdida') {
+        setMatchState('STOP');
+        return;
+    }
+
+    // 4. ACCIONES DEFENSIVAS: Si recupera, el reloj pasa a ese equipo
+    if (['Recup', 'Intercep', 'Duelo Aéreo', 'Duelo Suelo'].includes(type)) {
+        if (res !== 'Fallado') {
+            setMatchState(team);
+        }
+        return;
+    }
+
+    // 5. ACCIONES OFENSIVAS (Pases, Regates):
+    // Si completa, reloj corre para ese equipo. Si falla, reloj para.
+    if (['Pase', 'Clave', 'Asist', 'Conducción', 'Regate', 'Centro'].includes(type)) {
+        if (res === 'Completado' || res === 'Gol') {
+            setMatchState(team); // ARRANCA / CONTINÚA RELOJ
+        } else {
+            setMatchState('STOP'); // FALLO -> STOP
+        }
+        return;
+    }
+}
+
+
+// --- FUNCIÓN SAVE ACTUALIZADA (Mantiene toda tu lógica anterior) ---
 function save(res) {
+    // [NUEVO] GESTIÓN AUTOMÁTICA DEL CRONÓMETRO
+    // Se ejecuta al principio para leer STATE.subShot antes de que se borre
+    autoManagePossession(STATE.team, STATE.type, res);
+
+    // [PRESERVADO] Obtención de datos del DOM
     const pName = document.getElementById('selPlayer').value;
     const xg = parseFloat(document.getElementById('ixG').value) || 0;
     const xgot = parseFloat(document.getElementById('ixGOT').value) || 0;
-    
     const currentPhase = document.getElementById('gamePhase') ? document.getElementById('gamePhase').value : ''; 
 
-    // 1. Obtener coordenadas del clic
+    // [PRESERVADO] Obtener coordenadas del clic
     let rawX = DB.lastClick.x, rawY = DB.lastClick.y;
     let rawEndX = DB.lastEnd?.x, rawEndY = DB.lastEnd?.y;
 
-    // --- LÓGICA DE INVERSIÓN (XOR) ---
-    // Si (Invertido != Segunda Parte) -> Invertir coordenadas
+    // [PRESERVADO] LÓGICA DE INVERSIÓN (XOR)
     const shouldInvert = (STATE.invertSides !== STATE.isSecondHalf);
 
     if (shouldInvert) {
@@ -2644,10 +2660,11 @@ function save(res) {
         if (rawEndX != null) { rawEndX = 100 - rawEndX; rawEndY = 100 - rawEndY; }
     }
 
+    // [PRESERVADO] Cálculo de carril y zona
     let lane = "CENTRAL"; if (rawY < 33) lane = "IZQUIERDO"; else if (rawY > 66) lane = "DERECHO";
     let zone = "Z" + (Math.floor(rawX / 16.6) + 1); if(zone === "Z7") zone = "Z6";
 
-    // 3. CÁLCULOS AUTOMÁTICOS
+    // [PRESERVADO] CÁLCULOS AUTOMÁTICOS (xT, xBuild)
     let xtVal = 0, xBuildVal = 0;
     const actionsWithMetric = ['Pase', 'Conducción', 'Regate', 'Clave', 'Asist', 'Banda', 'Corner', 'Perdida', 'Centro'];
 
@@ -2658,11 +2675,12 @@ function save(res) {
         xBuildVal = calculateXBuild(rawX, rawY, rawEndX, rawEndY, STATE.type, res);
     }
 
+    // [PRESERVADO] Lógica especial de Disparo (Sub-opción manda sobre resultado)
     if (STATE.type === 'Disparo' && STATE.subShot === 'Gol') {
         res = 'Gol'; 
     }
 
-    // 4. CREAR LA ACCIÓN NUEVA
+    // [PRESERVADO] CREAR LA ACCIÓN NUEVA
     const newAction = {
         id: STATE.editId || Date.now(),
         min: document.getElementById('timer').innerText,
@@ -2687,6 +2705,7 @@ function save(res) {
         xbuild: xBuildVal
     };
 
+    // [PRESERVADO] Guardar o Editar
     if(STATE.editId) {
         const idx = DB.actions.findIndex(a => a.id === STATE.editId);
         if(idx >= 0) DB.actions[idx] = newAction;
@@ -2695,12 +2714,15 @@ function save(res) {
         DB.actions.push(newAction);
     }
     
-    resetSubOptions(); DB.lastEnd = null; 
+    // [PRESERVADO] Limpieza y UI
+    resetSubOptions(); 
+    DB.lastEnd = null; 
     saveDB(); 
     refreshPlayersFilter(); 
     updateDash(); 
     drawPitch(); 
     showToast("Guardado");
+    
     document.getElementById('ixG').value = ''; 
     document.getElementById('ixGOT').value = '';
 }
@@ -2880,8 +2902,7 @@ function downloadRadar() {
     showToast("Imagen Radar Guardada");
 }
 
-async function downloadElementImage(elementId, filename) {
-    await loadHTML2Canvas(); // Lazy-load html2canvas
+function downloadElementImage(elementId, filename) {
     const element = document.getElementById(elementId);
     if(!element) return;
     
@@ -2936,11 +2957,26 @@ function getStats(name, isTeam=false) {
     // 4. Volumen (Sin cambios)
     const vol = Math.min(acts.length * (isTeam ? 0.16 : 1.25), 100);
     
-    // 5. Creación (Incluye Centros) - AUMENTADO: necesita 140+ acciones para 100%
-    const creat = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type)).length * (isTeam ? 0.075 : 0.7);
+    // 5. Creación Ponderada (Calidad sobre Cantidad)
+// Filtramos las acciones de creación exitosas
+const creatActs = okActs.filter(a => ['Pase','Clave','Asist','Centro'].includes(a.type));
+
+let creatScore = 0;
+creatActs.forEach(a => {
+    if (a.type === 'Asist') creatScore += 20;       // Asistencia: Valor Máximo
+    else if (a.type === 'Clave') creatScore += 10;  // Pase Clave: Valor Alto
+    else if (a.type === 'Centro') creatScore += 2;  // Centro: Valor Medio
+    else creatScore += 1;                           // Pase normal: Valor Base
+});
+
+// ESCALADO (Multiplicadores para ajustar al gráfico 0-100):
+// - Jugador: Multiplicador 1.0 (Ej: 60 pases + 2 claves + 1 asistencia = 100 pts)
+// - Equipo: Multiplicador 0.15 (Porque un equipo hace ~500 pases)
+const creat = Math.min(creatScore * (isTeam ? 0.15 : 1.0), 100);
     
-    // 6. Ataque (AUMENTADO: necesita 80+ acciones para 100%) 
-    const att = okActs.filter(a => ['Disparo','Conducción','Regate'].includes(a.type)).length * (isTeam ? 0.3125 : 1.25);
+    // 6. Desequilibrio (Solo Conducción y Regate)
+// Eliminamos 'Disparo'. Ajustamos multiplicador: con ~25 acciones exitosas tienes 100 pts.
+const att = okActs.filter(a => ['Conducción','Regate'].includes(a.type)).length * (isTeam ? 1.0 : 4.0);
     
     // --- MODIFICACIÓN DEFENSA ---
     // A) Añadido 'Defensiva' a la lista para contar el botón manual (+1).
@@ -2976,11 +3012,6 @@ function getStats(name, isTeam=false) {
 
 let radarChart = null;
 function updateRadar() {
-    // Cargar Chart.js si es necesario
-    if (!window.Chart) {
-        loadChartJS().then(() => updateRadar()).catch(e => console.error('Error cargando Chart.js:', e));
-        return;
-    }
     const ctxR = document.getElementById('radarCanvas').getContext('2d');
     if(radarChart) radarChart.destroy();
     
@@ -3224,51 +3255,6 @@ function downloadExcel() {
     
     if(typeof showToast === "function") showToast("📊 Excel Descargado Correctamente");
 }
-
-async function generatePDFReport() {
-    try {
-        // Mostrar indicador de carga
-        if(typeof showToast === "function") showToast("⏳ Generando informe PDF...");
-        
-        // Preparar datos del partido
-        const matchData = {
-            config: DB.config,
-            actions: DB.actions,
-            rosters: DB.rosters
-        };
-        
-        // Llamar al endpoint
-        const response = await fetch('/api/reports/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ matchData })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error generando el informe');
-        }
-        
-        // Descargar el PDF
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Informe_${DB.config.homeName}_vs_${DB.config.awayName}_${new Date().toISOString().slice(0,10)}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        if(typeof showToast === "function") showToast("✅ Informe PDF generado exitosamente");
-    } catch (error) {
-        console.error('Error generando PDF:', error);
-        if(typeof showToast === "function") showToast("❌ Error generando informe: " + error.message);
-    }
-}
-
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
 function downloadPitchImg() { const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; const tCtx = tmp.getContext('2d'); tCtx.fillStyle = "#204a2e"; tCtx.fillRect(0,0,tmp.width, tmp.height); tCtx.drawImage(cv, 0, 0); const link = document.createElement('a'); link.download = `Pitch_${Date.now()}.png`; link.href = tmp.toDataURL(); link.click(); }
 
@@ -3485,11 +3471,6 @@ function updateLaneChart(actions, elId, team) {
 function openViolinModal() { document.getElementById('modalViolin').style.display = 'flex'; setTimeout(updateViolin, 200); }
 
 function updateViolin() {
-    // Cargar Plotly si es necesario
-    if (!window.Plotly) {
-        loadPlotly().then(() => updateViolin()).catch(e => console.error('Error cargando Plotly:', e));
-        return;
-    }
     const metric = document.getElementById('violinMetric').value;
     const viewTeam = document.getElementById('violinTeam').value;
     const container = document.getElementById('violinChartContainer');
@@ -3611,8 +3592,7 @@ let avgPosHover = null; // Jugador sobre el que está el ratón
 let avgNodePositions = []; // Almacena coordenadas para detectar el ratón
 let avgListenersAdded = false; // Evita duplicar eventos
 
-async function openAvgPosModal() {
-    await loadPlotly(); // Lazy-load Plotly
+function openAvgPosModal() {
     const modal = document.getElementById('modalAvgPos');
     modal.style.display = 'flex';
     document.getElementById('btnAvgHome').innerText = DB.config.homeName;
@@ -4066,7 +4046,7 @@ function downloadAvgPosImg() {
 // SANKEY DIAGRAM
 // ==========================================
 let currentSankeyTeam = 'HOME';
-async function openSankeyModal() { await loadPlotly(); document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
+function openSankeyModal() { document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
 function updateSankey(team) {
     currentSankeyTeam = team;
     document.getElementById('btnSankeyHome').className = team==='HOME'?'t-opt active-home':'t-opt';
@@ -4114,17 +4094,7 @@ function updateSankey(team) {
 // ==========================================
 let hullTeam = 'HOME';
 const HULL_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3'];
-async function openHullModal() { 
-    try {
-        // No necesitamos cargar librerías externas, usamos convex hull nativo
-        document.getElementById('modalHulls').style.display = 'flex'; 
-        document.getElementById('hullHome').innerText = DB.config.homeName; 
-        document.getElementById('hullAway').innerText = DB.config.awayName; 
-        setHullTeam('HOME');
-    } catch (error) {
-        console.error('Error abriendo modal de Convex Hull:', error);
-    }
-}
+function openHullModal() { document.getElementById('modalHulls').style.display = 'flex'; document.getElementById('hullHome').innerText = DB.config.homeName; document.getElementById('hullAway').innerText = DB.config.awayName; setHullTeam('HOME'); }
 function setHullTeam(t) { hullTeam = t; document.getElementById('hullHome').className = t==='HOME'?'t-opt active-home':'t-opt'; document.getElementById('hullAway').className = t==='AWAY'?'t-opt active-away':'t-opt'; renderHullList(); drawHulls(); }
 function renderHullList() {
     const list = document.getElementById('hullPlayerList'); list.innerHTML = '';
@@ -4268,8 +4238,7 @@ function downloadViolinImg() {
 // ==========================================
 let flowVizDB = { team: 'HOME', allPossessions: [], currentIndex: 0 };
 
-async function openFlowVizModal() {
-    await loadPlotly(); // Lazy-load Plotly
+function openFlowVizModal() {
     document.getElementById('modalFlowViz').style.display = 'flex';
     setTimeout(() => { setFlowTeam('HOME'); }, 100);
 }
@@ -4780,8 +4749,7 @@ function onTeamSelect() {
 // ==========================================
 // LÓGICA xG BUILDUP & CHAIN (NUEVO)
 // ==========================================
-async function openXgBuildModal() {
-    await Promise.all([loadChartJS(), loadXLSX()]); // Lazy-load Chart.js y XLSX
+function openXgBuildModal() {
     document.getElementById('modalXgBuild').style.display = 'flex';
     renderXgBuild();
 }
@@ -4886,8 +4854,7 @@ function downloadXgBuildImg() {
     downloadElementImage('boxXgBuild', 'xG_Buildup_Chain');
 }
 
-async function downloadXgBuildExcel() {
-    await loadXLSX(); // Lazy-load XLSX
+function downloadXgBuildExcel() {
     // 1. REPLICAR LÓGICA DE CÁLCULO
     const stats = {}; 
     const initP = (n, t) => { if(!stats[n]) stats[n] = { name: n, team: t, xGChain: 0, xGBuildup: 0 }; };
