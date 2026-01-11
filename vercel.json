@@ -30,8 +30,7 @@
   ],
   "functions": {
     "app/api/reports/generate/route.ts": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 60
     },
     "app/api/**/*.ts": {
       "maxDuration": 30
