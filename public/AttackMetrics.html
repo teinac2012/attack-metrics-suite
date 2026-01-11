@@ -2066,7 +2066,8 @@ let voronoiState = {
     ball: null,         // Posición del balón
     dragTarget: null,
     fieldX1: 0, fieldY1: 0, fieldX2: 0, fieldY2: 0,
-    currentMode: null   // 'HOME', 'AWAY', 'BALL' o null
+    currentMode: null,   // 'HOME', 'AWAY', 'BALL' o null
+    lastTap: 0          // Para detectar doble toque en tablets
 };
 
 // Compatibilidad: alias para acceso rápido a todos los puntos
@@ -2444,6 +2445,19 @@ function voronoiInputStart(e) {
     
     const p = clampToFieldPercent(getPos(e));
     const mode = voronoiState.currentMode;
+    
+    // Detectar doble toque en tablets
+    if (e.type === 'touchstart') {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - voronoiState.lastTap;
+        if (tapLength < 300 && tapLength > 0) {
+            // Es un doble toque - eliminar elemento
+            voronoiInputDblClick(e);
+            voronoiState.lastTap = 0;
+            return;
+        }
+        voronoiState.lastTap = currentTime;
+    }
     
     // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
     let found = null;

@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Match Data Hub - Pro Scout v18.11 (Calibración Fina xGOT)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* [ESTILOS EXACTOS - MANTENIDOS] */
         :root { --bg-dark: #0f0f13; --panel-bg: #18181c; --border: #2d2d33; --accent-blue: #3498db; --accent-red: #e74c3c; --accent-brand: #f39c12; --text-main: #ffffff; }
-        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; }
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; }
         header { height: 40px; background: #000; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 15px; flex-shrink: 0; z-index: 100; }
         .logo { font-weight: 900; letter-spacing: 1px; font-size: 0.9rem; text-transform: uppercase; font-style: italic;}
         .logo span { color: var(--accent-brand); }
@@ -497,7 +499,20 @@
         };
         draw();
     });
+    pCanvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const rect = pCanvas.getBoundingClientRect();
+        mousePos = {
+            x: e.touches[0].clientX - rect.left,
+            y: e.touches[0].clientY - rect.top
+        };
+        draw();
+    }, {passive:false});
     pCanvas.addEventListener('mouseleave', () => {
+        mousePos = null;
+        draw();
+    });
+    pCanvas.addEventListener('touchend', () => {
         mousePos = null;
         draw();
     });
@@ -551,7 +566,8 @@
         ctx.fillStyle = "#333"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "right"; ctx.fillText("3. CLICK DESTINO", w-10, 20);
     }
     const gCanvas = document.getElementById('goalCanvas');
-    gCanvas.addEventListener('mousedown', handleGoalInteract); 
+    gCanvas.addEventListener('mousedown', handleGoalInteract);
+    gCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleGoalInteract(e); }, {passive:false}); 
     gCanvas.addEventListener('touchstart', handleGoalInteract, {passive: false});
     function handleGoalInteract(e) {
         e.preventDefault(); const rect = gCanvas.getBoundingClientRect();

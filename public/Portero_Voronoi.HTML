@@ -392,7 +392,8 @@ const app = {
     viewMode: 0, 
     vizMode: 'LIVE', 
     vizFilter: 'ALL', 
-    dragTarget: null, 
+    dragTarget: null,
+    lastTap: 0, // Para detectar doble toque en tablets
     charts: {}, 
     db: {
         "Blocaje": { "Frontal": ["Frontal Raso", "Frontal Media Altura", "Frontal Arriba", "Con Caída", "En Dos Tiempos"], "Lateral": ["Lateral Raso", "Lateral Media Altura", "Lateral Arriba", "Desvío al poste"] },
@@ -450,6 +451,17 @@ const app = {
     inputStart: function(e) {
         if(e.type === 'touchstart') e.preventDefault();
         let p = this.getPos(e);
+
+        // Detectar doble toque en tablets
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - this.lastTap;
+        if (tapLength < 300 && tapLength > 0 && e.type === 'touchstart') {
+            // Es un doble toque
+            this.inputDblClick(e);
+            this.lastTap = 0;
+            return;
+        }
+        this.lastTap = currentTime;
 
         if (this.vizMode === 'VORONOI') {
             let found = null;
