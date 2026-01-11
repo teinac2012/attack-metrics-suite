@@ -161,7 +161,6 @@ export async function POST(request: NextRequest) {
 
     // Crear documento PDF
     const pdfDoc = await PDFDocument.create();
-    const { width, height } = pdfDoc.getPage(0).getSize();
 
     // Página 1: Equipo local
     let page = pdfDoc.addPage([595, 842]); // A4
