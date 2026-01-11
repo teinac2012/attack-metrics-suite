@@ -22,7 +22,6 @@
     "next": "16.1.1",
     "next-auth": "^5.0.0-beta.25",
     "pdf-lib": "^1.17.1",
-    "pdfkit": "^0.17.2",
     "pg": "^8.16.3",
     "plotly.js-dist-min": "^2.26.0",
     "react": "^19.0.0",
