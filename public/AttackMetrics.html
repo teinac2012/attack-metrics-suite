@@ -1843,7 +1843,8 @@ function getPos(e) {
     // Manejar eventos táctiles
     const clientX = e.touches ? e.touches[0].clientX : (e.changedTouches ? e.changedTouches[0].clientX : e.clientX);
     const clientY = e.touches ? e.touches[0].clientY : (e.changedTouches ? e.changedTouches[0].clientY : e.clientY);
-    return { x: (clientX - r.left)/cv.width*100, y: (clientY - r.top)/cv.height*100 };
+    // Usar r.width y r.height (tamaño visual) en lugar de cv.width/cv.height (tamaño lógico)
+    return { x: ((clientX - r.left) / r.width) * 100, y: ((clientY - r.top) / r.height) * 100 };
 }
 
 function finishDrag(e) {
