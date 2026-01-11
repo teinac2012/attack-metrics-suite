@@ -29,15 +29,8 @@
     }
   ],
   "functions": {
-    "api/generate-pdf.py": {
-      "runtime": "python@3.12",
-      "maxDuration": 60
-    },
-    "app/api/reports/generate/route.ts": {
-      "maxDuration": 60
-    },
     "app/api/**/*.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }

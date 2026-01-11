@@ -5038,8 +5038,8 @@ function generatePDFReport() {
         }))
     };
 
-    // Enviar al backend (endpoint Python de Vercel)
-    fetch('/api/generate-pdf', {
+    // Enviar al backend (API de Next.js)
+    fetch('/api/reports/generate-pdf', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

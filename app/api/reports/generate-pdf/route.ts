@@ -71,17 +71,15 @@ export async function POST(req: NextRequest) {
 
 function executePythonScript(scriptPath: string, args: string[]): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    // Intentar usar el entorno virtual si existe
-    const pythonCmd = process.platform === 'win32' 
-      ? join(process.cwd(), '.venv', 'Scripts', 'python.exe')
-      : join(process.cwd(), '.venv', 'bin', 'python');
+    // En Vercel, Python siempre está disponible como 'python3'
+    const usePython = 'python3';
 
-    const fs = require('fs');
-    const usePython = fs.existsSync(pythonCmd) ? pythonCmd : 'python';
-
-    const pythonProcess = spawn(usePython, [scriptPath, ...args]);
+    const pythonProcess = spawn(usePython, [scriptPath, ...args], {
+      timeout: 50000,
+    });
 
     let errorOutput = '';
+    let successOutput = '';
 
     pythonProcess.stderr.on('data', (data) => {
       errorOutput += data.toString();
@@ -89,6 +87,7 @@ function executePythonScript(scriptPath: string, args: string[]): Promise<{ succ
     });
 
     pythonProcess.stdout.on('data', (data) => {
+      successOutput += data.toString();
       console.log(`Python stdout: ${data}`);
     });
 
