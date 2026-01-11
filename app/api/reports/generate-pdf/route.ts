@@ -20,25 +20,6 @@ interface MatchData {
   actions: Action[];
 }
 
-function createHeatmapData(actions: Action[], team: string): number[][] {
-  const grid: number[][] = Array(10)
-    .fill(null)
-    .map(() => Array(10).fill(0));
-
-  for (const action of actions) {
-    if (action.team === team) {
-      const col = Math.floor(action.x / 10);
-      const row = Math.floor(action.y / 10);
-
-      if (col >= 0 && col < 10 && row >= 0 && row < 10) {
-        grid[row][col]++;
-      }
-    }
-  }
-
-  return grid;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const data: MatchData = await request.json();
@@ -48,6 +29,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { homeTeam, awayTeam, date } = data.config;
+
+    // Mapear HOME/AWAY a nombres reales
+    const homeActions = data.actions.filter((a) => a.team === 'HOME' || a.team === homeTeam);
+    const awayActions = data.actions.filter((a) => a.team === 'AWAY' || a.team === awayTeam);
 
     // Crear documento PDF
     const pdfDoc = await PDFDocument.create();
@@ -83,7 +68,7 @@ export async function POST(request: NextRequest) {
     yPos -= 30;
 
     // Dibujar heatmap simple para equipo local
-    const homeGrid = createHeatmapData(data.actions, homeTeam);
+    const homeGrid = createHeatmapData(homeActions);
     const cellSize = 15;
     const startX = 50;
 
@@ -116,7 +101,6 @@ export async function POST(request: NextRequest) {
     yPos -= 180;
 
     // Estadísticas
-    const homeActions = data.actions.filter((a) => a.team === homeTeam);
     page1.drawText(`Total de acciones: ${homeActions.length}`, {
       x: 50,
       y: yPos,
@@ -183,7 +167,7 @@ export async function POST(request: NextRequest) {
     yPos -= 30;
 
     // Dibujar heatmap para equipo visitante
-    const awayGrid = createHeatmapData(data.actions, awayTeam);
+    const awayGrid = createHeatmapData(awayActions);
 
     for (let row = 0; row < 10; row++) {
       for (let col = 0; col < 10; col++) {
@@ -214,7 +198,6 @@ export async function POST(request: NextRequest) {
     yPos -= 180;
 
     // Estadísticas
-    const awayActions = data.actions.filter((a) => a.team === awayTeam);
     page2.drawText(`Total de acciones: ${awayActions.length}`, {
       x: 50,
       y: yPos,
@@ -272,4 +255,21 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function createHeatmapData(actions: Action[]): number[][] {
+  const grid: number[][] = Array(10)
+    .fill(null)
+    .map(() => Array(10).fill(0));
+
+  for (const action of actions) {
+    const col = Math.floor(action.x / 10);
+    const row = Math.floor(action.y / 10);
+
+    if (col >= 0 && col < 10 && row >= 0 && row < 10) {
+      grid[row][col]++;
+    }
+  }
+
+  return grid;
 }
