@@ -44,12 +44,6 @@ function drawPitch(page: PDFKit.PDFDocument, x: number, y: number, width: number
   // Área de portería izquierda
   page.rect(x, y + 36.8 * ratio, 5.5 * ratio, 26.4 * ratio).stroke();
 
-  // Arco izquierdo
-  const arcRadius = 9.15 * ratio;
-  page
-    .arc(x + 16.5 * ratio, y + 50 * ratio, arcRadius, -Math.PI / 2, Math.PI / 2)
-    .stroke();
-
   // Áreas de penalty - derecha
   page
     .rect(x + width - 16.5 * ratio, y + 21.1 * ratio, 16.5 * ratio, 57.8 * ratio)
@@ -58,11 +52,6 @@ function drawPitch(page: PDFKit.PDFDocument, x: number, y: number, width: number
   // Área de portería derecha
   page
     .rect(x + width - 5.5 * ratio, y + 36.8 * ratio, 5.5 * ratio, 26.4 * ratio)
-    .stroke();
-
-  // Arco derecho
-  page
-    .arc(x + width - 16.5 * ratio, y + 50 * ratio, arcRadius, Math.PI / 2, (3 * Math.PI) / 2)
     .stroke();
 }
 
