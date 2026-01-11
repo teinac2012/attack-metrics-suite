@@ -1,4 +1,4 @@
-mport json
+import json
 import pandas as pd
 
 file_path = 'AttackMetrics_RINCONADA_vs_ALCALA_20260109.json'
