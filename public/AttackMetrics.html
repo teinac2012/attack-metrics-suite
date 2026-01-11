@@ -1887,9 +1887,9 @@ function drawPitch(dragS, dragE) {
     // Puntos de penalti y arcos (corregido para que los arcos salgan del área)
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.beginPath(); ctx.arc(w*0.16, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
-    ctx.beginPath(); ctx.arc(w*0.16, h*0.5, h*0.1, Math.PI - 0.92, Math.PI + 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w*0.16, h*0.5, h*0.1, -0.92, 0.92); ctx.stroke();
     ctx.beginPath(); ctx.arc(w*0.84, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
-    ctx.beginPath(); ctx.arc(w*0.84, h*0.5, h*0.1, -0.92, 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w*0.84, h*0.5, h*0.1, Math.PI - 0.92, Math.PI + 0.92); ctx.stroke();
 
     // Grid Opcional
     if(document.getElementById('gridToggle').checked) { 
