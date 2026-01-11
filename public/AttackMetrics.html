@@ -1832,15 +1832,18 @@ function setupCanvas() {
     cv.addEventListener('mousemove', e => { voronoiInputMove(e); if(isDrag) { DB.lastClick = getPos(e); drawPitch(startP, DB.lastClick); } });
     cv.addEventListener('mouseup', e => { voronoiInputEnd(e); finishDrag(e); });
     cv.addEventListener('dblclick', e => { voronoiInputDblClick(e); });
-    cv.addEventListener('touchstart', e => { e.preventDefault(); voronoiInputStart(e); isDrag=true; startP=getPos(e.touches[0]); });
-    cv.addEventListener('touchmove', e => { e.preventDefault(); voronoiInputMove(e); if(isDrag) { DB.lastClick = getPos(e.touches[0]); drawPitch(startP, DB.lastClick); } });
-    cv.addEventListener('touchend', e => { e.preventDefault(); voronoiInputEnd(e); finishDrag(e.changedTouches[0]); });
+    cv.addEventListener('touchstart', e => { e.preventDefault(); voronoiInputStart(e); isDrag=true; startP=getPos(e); }, {passive:false});
+    cv.addEventListener('touchmove', e => { e.preventDefault(); voronoiInputMove(e); if(isDrag) { DB.lastClick = getPos(e); drawPitch(startP, DB.lastClick); } }, {passive:false});
+    cv.addEventListener('touchend', e => { e.preventDefault(); voronoiInputEnd(e); finishDrag(e); }, {passive:false});
     drawPitch();
 }
 
 function getPos(e) {
     const r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left)/cv.width*100, y: (e.clientY - r.top)/cv.height*100 };
+    // Manejar eventos táctiles
+    const clientX = e.touches ? e.touches[0].clientX : (e.changedTouches ? e.changedTouches[0].clientX : e.clientX);
+    const clientY = e.touches ? e.touches[0].clientY : (e.changedTouches ? e.changedTouches[0].clientY : e.clientY);
+    return { x: (clientX - r.left)/cv.width*100, y: (clientY - r.top)/cv.height*100 };
 }
 
 function finishDrag(e) {
