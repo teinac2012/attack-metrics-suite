@@ -2699,9 +2699,16 @@ function save(res) {
     }
 
     // [PRESERVADO] CREAR LA ACCIÓN NUEVA
+    // Calcular tiempo directamente desde STATE.sec (fuente de verdad)
+    const minutes = Math.floor(STATE.sec / 60);
+    const seconds = Math.floor(STATE.sec % 60);
+    const mStr = minutes < 10 ? "0" + minutes : minutes;
+    const sStr = seconds < 10 ? "0" + seconds : seconds;
+    const timeStamp = `${mStr}:${sStr}`;
+    
     const newAction = {
         id: STATE.editId || Date.now(),
-        min: document.getElementById('timer').innerText,
+        min: timeStamp,
         period: STATE.isSecondHalf ? '2T' : '1T',
         team: STATE.team, 
         player: pName, 
@@ -2747,7 +2754,14 @@ function save(res) {
 
 function savePpda() {
     const targetDefTeam = STATE.team === 'HOME' ? 'AWAY' : 'HOME';
-    DB.actions.push({ id: Date.now(), min: document.getElementById('timer').innerText, team: targetDefTeam, player: 'EQUIPO', type: 'Defensiva', res: 'Neutro', x:-10, y:-10 });
+    // Calcular tiempo directamente desde STATE.sec
+    const minutes = Math.floor(STATE.sec / 60);
+    const seconds = Math.floor(STATE.sec % 60);
+    const mStr = minutes < 10 ? "0" + minutes : minutes;
+    const sStr = seconds < 10 ? "0" + seconds : seconds;
+    const timeStamp = `${mStr}:${sStr}`;
+    
+    DB.actions.push({ id: Date.now(), min: timeStamp, team: targetDefTeam, player: 'EQUIPO', type: 'Defensiva', res: 'Neutro', x:-10, y:-10 });
     saveDB(); updateDash(); showToast("Defensa +1");
 }
 
@@ -4061,49 +4075,116 @@ function downloadAvgPosImg() {
 }
 
 // ==========================================
-// SANKEY DIAGRAM
+// SANKEY DIAGRAM (4 ZONAS SIMÉTRICAS)
 // ==========================================
 let currentSankeyTeam = 'HOME';
-function openSankeyModal() { document.getElementById('modalSankey').style.display = 'flex'; updateSankey('HOME'); }
+
+function openSankeyModal() { 
+    document.getElementById('modalSankey').style.display = 'flex'; 
+    updateSankey('HOME'); 
+}
+
 function updateSankey(team) {
     currentSankeyTeam = team;
     document.getElementById('btnSankeyHome').className = team==='HOME'?'t-opt active-home':'t-opt';
     document.getElementById('btnSankeyAway').className = team==='AWAY'?'t-opt active-away':'t-opt';
 
-    const possessions = []; let currentPossession = null;
+    const possessions = []; 
+    let currentPossession = null;
     const sortedActions = [...DB.actions].sort((a,b) => a.id - b.id);
+
     sortedActions.forEach(a => {
         if(a.x < 0) return;
+        
         let zoneSimple = "";
-        if(a.team === 'HOME') { if(a.x < 33) zoneSimple = "Inicio (Def)"; else if(a.x < 66) zoneSimple = "Creación (Med)"; else zoneSimple = "Finalización (Atq)"; } 
-        else { if(a.x > 66) zoneSimple = "Inicio (Def)"; else if(a.x > 33) zoneSimple = "Creación (Med)"; else zoneSimple = "Finalización (Atq)"; }
+
+        // LÓGICA DE ESPEJO (INVERSA) BASADA EN TU DIBUJO
+        if(a.team === 'HOME') { 
+            // LOCAL (Ataca 0 -> 100)
+            // Zona 1: 0-25 | Zona 2: 25-50 | Zona 3: 50-75 | Zona 4: 75-100
+            if(a.x < 25) zoneSimple = "Salida"; 
+            else if(a.x < 50) zoneSimple = "Progresion"; 
+            else if(a.x < 75) zoneSimple = "Creacion"; 
+            else zoneSimple = "Finalizacion"; 
+        } else { 
+            // VISITANTE (Ataca 100 -> 0)
+            // Zona 1 (Su Salida): 100-75 | Zona 2: 75-50 | Zona 3: 50-25 | Zona 4: 25-0
+            if(a.x > 75) zoneSimple = "Salida";          // Su defensa profunda
+            else if(a.x > 50) zoneSimple = "Progresion"; 
+            else if(a.x > 25) zoneSimple = "Creacion"; 
+            else zoneSimple = "Finalizacion";            // Su ataque (cerca de nuestra portería)
+        }
 
         if(a.team === team) {
             if(!currentPossession) currentPossession = { start: zoneSimple, end: zoneSimple, count: 0 };
-            currentPossession.end = zoneSimple; currentPossession.count++;
-        } else { if(currentPossession) { possessions.push(currentPossession); currentPossession = null; } }
+            currentPossession.end = zoneSimple; 
+            currentPossession.count++;
+        } else { 
+            if(currentPossession) { 
+                possessions.push(currentPossession); 
+                currentPossession = null; 
+            } 
+        }
     });
+    
     if(currentPossession) possessions.push(currentPossession);
 
-    const nodes = ["Recup: Defensa", "Recup: Medio", "Recup: Ataque", "Fin: Defensa", "Fin: Medio", "Fin: Ataque"];
-    const nodeMap = { "Inicio (Def)": 0, "Creación (Med)": 1, "Finalización (Atq)": 2, "Fin: Inicio (Def)": 3, "Fin: Creación (Med)": 4, "Fin: Finalización (Atq)": 5 };
+    // Definimos los nodos de Origen (Recup) y Destino (Fin)
+    const nodes = [
+        "Recup: Salida (1)", "Recup: Progresión (2)", "Recup: Creación (3)", "Recup: Finalización (4)", 
+        "Fin: Salida (1)", "Fin: Progresión (2)", "Fin: Creación (3)", "Fin: Finalización (4)"
+    ];
+    
+    const nodeMap = { 
+        "Salida": 0, "Progresion": 1, "Creacion": 2, "Finalizacion": 3, 
+        "Fin: Salida": 4, "Fin: Progresion": 5, "Fin: Creacion": 6, "Fin: Finalizacion": 7 
+    };
+
     const linksDict = {};
     possessions.forEach(p => {
-        const srcIdx = nodeMap[p.start]; const tgtStr = "Fin: " + p.end; const tgtIdx = nodeMap[tgtStr];
-        const key = srcIdx + "-" + tgtIdx; if(!linksDict[key]) linksDict[key] = 0; linksDict[key]++;
+        const srcIdx = nodeMap[p.start]; 
+        const tgtStr = "Fin: " + p.end; 
+        const tgtIdx = nodeMap[tgtStr];
+
+        if (srcIdx !== undefined && tgtIdx !== undefined) {
+            const key = srcIdx + "-" + tgtIdx; 
+            if(!linksDict[key]) linksDict[key] = 0; 
+            linksDict[key]++;
+        }
     });
 
     const sources = []; const targets = []; const values = [];
-    Object.keys(linksDict).forEach(k => { const [s, t] = k.split("-").map(Number); sources.push(s); targets.push(t); values.push(linksDict[k]); });
+    Object.keys(linksDict).forEach(k => { 
+        const [s, t] = k.split("-").map(Number); 
+        sources.push(s); targets.push(t); values.push(linksDict[k]); 
+    });
+
     const color = team === 'HOME' ? "rgba(52, 152, 219, 0.8)" : "rgba(231, 76, 60, 0.8)";
-    const nodeColors = ["#7f8c8d", "#7f8c8d", "#7f8c8d", color, color, color];
+    const gray = "#95a5a6"; // Gris para las recuperaciones
+    
+    const nodeColors = [gray, gray, gray, gray, color, color, color, color];
 
     const data = {
         type: "sankey", orientation: "h",
-        node: { pad: 15, thickness: 20, line: { color: "black", width: 0.5 }, label: nodes, color: nodeColors },
-        link: { source: sources, target: targets, value: values, color: team === 'HOME' ? "rgba(52, 152, 219, 0.3)" : "rgba(231, 76, 60, 0.3)" }
+        node: { 
+            pad: 15, thickness: 20, 
+            line: { color: "black", width: 0.5 }, 
+            label: nodes, 
+            color: nodeColors 
+        },
+        link: { 
+            source: sources, target: targets, value: values, 
+            color: team === 'HOME' ? "rgba(52, 152, 219, 0.3)" : "rgba(231, 76, 60, 0.3)" 
+        }
     };
-    const layout = { font: { size: 12, color: "black" }, paper_bgcolor: "#fff", plot_bgcolor: "#fff", margin: { t: 30, l: 10, r: 10, b: 10 } };
+
+    const layout = { 
+        font: { size: 12, color: "black" }, 
+        paper_bgcolor: "#fff", 
+        plot_bgcolor: "#fff", 
+        margin: { t: 30, l: 10, r: 10, b: 10 } 
+    };
+    
     Plotly.newPlot('sankeyChartContainer', [data], layout, {responsive: true, displayModeBar: false});
 }
 
@@ -4332,19 +4413,24 @@ function clearFlowCanvas() {
     document.getElementById('flowLogBody').innerHTML = "";
 }
 
-// Función de ayuda para clasificar una acción en una zona de campo simple
+// Función para clasificar zonas (4 Cuadrantes Inversos)
 function getSimpleZone(action, team) {
     if (action.x < 0) return 'DEFENSIVA (FUERA DE CAMPO)';
     
     const x = action.x;
+
     if (team === 'HOME') {
-        if (x < 33) return "Defensa (0-33%)";
-        if (x < 66) return "Medio (33-66%)";
-        return "Ataque (66-100%)";
-    } else { // Team AWAY (Ataca de derecha a izquierda)
-        if (x > 66) return "Defensa (66-100%)";
-        if (x > 33) return "Medio (33-66%)";
-        return "Ataque (0-33%)";
+        // Local: 0 -> 100
+        if (x < 25) return "Zona 1: Salida";
+        if (x < 50) return "Zona 2: Progresión";
+        if (x < 75) return "Zona 3: Creación";
+        return "Zona 4: Finalización";
+    } else { 
+        // Visitante: 100 -> 0 (Lógica Inversa)
+        if (x > 75) return "Zona 1: Salida";      // Su campo propio
+        if (x > 50) return "Zona 2: Progresión";
+        if (x > 25) return "Zona 3: Creación";
+        return "Zona 4: Finalización";            // Campo contrario
     }
 }
 
