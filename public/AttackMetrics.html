@@ -728,6 +728,7 @@
         <option value="ALL">🏹 TAC</option>
         <option value="HEAT">🔥 MAP</option>
         <option value="XBUILD">🏗 xBUILD</option>
+        <option value="LINES">📏 LÍNEAS</option>
         <option value="VORONOI">🗺️ VOR</option>
     </select>
     
@@ -736,6 +737,16 @@
         <button class="btn-tool" style="background:#e74c3c; padding:8px 12px;" onclick="voronoiSetMode('AWAY')" title="Click para añadir VISITANTE">🔴 VISITANTE</button>
         <button class="btn-tool" style="background:#f1c40f; padding:8px 12px;" onclick="voronoiSetMode('BALL')" title="Click para colocar balón">⚽ BALÓN</button>
         <button class="btn-tool" style="background:#e74c3c" onclick="voronoiClearAll()">🗑 Limpiar</button>
+    </div>
+
+    <div id="lineControls" style="display:none; gap:5px; margin:0 5px; align-items:center; color:#ccc; font-size:0.7rem;">
+        <span style="color:#aaa;">Líneas:</span>
+        <select id="lineCount" class="header-select" style="width:65px;" onchange="drawPitch()">
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+        </select>
+        <span style="color:#aaa;">Largo (m):</span>
+        <input id="lineFieldLength" type="number" value="105" step="1" min="60" max="130" style="width:70px; background:#222; color:#fff; border:1px solid #444; padding:2px 4px; border-radius:4px;" oninput="drawPitch()" />
     </div>
     
     <select class="header-select" id="teamView" onchange="onTeamSelect()"><option value="HOME">L</option><option value="AWAY">V</option><option value="ALL">T</option></select>
@@ -1936,6 +1947,7 @@ function drawPitch(dragS, dragE) {
     if(viewMode === 'LIVE') actionsToDraw = filtered.slice(-2); // Solo las últimas 2
     else if(viewMode === 'HEAT') actionsToDraw = []; // El Heatmap va aparte
     else if(viewMode === 'VORONOI') actionsToDraw = []; // El Voronoi va aparte
+    else if(viewMode === 'LINES') actionsToDraw = []; // Distancias entre líneas va aparte
 
     // Lógica para invertir visualización de acciones pasadas
     const shouldInvertVisuals = (STATE.invertSides !== STATE.isSecondHalf);
@@ -2007,6 +2019,11 @@ function drawPitch(dragS, dragE) {
     // PINTAR VORONOI (Si está activo)
     if(viewMode === 'VORONOI') {
         drawVoronoiDiagram(ctx, w, h, filtered, shouldInvertVisuals);
+    }
+
+    // PINTAR DISTANCIAS ENTRE LÍNEAS (Si está activo)
+    if(viewMode === 'LINES') {
+        drawLineDistances(ctx, w, h, filtered, shouldInvertVisuals);
     }
 
     // 6. PINTAR FLECHAS (CON SEMÁFORO xBUILD)
@@ -2090,6 +2107,160 @@ function clampToFieldPercent(p) {
         x: Math.min(95, Math.max(5, p.x)),
         y: Math.min(95, Math.max(5, p.y))
     };
+}
+
+// --- LÍNEAS ENTRE LÍNEAS DE JUGADORES ---
+function seedLinePointsFromActions(actions) {
+    if (voronoiState.points_HOME.length || voronoiState.points_AWAY.length) return;
+    const playerPositions = {};
+    actions.forEach(a => {
+        if (!playerPositions[a.player]) {
+            const pos = clampToFieldPercent({ x: a.x, y: a.y });
+            playerPositions[a.player] = { x: pos.x, y: pos.y, team: a.team, name: a.player };
+        }
+    });
+    Object.values(playerPositions).forEach(p => {
+        if (p.team === 'HOME') voronoiState.points_HOME.push(p);
+        else if (p.team === 'AWAY') voronoiState.points_AWAY.push(p);
+    });
+}
+
+function kMeans1D(points, k) {
+    if (points.length === 0) return [];
+    if (points.length <= k) return points.map(p => [p]);
+
+    const sorted = [...points].sort((a, b) => a.x - b.x);
+    const centroids = new Array(k).fill(0).map((_, i) => {
+        const idx = Math.floor((i + 0.5) * sorted.length / k);
+        return sorted[Math.min(idx, sorted.length - 1)].x;
+    });
+
+    for (let iter = 0; iter < 7; iter++) {
+        const clusters = new Array(k).fill(0).map(() => []);
+        points.forEach(p => {
+            let best = 0, bestDist = Infinity;
+            centroids.forEach((c, idx) => {
+                const d = Math.abs(p.x - c);
+                if (d < bestDist) { bestDist = d; best = idx; }
+            });
+            clusters[best].push(p);
+        });
+
+        let changed = false;
+        clusters.forEach((c, idx) => {
+            if (c.length === 0) return;
+            const mean = c.reduce((acc, p) => acc + p.x, 0) / c.length;
+            if (Math.abs(mean - centroids[idx]) > 0.001) changed = true;
+            centroids[idx] = mean;
+        });
+        if (!changed) return clusters;
+        // Rellenar vacíos con el punto más lejano
+        clusters.forEach((c, idx) => {
+            if (c.length === 0) {
+                const far = sorted.reduce((acc, p) => {
+                    const d = Math.abs(p.x - centroids[idx]);
+                    return d > acc.d ? { p, d } : acc;
+                }, { p: sorted[0], d: -1 }).p;
+                clusters[idx].push(far);
+            }
+        });
+    }
+    return clusters;
+}
+
+function computeLineBands(points, lineCount) {
+    if (!points.length || lineCount < 2) return null;
+    const clusters = kMeans1D(points, lineCount).filter(c => c.length > 0);
+    if (clusters.length < 2) return null;
+    const centroids = clusters.map(c => {
+        const cx = c.reduce((acc, p) => acc + p.x, 0) / c.length;
+        const cy = c.reduce((acc, p) => acc + p.y, 0) / c.length;
+        return { x: cx, y: cy, count: c.length };
+    }).sort((a, b) => a.x - b.x);
+
+    const distances = [];
+    for (let i = 0; i < centroids.length - 1; i++) {
+        distances.push(centroids[i + 1].x - centroids[i].x);
+    }
+    return { centroids, distances };
+}
+
+function drawLineDistances(ctx, w, h, actions, shouldInvert) {
+    const lineCountSel = document.getElementById('lineCount');
+    const fieldLenInput = document.getElementById('lineFieldLength');
+    const lineCount = parseInt(lineCountSel ? lineCountSel.value : '4', 10) || 4;
+    const fieldLength = parseFloat(fieldLenInput ? fieldLenInput.value : '105') || 105;
+
+    seedLinePointsFromActions(actions || []);
+
+    const mapPoints = (arr) => arr.map(p => {
+        let px = p.x, py = p.y;
+        if (shouldInvert) { px = 100 - px; py = 100 - py; }
+        const pos = clampToFieldPercent({ x: px, y: py });
+        return { ...p, x: pos.x, y: pos.y };
+    });
+
+    const teams = [
+        { key: 'HOME', color: '#3498db', labelY: h * 0.08, arrowY: h * 0.11, points: mapPoints(voronoiState.points_HOME) },
+        { key: 'AWAY', color: '#e74c3c', labelY: h * 0.92, arrowY: h * 0.89, points: mapPoints(voronoiState.points_AWAY) }
+    ];
+
+    teams.forEach(team => {
+        const res = computeLineBands(team.points, lineCount);
+        if (!res) return;
+        const { centroids, distances } = res;
+
+        // Líneas verticales de cada línea de jugadores
+        ctx.save();
+        centroids.forEach((c, idx) => {
+            const x = (c.x / 100) * w;
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = team.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, h * 0.05);
+            ctx.lineTo(x, h * 0.95);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = team.color;
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 3;
+            ctx.fillText(`${team.key === 'HOME' ? 'L' : 'V'}${idx + 1}`, x, team.labelY);
+            ctx.shadowBlur = 0;
+        });
+
+        // Distancias entre líneas consecutivas
+        distances.forEach((d, idx) => {
+            const x1 = (centroids[idx].x / 100) * w;
+            const x2 = (centroids[idx + 1].x / 100) * w;
+            const mid = (x1 + x2) / 2;
+            const distMeters = (d / 100) * fieldLength;
+
+            ctx.strokeStyle = team.color;
+            ctx.lineWidth = 2;
+            arrow(ctx, x1, team.arrowY, x2, team.arrowY);
+
+            ctx.fillStyle = team.color;
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 4;
+            ctx.fillText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 6 : -6));
+            ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+    });
+
+    // Indicaciones breves
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('💡 Usa el modo Voronoi para arrastrar/colocar jugadores y balón. Las distancias usan el eje longitudinal (x).', 10, h - 25);
+    ctx.restore();
 }
 
 // --- FUNCIÓN VORONOI MEJORADA ---
@@ -2329,15 +2500,15 @@ function getDist(p1, p2) {
     return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)); 
 }
 
-// Mostrar/Ocultar controles de Voronoi
+// Mostrar/Ocultar controles de Voronoi y Líneas
 document.addEventListener('DOMContentLoaded', () => {
     const viewMode = document.getElementById('viewMode');
     if (viewMode) {
         viewMode.addEventListener('change', () => {
             const controls = document.getElementById('voronoiControls');
-            if (controls) {
-                controls.style.display = viewMode.value === 'VORONOI' ? 'flex' : 'none';
-            }
+            const lineCtrls = document.getElementById('lineControls');
+            if (controls) controls.style.display = viewMode.value === 'VORONOI' ? 'flex' : 'none';
+            if (lineCtrls) lineCtrls.style.display = viewMode.value === 'LINES' ? 'flex' : 'none';
         });
     }
 });
