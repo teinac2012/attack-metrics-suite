@@ -2201,8 +2201,8 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
     });
 
     const teams = [
-        { key: 'HOME', color: '#3498db', labelY: h * 0.08, arrowY: h * 0.11, points: mapPoints(voronoiState.points_HOME) },
-        { key: 'AWAY', color: '#e74c3c', labelY: h * 0.92, arrowY: h * 0.89, points: mapPoints(voronoiState.points_AWAY) }
+        { key: 'HOME', color: '#3498db', colorLight: 'rgba(52, 152, 219, 0.3)', labelY: h * 0.08, arrowY: h * 0.11, points: mapPoints(voronoiState.points_HOME) },
+        { key: 'AWAY', color: '#e74c3c', colorLight: 'rgba(231, 76, 60, 0.3)', labelY: h * 0.92, arrowY: h * 0.89, points: mapPoints(voronoiState.points_AWAY) }
     ];
 
     teams.forEach(team => {
@@ -2210,10 +2210,23 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         if (!res) return;
         const { centroids, distances } = res;
 
-        // Líneas verticales de cada línea de jugadores
+        // Asignar jugadores a cada línea
+        const clusters = kMeans1D(team.points, lineCount);
+        
         ctx.save();
+        
+        // Líneas verticales y bandas de cada línea de jugadores
         centroids.forEach((c, idx) => {
             const x = (c.x / 100) * w;
+            
+            // Banda de fondo semi-transparente
+            const bandWidth = idx < centroids.length - 1 
+                ? ((centroids[idx + 1].x - c.x) / 100) * w 
+                : ((100 - c.x) / 100) * w;
+            ctx.fillStyle = team.colorLight;
+            ctx.fillRect(x - bandWidth/2, h * 0.05, bandWidth, h * 0.9);
+            
+            // Línea vertical punteada
             ctx.setLineDash([6, 6]);
             ctx.strokeStyle = team.color;
             ctx.lineWidth = 2;
@@ -2223,43 +2236,125 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             ctx.stroke();
             ctx.setLineDash([]);
 
+            // Etiqueta de línea
             ctx.fillStyle = team.color;
-            ctx.font = 'bold 11px sans-serif';
+            ctx.font = 'bold 13px sans-serif';
             ctx.textAlign = 'center';
             ctx.shadowColor = '#000';
-            ctx.shadowBlur = 3;
+            ctx.shadowBlur = 4;
             ctx.fillText(`${team.key === 'HOME' ? 'L' : 'V'}${idx + 1}`, x, team.labelY);
             ctx.shadowBlur = 0;
         });
 
-        // Distancias entre líneas consecutivas
+        // Dibujar jugadores como círculos
+        clusters.forEach((cluster, lineIdx) => {
+            cluster.forEach((player) => {
+                const px = (player.x / 100) * w;
+                const py = (player.y / 100) * h;
+                
+                // Círculo del jugador
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = team.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Etiqueta del jugador
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 3;
+                ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - 14);
+                ctx.shadowBlur = 0;
+            });
+        });
+
+        // Distancias entre líneas consecutivas (centroides)
         distances.forEach((d, idx) => {
             const x1 = (centroids[idx].x / 100) * w;
             const x2 = (centroids[idx + 1].x / 100) * w;
             const mid = (x1 + x2) / 2;
             const distMeters = (d / 100) * fieldLength;
 
+            // Flecha entre centroides
             ctx.strokeStyle = team.color;
-            ctx.lineWidth = 2;
+            ctx.fillStyle = team.color;
+            ctx.lineWidth = 3;
             arrow(ctx, x1, team.arrowY, x2, team.arrowY);
 
-            ctx.fillStyle = team.color;
-            ctx.font = 'bold 12px sans-serif';
+            // Distancia en metros
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px sans-serif';
             ctx.textAlign = 'center';
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 4;
-            ctx.fillText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 6 : -6));
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 8 : -8));
+            ctx.fillStyle = team.color;
+            ctx.fillText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 8 : -8));
             ctx.shadowBlur = 0;
         });
+
+        // Distancias entre jugadores individuales de líneas consecutivas
+        for (let i = 0; i < clusters.length - 1; i++) {
+            const currentLine = clusters[i];
+            const nextLine = clusters[i + 1];
+            
+            // Calcular distancia promedio entre jugadores de líneas consecutivas
+            currentLine.forEach(p1 => {
+                const closestInNext = nextLine.reduce((closest, p2) => {
+                    const dist = Math.abs(p2.x - p1.x);
+                    return dist < closest.dist ? { player: p2, dist } : closest;
+                }, { player: nextLine[0], dist: Infinity });
+                
+                if (closestInNext.dist !== Infinity) {
+                    const p2 = closestInNext.player;
+                    const x1 = (p1.x / 100) * w;
+                    const y1 = (p1.y / 100) * h;
+                    const x2 = (p2.x / 100) * w;
+                    const y2 = (p2.y / 100) * h;
+                    const distMeters = (Math.abs(p2.x - p1.x) / 100) * fieldLength;
+                    
+                    // Línea fina entre jugadores
+                    ctx.strokeStyle = team.color;
+                    ctx.globalAlpha = 0.3;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+                    
+                    // Etiqueta pequeña de distancia
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+                    ctx.fillStyle = team.color;
+                    ctx.font = 'bold 9px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = '#000';
+                    ctx.shadowBlur = 2;
+                    ctx.fillText(`${distMeters.toFixed(1)}m`, midX, midY);
+                    ctx.shadowBlur = 0;
+                }
+            });
+        }
+        
         ctx.restore();
     });
 
     // Indicaciones breves
     ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '10px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('💡 Usa el modo Voronoi para arrastrar/colocar jugadores y balón. Las distancias usan el eje longitudinal (x).', 10, h - 25);
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 2;
+    ctx.fillText('💡 Modo Voronoi para mover jugadores | Distancias: gruesas=entre líneas, finas=entre jugadores', 10, h - 10);
+    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
