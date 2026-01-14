@@ -2185,6 +2185,9 @@ function computeLineBands(points, lineCount) {
     return { centroids, distances };
 }
 
+// Variable para tracking de hover
+let lineHoverState = { player: null, team: null };
+
 function drawLineDistances(ctx, w, h, actions, shouldInvert) {
     const lineCountSel = document.getElementById('lineCount');
     const fieldLenInput = document.getElementById('lineFieldLength');
@@ -2201,159 +2204,184 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
     });
 
     const teams = [
-        { key: 'HOME', color: '#3498db', colorLight: 'rgba(52, 152, 219, 0.3)', labelY: h * 0.08, arrowY: h * 0.11, points: mapPoints(voronoiState.points_HOME) },
-        { key: 'AWAY', color: '#e74c3c', colorLight: 'rgba(231, 76, 60, 0.3)', labelY: h * 0.92, arrowY: h * 0.89, points: mapPoints(voronoiState.points_AWAY) }
+        { key: 'HOME', color: '#3498db', colorGlow: 'rgba(52, 152, 219, 0.5)', colorFaint: 'rgba(52, 152, 219, 0.15)', points: mapPoints(voronoiState.points_HOME) },
+        { key: 'AWAY', color: '#e74c3c', colorGlow: 'rgba(231, 76, 60, 0.5)', colorFaint: 'rgba(231, 76, 60, 0.15)', points: mapPoints(voronoiState.points_AWAY) }
     ];
 
-    teams.forEach(team => {
-        const res = computeLineBands(team.points, lineCount);
-        if (!res) return;
-        const { centroids, distances } = res;
+    // Calcular distancias euclidianas entre todos los jugadores
+    const calcDist = (p1, p2) => {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
 
-        // Asignar jugadores a cada línea
-        const clusters = kMeans1D(team.points, lineCount);
+    teams.forEach(team => {
+        if (team.points.length < 2) return;
+
+        const res = computeLineBands(team.points, lineCount);
+        const clusters = res ? kMeans1D(team.points, lineCount) : [team.points];
         
         ctx.save();
         
-        // Líneas verticales y bandas de cada línea de jugadores
-        centroids.forEach((c, idx) => {
-            const x = (c.x / 100) * w;
-            
-            // Banda de fondo semi-transparente
-            const bandWidth = idx < centroids.length - 1 
-                ? ((centroids[idx + 1].x - c.x) / 100) * w 
-                : ((100 - c.x) / 100) * w;
-            ctx.fillStyle = team.colorLight;
-            ctx.fillRect(x - bandWidth/2, h * 0.05, bandWidth, h * 0.9);
-            
-            // Línea vertical punteada
-            ctx.setLineDash([6, 6]);
-            ctx.strokeStyle = team.color;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x, h * 0.05);
-            ctx.lineTo(x, h * 0.95);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Etiqueta de línea
-            ctx.fillStyle = team.color;
-            ctx.font = 'bold 13px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 4;
-            ctx.fillText(`${team.key === 'HOME' ? 'L' : 'V'}${idx + 1}`, x, team.labelY);
-            ctx.shadowBlur = 0;
-        });
-
-        // Dibujar jugadores como círculos
-        clusters.forEach((cluster, lineIdx) => {
-            cluster.forEach((player) => {
-                const px = (player.x / 100) * w;
-                const py = (player.y / 100) * h;
-                
-                // Círculo del jugador
+        // Líneas de referencia entre centroides (muy discretas)
+        if (res && res.centroids.length >= 2) {
+            const { centroids, distances } = res;
+            centroids.forEach((c, idx) => {
+                const x = (c.x / 100) * w;
+                ctx.setLineDash([3, 6]);
+                ctx.strokeStyle = team.colorFaint;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.4;
                 ctx.beginPath();
-                ctx.arc(px, py, 8, 0, 2 * Math.PI);
-                ctx.fillStyle = team.color;
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
+                ctx.moveTo(x, h * 0.05);
+                ctx.lineTo(x, h * 0.95);
                 ctx.stroke();
-                
-                // Etiqueta del jugador
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 10px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#000';
-                ctx.shadowBlur = 3;
-                ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - 14);
-                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+                ctx.setLineDash([]);
+            });
+        }
+
+        // Dibujar todas las conexiones de distancia entre jugadores cercanos
+        team.points.forEach((p1, idx1) => {
+            // Encontrar los 3 jugadores más cercanos del mismo equipo
+            const neighbors = team.points
+                .map((p2, idx2) => ({ player: p2, dist: calcDist(p1, p2), idx: idx2 }))
+                .filter(n => n.idx !== idx1)
+                .sort((a, b) => a.dist - b.dist)
+                .slice(0, 3);
+
+            const px1 = (p1.x / 100) * w;
+            const py1 = (p1.y / 100) * h;
+            const isHovered = lineHoverState.player === p1 && lineHoverState.team === team.key;
+
+            neighbors.forEach((n, nIdx) => {
+                const p2 = n.player;
+                const px2 = (p2.x / 100) * w;
+                const py2 = (p2.y / 100) * h;
+                const distPercent = n.dist;
+                const distMeters = (distPercent / 100) * fieldLength;
+
+                // Estilo según distancia y hover
+                const isClose = distPercent < 15;
+                const isMedium = distPercent >= 15 && distPercent < 30;
+                const lineAlpha = isHovered ? 0.8 : (isClose ? 0.4 : (isMedium ? 0.25 : 0.15));
+                const lineWidth = isHovered ? 2.5 : (isClose ? 2 : 1.5);
+                const lineColor = isHovered ? team.colorGlow : (isClose ? team.color : team.colorFaint);
+
+                // Línea de conexión
+                ctx.strokeStyle = lineColor;
+                ctx.globalAlpha = lineAlpha;
+                ctx.lineWidth = lineWidth;
+                ctx.setLineDash(isClose ? [] : [4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(px1, py1);
+                ctx.lineTo(px2, py2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+
+                // Etiqueta de distancia (solo si hover o muy cerca)
+                if (isHovered || (isClose && nIdx === 0)) {
+                    const midX = (px1 + px2) / 2;
+                    const midY = (py1 + py2) / 2;
+                    
+                    // Fondo de etiqueta
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    const labelText = `${distMeters.toFixed(1)}m`;
+                    ctx.font = 'bold 11px sans-serif';
+                    const metrics = ctx.measureText(labelText);
+                    ctx.fillRect(midX - metrics.width/2 - 3, midY - 9, metrics.width + 6, 14);
+                    
+                    // Texto
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(labelText, midX, midY);
+                }
             });
         });
 
-        // Distancias entre líneas consecutivas (centroides)
-        distances.forEach((d, idx) => {
-            const x1 = (centroids[idx].x / 100) * w;
-            const x2 = (centroids[idx + 1].x / 100) * w;
-            const mid = (x1 + x2) / 2;
-            const distMeters = (d / 100) * fieldLength;
-
-            // Flecha entre centroides
-            ctx.strokeStyle = team.color;
+        // Dibujar jugadores como círculos (encima de las líneas)
+        team.points.forEach((player) => {
+            const px = (player.x / 100) * w;
+            const py = (player.y / 100) * h;
+            const isHovered = lineHoverState.player === player && lineHoverState.team === team.key;
+            const radius = isHovered ? 10 : 8;
+            
+            // Glow effect si hover
+            if (isHovered) {
+                ctx.beginPath();
+                ctx.arc(px, py, radius + 6, 0, 2 * Math.PI);
+                ctx.fillStyle = team.colorGlow;
+                ctx.fill();
+            }
+            
+            // Círculo del jugador
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, 2 * Math.PI);
             ctx.fillStyle = team.color;
-            ctx.lineWidth = 3;
-            arrow(ctx, x1, team.arrowY, x2, team.arrowY);
-
-            // Distancia en metros
+            ctx.fill();
+            ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = isHovered ? 3 : 2;
+            ctx.stroke();
+            
+            // Etiqueta del jugador
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = isHovered ? 'bold 12px sans-serif' : 'bold 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 3;
-            ctx.strokeText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 8 : -8));
-            ctx.fillStyle = team.color;
-            ctx.fillText(`${distMeters.toFixed(1)} m`, mid, team.arrowY - (team.key === 'HOME' ? 8 : -8));
-            ctx.shadowBlur = 0;
+            ctx.strokeText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
+            ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
         });
-
-        // Distancias entre jugadores individuales de líneas consecutivas
-        for (let i = 0; i < clusters.length - 1; i++) {
-            const currentLine = clusters[i];
-            const nextLine = clusters[i + 1];
-            
-            // Calcular distancia promedio entre jugadores de líneas consecutivas
-            currentLine.forEach(p1 => {
-                const closestInNext = nextLine.reduce((closest, p2) => {
-                    const dist = Math.abs(p2.x - p1.x);
-                    return dist < closest.dist ? { player: p2, dist } : closest;
-                }, { player: nextLine[0], dist: Infinity });
-                
-                if (closestInNext.dist !== Infinity) {
-                    const p2 = closestInNext.player;
-                    const x1 = (p1.x / 100) * w;
-                    const y1 = (p1.y / 100) * h;
-                    const x2 = (p2.x / 100) * w;
-                    const y2 = (p2.y / 100) * h;
-                    const distMeters = (Math.abs(p2.x - p1.x) / 100) * fieldLength;
-                    
-                    // Línea fina entre jugadores
-                    ctx.strokeStyle = team.color;
-                    ctx.globalAlpha = 0.3;
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([4, 4]);
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.globalAlpha = 1;
-                    
-                    // Etiqueta pequeña de distancia
-                    const midX = (x1 + x2) / 2;
-                    const midY = (y1 + y2) / 2;
-                    ctx.fillStyle = team.color;
-                    ctx.font = 'bold 9px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.shadowColor = '#000';
-                    ctx.shadowBlur = 2;
-                    ctx.fillText(`${distMeters.toFixed(1)}m`, midX, midY);
-                    ctx.shadowBlur = 0;
-                }
-            });
-        }
         
         ctx.restore();
     });
 
-    // Indicaciones breves
+    // Panel de información si hay hover
+    if (lineHoverState.player) {
+        const team = teams.find(t => t.key === lineHoverState.team);
+        if (team) {
+            const p = lineHoverState.player;
+            const neighbors = team.points
+                .filter(p2 => p2 !== p)
+                .map(p2 => ({ name: p2.name, dist: (calcDist(p, p2) / 100) * fieldLength }))
+                .sort((a, b) => a.dist - b.dist)
+                .slice(0, 3);
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(10, 10, 200, 90);
+            ctx.strokeStyle = team.color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 10, 200, 90);
+            
+            ctx.fillStyle = team.color;
+            ctx.font = 'bold 13px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${p.name.toUpperCase()}`, 20, 30);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('Distancias más cercanas:', 20, 48);
+            
+            neighbors.forEach((n, idx) => {
+                ctx.fillStyle = '#aaa';
+                ctx.fillText(`${idx + 1}. ${n.name}: ${n.dist.toFixed(1)}m`, 20, 65 + idx * 14);
+            });
+            
+            ctx.restore();
+        }
+    }
+
+    // Instrucciones
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.shadowColor = '#000';
     ctx.shadowBlur = 2;
-    ctx.fillText('💡 Modo Voronoi para mover jugadores | Distancias: gruesas=entre líneas, finas=entre jugadores', 10, h - 10);
+    ctx.fillText('🖱 Click: añadir | Arrastrar: mover | Doble-click: eliminar | Hover: info detallada', 10, h - 10);
     ctx.shadowBlur = 0;
     ctx.restore();
 }
@@ -2602,7 +2630,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewMode.addEventListener('change', () => {
             const controls = document.getElementById('voronoiControls');
             const lineCtrls = document.getElementById('lineControls');
-            if (controls) controls.style.display = viewMode.value === 'VORONOI' ? 'flex' : 'none';
+            if (controls) controls.style.display = (viewMode.value === 'VORONOI' || viewMode.value === 'LINES') ? 'flex' : 'none';
             if (lineCtrls) lineCtrls.style.display = viewMode.value === 'LINES' ? 'flex' : 'none';
         });
     }
@@ -2711,7 +2739,7 @@ function voronoiAnalyze() {
 
 function voronoiInputStart(e) {
     const viewMode = document.getElementById('viewMode').value;
-    if (viewMode !== 'VORONOI') return;
+    if (viewMode !== 'VORONOI' && viewMode !== 'LINES') return;
     
     const p = clampToFieldPercent(getPos(e));
     const mode = voronoiState.currentMode;
@@ -2755,19 +2783,30 @@ function voronoiInputStart(e) {
 
 function voronoiInputMove(e) {
     const viewMode = document.getElementById('viewMode').value;
-    if (viewMode !== 'VORONOI') return;
+    if (viewMode !== 'VORONOI' && viewMode !== 'LINES') return;
 
     const p = clampToFieldPercent(getPos(e));
 
     // Cambiar cursor según hover
     const cv = document.getElementById('pitchCanvas');
     let hover = null;
-    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'HOME' }; });
-    if (!hover) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'AWAY' }; });
+    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'HOME', player: pt }; });
+    if (!hover) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) hover = { type: 'player', idx, team: 'AWAY', player: pt }; });
     if (!hover && voronoiState.ball && getDist(p, voronoiState.ball) < 5) hover = { type: 'ball' };
     if (hover || voronoiState.dragTarget) cv.style.cursor = 'grab';
     else if (voronoiState.currentMode) cv.style.cursor = 'crosshair';
     else cv.style.cursor = 'default';
+
+    // Update hover state for LINES mode
+    if (viewMode === 'LINES') {
+        if (hover && hover.type === 'player') {
+            lineHoverState.player = hover.player;
+            lineHoverState.team = hover.team;
+        } else {
+            lineHoverState.player = null;
+            lineHoverState.team = null;
+        }
+    }
 
     // Si no se está arrastrando, salir
     if (!voronoiState.dragTarget) return;
@@ -2789,7 +2828,7 @@ function voronoiInputEnd(e) {
 
 function voronoiInputDblClick(e) {
     const viewMode = document.getElementById('viewMode').value;
-    if (viewMode !== 'VORONOI') return;
+    if (viewMode !== 'VORONOI' && viewMode !== 'LINES') return;
 
     const p = getPos(e);
     let delIdx = -1;
