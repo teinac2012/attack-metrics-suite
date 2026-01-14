@@ -735,7 +735,7 @@
     <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
         <button class="btn-tool" style="background:#3498db; padding:8px 12px;" onclick="voronoiSetMode('HOME')" title="Click para añadir LOCAL">🔵 LOCAL</button>
         <button class="btn-tool" style="background:#e74c3c; padding:8px 12px;" onclick="voronoiSetMode('AWAY')" title="Click para añadir VISITANTE">🔴 VISITANTE</button>
-        <button class="btn-tool" style="background:#f1c40f; padding:8px 12px;" onclick="voronoiSetMode('BALL')" title="Click para colocar balón">⚽ BALÓN</button>
+        <button class="btn-tool" id="btnVoronoiBall" style="background:#f1c40f; padding:8px 12px;" onclick="voronoiSetMode('BALL')" title="Click para colocar balón">⚽ BALÓN</button>
         <button class="btn-tool" style="background:#e74c3c" onclick="voronoiClearAll()">🗑 Limpiar</button>
     </div>
 
@@ -2231,7 +2231,7 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
                 ctx.setLineDash([3, 6]);
                 ctx.strokeStyle = team.colorFaint;
                 ctx.lineWidth = 1;
-                ctx.globalAlpha = 0.4;
+                ctx.globalAlpha = 0.3;
                 ctx.beginPath();
                 ctx.moveTo(x, h * 0.05);
                 ctx.lineTo(x, h * 0.95);
@@ -2241,14 +2241,13 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             });
         }
 
-        // Dibujar todas las conexiones de distancia entre jugadores cercanos
+        // Dibujar TODAS las conexiones entre jugadores, destacando la más cercana
         team.points.forEach((p1, idx1) => {
-            // Encontrar los 3 jugadores más cercanos del mismo equipo
+            // Encontrar TODOS los demás jugadores del mismo equipo, ordenados por distancia
             const neighbors = team.points
                 .map((p2, idx2) => ({ player: p2, dist: calcDist(p1, p2), idx: idx2 }))
                 .filter(n => n.idx !== idx1)
-                .sort((a, b) => a.dist - b.dist)
-                .slice(0, 3);
+                .sort((a, b) => a.dist - b.dist);
 
             const px1 = (p1.x / 100) * w;
             const py1 = (p1.y / 100) * h;
@@ -2260,19 +2259,39 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
                 const py2 = (p2.y / 100) * h;
                 const distPercent = n.dist;
                 const distMeters = (distPercent / 100) * fieldLength;
+                
+                // El más cercano se destaca con color brillante
+                const isClosest = nIdx === 0;
 
-                // Estilo según distancia y hover
-                const isClose = distPercent < 15;
-                const isMedium = distPercent >= 15 && distPercent < 30;
-                const lineAlpha = isHovered ? 0.8 : (isClose ? 0.4 : (isMedium ? 0.25 : 0.15));
-                const lineWidth = isHovered ? 2.5 : (isClose ? 2 : 1.5);
-                const lineColor = isHovered ? team.colorGlow : (isClose ? team.color : team.colorFaint);
+                // Estilo según si es el más cercano o no
+                let lineAlpha, lineWidth, lineColor;
+                if (isHovered && isClosest) {
+                    // Hover sobre jugador + su vecino más cercano: máximo brillo
+                    lineAlpha = 0.9;
+                    lineWidth = 3.5;
+                    lineColor = team.colorGlow;
+                } else if (isClosest) {
+                    // Vecino más cercano sin hover: resaltado
+                    lineAlpha = 0.6;
+                    lineWidth = 2.5;
+                    lineColor = team.color;
+                } else if (isHovered) {
+                    // Hover pero no el más cercano: semi-visible
+                    lineAlpha = 0.4;
+                    lineWidth = 1.5;
+                    lineColor = team.colorFaint;
+                } else {
+                    // Conexiones normales: muy tenues
+                    lineAlpha = 0.12;
+                    lineWidth = 1;
+                    lineColor = team.colorFaint;
+                }
 
                 // Línea de conexión
                 ctx.strokeStyle = lineColor;
                 ctx.globalAlpha = lineAlpha;
                 ctx.lineWidth = lineWidth;
-                ctx.setLineDash(isClose ? [] : [4, 4]);
+                ctx.setLineDash(isClosest ? [] : [3, 3]);
                 ctx.beginPath();
                 ctx.moveTo(px1, py1);
                 ctx.lineTo(px2, py2);
@@ -2280,20 +2299,21 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
                 ctx.setLineDash([]);
                 ctx.globalAlpha = 1;
 
-                // Etiqueta de distancia (solo si hover o muy cerca)
-                if (isHovered || (isClose && nIdx === 0)) {
+                // Etiqueta de distancia solo para el más cercano o si hay hover
+                if (isClosest || isHovered) {
                     const midX = (px1 + px2) / 2;
                     const midY = (py1 + py2) / 2;
                     
                     // Fondo de etiqueta
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillStyle = isClosest ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
                     const labelText = `${distMeters.toFixed(1)}m`;
-                    ctx.font = 'bold 11px sans-serif';
+                    ctx.font = isClosest ? 'bold 12px sans-serif' : 'bold 10px sans-serif';
                     const metrics = ctx.measureText(labelText);
-                    ctx.fillRect(midX - metrics.width/2 - 3, midY - 9, metrics.width + 6, 14);
+                    const pad = isClosest ? 4 : 3;
+                    ctx.fillRect(midX - metrics.width/2 - pad, midY - 10, metrics.width + pad*2, 16);
                     
                     // Texto
-                    ctx.fillStyle = '#fff';
+                    ctx.fillStyle = isClosest ? '#fff' : '#ddd';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(labelText, midX, midY);
@@ -2337,42 +2357,6 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         
         ctx.restore();
     });
-
-    // Panel de información si hay hover
-    if (lineHoverState.player) {
-        const team = teams.find(t => t.key === lineHoverState.team);
-        if (team) {
-            const p = lineHoverState.player;
-            const neighbors = team.points
-                .filter(p2 => p2 !== p)
-                .map(p2 => ({ name: p2.name, dist: (calcDist(p, p2) / 100) * fieldLength }))
-                .sort((a, b) => a.dist - b.dist)
-                .slice(0, 3);
-
-            ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-            ctx.fillRect(10, 10, 200, 90);
-            ctx.strokeStyle = team.color;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(10, 10, 200, 90);
-            
-            ctx.fillStyle = team.color;
-            ctx.font = 'bold 13px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`${p.name.toUpperCase()}`, 20, 30);
-            
-            ctx.fillStyle = '#fff';
-            ctx.font = '11px sans-serif';
-            ctx.fillText('Distancias más cercanas:', 20, 48);
-            
-            neighbors.forEach((n, idx) => {
-                ctx.fillStyle = '#aaa';
-                ctx.fillText(`${idx + 1}. ${n.name}: ${n.dist.toFixed(1)}m`, 20, 65 + idx * 14);
-            });
-            
-            ctx.restore();
-        }
-    }
 
     // Instrucciones
     ctx.save();
@@ -2630,8 +2614,10 @@ document.addEventListener('DOMContentLoaded', () => {
         viewMode.addEventListener('change', () => {
             const controls = document.getElementById('voronoiControls');
             const lineCtrls = document.getElementById('lineControls');
+            const ballBtn = document.getElementById('btnVoronoiBall');
             if (controls) controls.style.display = (viewMode.value === 'VORONOI' || viewMode.value === 'LINES') ? 'flex' : 'none';
             if (lineCtrls) lineCtrls.style.display = viewMode.value === 'LINES' ? 'flex' : 'none';
+            if (ballBtn) ballBtn.style.display = viewMode.value === 'LINES' ? 'none' : 'inline-block';
         });
     }
 });
