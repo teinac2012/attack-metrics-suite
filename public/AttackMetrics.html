@@ -2241,12 +2241,12 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             });
         }
 
-        // Dibujar TODAS las conexiones entre jugadores, destacando la más cercana
+        // Dibujar TODAS las conexiones entre jugadores, destacando los 3 más cercanos
         team.points.forEach((p1, idx1) => {
-            // Encontrar TODOS los demás jugadores del mismo equipo, ordenados por distancia
+            // Encontrar TODOS los demás jugadores del mismo equipo (excluir el propio), ordenados por distancia
             const neighbors = team.points
                 .map((p2, idx2) => ({ player: p2, dist: calcDist(p1, p2), idx: idx2 }))
-                .filter(n => n.idx !== idx1)
+                .filter(n => n.idx !== idx1 && n.dist > 0) // Excluir el propio jugador
                 .sort((a, b) => a.dist - b.dist);
 
             const px1 = (p1.x / 100) * w;
@@ -2260,38 +2260,70 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
                 const distPercent = n.dist;
                 const distMeters = (distPercent / 100) * fieldLength;
                 
-                // El más cercano se destaca con color brillante
-                const isClosest = nIdx === 0;
+                // Categorías: 1º, 2º, 3º más cercano, resto
+                const isFirst = nIdx === 0;
+                const isSecond = nIdx === 1;
+                const isThird = nIdx === 2;
+                const isTop3 = nIdx < 3;
 
-                // Estilo según si es el más cercano o no
-                let lineAlpha, lineWidth, lineColor;
-                if (isHovered && isClosest) {
-                    // Hover sobre jugador + su vecino más cercano: máximo brillo
-                    lineAlpha = 0.9;
-                    lineWidth = 3.5;
+                // Estilo según ranking de proximidad
+                let lineAlpha, lineWidth, lineColor, showLabel;
+                
+                if (isHovered && isFirst) {
+                    // Hover + 1º más cercano: máximo brillo
+                    lineAlpha = 0.95;
+                    lineWidth = 4;
                     lineColor = team.colorGlow;
-                } else if (isClosest) {
-                    // Vecino más cercano sin hover: resaltado
-                    lineAlpha = 0.6;
-                    lineWidth = 2.5;
+                    showLabel = true;
+                } else if (isFirst) {
+                    // 1º más cercano: color brillante sólido
+                    lineAlpha = 0.75;
+                    lineWidth = 3;
                     lineColor = team.color;
+                    showLabel = true;
+                } else if (isHovered && isSecond) {
+                    // Hover + 2º más cercano
+                    lineAlpha = 0.75;
+                    lineWidth = 3;
+                    lineColor = team.colorGlow;
+                    showLabel = true;
+                } else if (isSecond) {
+                    // 2º más cercano: color medio-brillante
+                    lineAlpha = 0.5;
+                    lineWidth = 2.5;
+                    lineColor = `rgba(${team.key === 'HOME' ? '100, 181, 246' : '239, 154, 154'}, 1)`;
+                    showLabel = true;
+                } else if (isHovered && isThird) {
+                    // Hover + 3º más cercano
+                    lineAlpha = 0.65;
+                    lineWidth = 2.5;
+                    lineColor = team.colorGlow;
+                    showLabel = true;
+                } else if (isThird) {
+                    // 3º más cercano: color suave
+                    lineAlpha = 0.35;
+                    lineWidth = 2;
+                    lineColor = `rgba(${team.key === 'HOME' ? '144, 202, 249' : '244, 143, 177'}, 1)`;
+                    showLabel = true;
                 } else if (isHovered) {
-                    // Hover pero no el más cercano: semi-visible
-                    lineAlpha = 0.4;
+                    // Hover resto de conexiones
+                    lineAlpha = 0.3;
                     lineWidth = 1.5;
                     lineColor = team.colorFaint;
+                    showLabel = false;
                 } else {
-                    // Conexiones normales: muy tenues
-                    lineAlpha = 0.12;
-                    lineWidth = 1;
+                    // Resto: muy tenues
+                    lineAlpha = 0.08;
+                    lineWidth = 0.8;
                     lineColor = team.colorFaint;
+                    showLabel = false;
                 }
 
                 // Línea de conexión
                 ctx.strokeStyle = lineColor;
                 ctx.globalAlpha = lineAlpha;
                 ctx.lineWidth = lineWidth;
-                ctx.setLineDash(isClosest ? [] : [3, 3]);
+                ctx.setLineDash(isTop3 ? [] : [2, 4]);
                 ctx.beginPath();
                 ctx.moveTo(px1, py1);
                 ctx.lineTo(px2, py2);
@@ -2299,21 +2331,28 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
                 ctx.setLineDash([]);
                 ctx.globalAlpha = 1;
 
-                // Etiqueta de distancia solo para el más cercano o si hay hover
-                if (isClosest || isHovered) {
+                // Etiqueta de distancia para los 3 más cercanos
+                if (showLabel) {
                     const midX = (px1 + px2) / 2;
                     const midY = (py1 + py2) / 2;
                     
-                    // Fondo de etiqueta
-                    ctx.fillStyle = isClosest ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
+                    // Fondo de etiqueta con intensidad según ranking
+                    const bgAlpha = isFirst ? 0.9 : (isSecond ? 0.8 : 0.7);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
                     const labelText = `${distMeters.toFixed(1)}m`;
-                    ctx.font = isClosest ? 'bold 12px sans-serif' : 'bold 10px sans-serif';
+                    const fontSize = isFirst ? 13 : (isSecond ? 12 : 11);
+                    ctx.font = `bold ${fontSize}px sans-serif`;
                     const metrics = ctx.measureText(labelText);
-                    const pad = isClosest ? 4 : 3;
-                    ctx.fillRect(midX - metrics.width/2 - pad, midY - 10, metrics.width + pad*2, 16);
+                    const pad = isFirst ? 5 : 4;
+                    ctx.fillRect(midX - metrics.width/2 - pad, midY - 11, metrics.width + pad*2, 18);
+                    
+                    // Borde sutil
+                    ctx.strokeStyle = lineColor;
+                    ctx.lineWidth = isFirst ? 2 : 1;
+                    ctx.strokeRect(midX - metrics.width/2 - pad, midY - 11, metrics.width + pad*2, 18);
                     
                     // Texto
-                    ctx.fillStyle = isClosest ? '#fff' : '#ddd';
+                    ctx.fillStyle = '#fff';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(labelText, midX, midY);
