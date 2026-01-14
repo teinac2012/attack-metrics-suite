@@ -2241,131 +2241,127 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             });
         }
 
-        // Dibujar TODAS las conexiones entre jugadores, destacando los 3 más cercanos
+        // Encontrar la distancia mínima absoluta del equipo
+        let minDistGlobal = Infinity;
+        let minDistPlayerIdx = -1;
+        
         team.points.forEach((p1, idx1) => {
-            // Encontrar TODOS los demás jugadores del mismo equipo (excluir el propio), ordenados por distancia
+            const neighbors = team.points
+                .map((p2, idx2) => ({ dist: calcDist(p1, p2), idx: idx2 }))
+                .filter(n => n.idx !== idx1 && n.dist > 0)
+                .sort((a, b) => a.dist - b.dist);
+            
+            if (neighbors.length > 0 && neighbors[0].dist < minDistGlobal) {
+                minDistGlobal = neighbors[0].dist;
+                minDistPlayerIdx = idx1;
+            }
+        });
+
+        // Dibujar SOLO la conexión al vecino más cercano de cada jugador
+        team.points.forEach((p1, idx1) => {
             const neighbors = team.points
                 .map((p2, idx2) => ({ player: p2, dist: calcDist(p1, p2), idx: idx2 }))
-                .filter(n => n.idx !== idx1 && n.dist > 0) // Excluir el propio jugador
+                .filter(n => n.idx !== idx1 && n.dist > 0)
                 .sort((a, b) => a.dist - b.dist);
+
+            if (neighbors.length === 0) return;
 
             const px1 = (p1.x / 100) * w;
             const py1 = (p1.y / 100) * h;
             const isHovered = lineHoverState.player === p1 && lineHoverState.team === team.key;
+            const hasMinDist = idx1 === minDistPlayerIdx;
 
-            neighbors.forEach((n, nIdx) => {
-                const p2 = n.player;
-                const px2 = (p2.x / 100) * w;
-                const py2 = (p2.y / 100) * h;
-                const distPercent = n.dist;
-                const distMeters = (distPercent / 100) * fieldLength;
-                
-                // Categorías: 1º, 2º, 3º más cercano, resto
-                const isFirst = nIdx === 0;
-                const isSecond = nIdx === 1;
-                const isThird = nIdx === 2;
-                const isTop3 = nIdx < 3;
+            // SOLO dibujar conexión con el más cercano
+            const closest = neighbors[0];
+            const p2 = closest.player;
+            const px2 = (p2.x / 100) * w;
+            const py2 = (p2.y / 100) * h;
+            const distMeters = (closest.dist / 100) * fieldLength;
 
-                // Estilo según ranking de proximidad
-                let lineAlpha, lineWidth, lineColor, showLabel;
-                
-                if (isHovered && isFirst) {
-                    // Hover + 1º más cercano: máximo brillo
-                    lineAlpha = 0.95;
-                    lineWidth = 4;
-                    lineColor = team.colorGlow;
-                    showLabel = true;
-                } else if (isFirst) {
-                    // 1º más cercano: color brillante sólido
-                    lineAlpha = 0.75;
-                    lineWidth = 3;
-                    lineColor = team.color;
-                    showLabel = true;
-                } else if (isHovered && isSecond) {
-                    // Hover + 2º más cercano
-                    lineAlpha = 0.75;
-                    lineWidth = 3;
-                    lineColor = team.colorGlow;
-                    showLabel = true;
-                } else if (isSecond) {
-                    // 2º más cercano: color medio-brillante
-                    lineAlpha = 0.5;
-                    lineWidth = 2.5;
-                    lineColor = `rgba(${team.key === 'HOME' ? '100, 181, 246' : '239, 154, 154'}, 1)`;
-                    showLabel = true;
-                } else if (isHovered && isThird) {
-                    // Hover + 3º más cercano
-                    lineAlpha = 0.65;
-                    lineWidth = 2.5;
-                    lineColor = team.colorGlow;
-                    showLabel = true;
-                } else if (isThird) {
-                    // 3º más cercano: color suave
-                    lineAlpha = 0.35;
-                    lineWidth = 2;
-                    lineColor = `rgba(${team.key === 'HOME' ? '144, 202, 249' : '244, 143, 177'}, 1)`;
-                    showLabel = true;
-                } else if (isHovered) {
-                    // Hover resto de conexiones
-                    lineAlpha = 0.3;
-                    lineWidth = 1.5;
-                    lineColor = team.colorFaint;
-                    showLabel = false;
-                } else {
-                    // Resto: muy tenues
-                    lineAlpha = 0.08;
-                    lineWidth = 0.8;
-                    lineColor = team.colorFaint;
-                    showLabel = false;
-                }
+            // Estilo según si es hover o no
+            let lineAlpha, lineWidth, lineColor;
+            if (isHovered) {
+                lineAlpha = 1;
+                lineWidth = 5;
+                lineColor = team.colorGlow;
+            } else if (hasMinDist) {
+                // Jugador con distancia mínima del equipo: muy destacado
+                lineAlpha = 0.95;
+                lineWidth = 4.5;
+                lineColor = team.color;
+            } else {
+                // Resto: visible pero no tanto
+                lineAlpha = 0.7;
+                lineWidth = 3.5;
+                lineColor = team.color;
+            }
 
-                // Línea de conexión
-                ctx.strokeStyle = lineColor;
-                ctx.globalAlpha = lineAlpha;
-                ctx.lineWidth = lineWidth;
-                ctx.setLineDash(isTop3 ? [] : [2, 4]);
-                ctx.beginPath();
-                ctx.moveTo(px1, py1);
-                ctx.lineTo(px2, py2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.globalAlpha = 1;
+            // Línea de conexión (solo al más cercano)
+            ctx.strokeStyle = lineColor;
+            ctx.globalAlpha = lineAlpha;
+            ctx.lineWidth = lineWidth;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(px1, py1);
+            ctx.lineTo(px2, py2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
 
-                // Etiqueta de distancia para los 3 más cercanos
-                if (showLabel) {
-                    const midX = (px1 + px2) / 2;
-                    const midY = (py1 + py2) / 2;
-                    
-                    // Fondo de etiqueta con intensidad según ranking
-                    const bgAlpha = isFirst ? 0.9 : (isSecond ? 0.8 : 0.7);
-                    ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
-                    const labelText = `${distMeters.toFixed(1)}m`;
-                    const fontSize = isFirst ? 13 : (isSecond ? 12 : 11);
-                    ctx.font = `bold ${fontSize}px sans-serif`;
-                    const metrics = ctx.measureText(labelText);
-                    const pad = isFirst ? 5 : 4;
-                    ctx.fillRect(midX - metrics.width/2 - pad, midY - 11, metrics.width + pad*2, 18);
-                    
-                    // Borde sutil
-                    ctx.strokeStyle = lineColor;
-                    ctx.lineWidth = isFirst ? 2 : 1;
-                    ctx.strokeRect(midX - metrics.width/2 - pad, midY - 11, metrics.width + pad*2, 18);
-                    
-                    // Texto
-                    ctx.fillStyle = '#fff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(labelText, midX, midY);
-                }
-            });
+            // Etiqueta de distancia con fondo muy visible
+            const midX = (px1 + px2) / 2;
+            const midY = (py1 + py2) / 2;
+            
+            const labelText = `${distMeters.toFixed(1)}m`;
+            const fontSize = hasMinDist ? 15 : 13;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            const metrics = ctx.measureText(labelText);
+            const pad = 6;
+            
+            // Fondo negro sólido
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+            ctx.fillRect(midX - metrics.width/2 - pad, midY - 12, metrics.width + pad*2, 22);
+            
+            // Borde de color
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = hasMinDist ? 3 : 2;
+            ctx.strokeRect(midX - metrics.width/2 - pad, midY - 12, metrics.width + pad*2, 22);
+            
+            // Texto blanco
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, midX, midY);
         });
 
         // Dibujar jugadores como círculos (encima de las líneas)
-        team.points.forEach((player) => {
+        team.points.forEach((player, idx) => {
             const px = (player.x / 100) * w;
             const py = (player.y / 100) * h;
             const isHovered = lineHoverState.player === player && lineHoverState.team === team.key;
-            const radius = isHovered ? 10 : 8;
+            const hasMinDist = idx === minDistPlayerIdx;
+            const radius = isHovered ? 11 : (hasMinDist ? 10 : 8);
+            
+            // Indicador especial para el jugador con distancia mínima del equipo
+            if (hasMinDist) {
+                // Glow exterior grande
+                ctx.beginPath();
+                ctx.arc(px, py, radius + 10, 0, 2 * Math.PI);
+                const gradient = ctx.createRadialGradient(px, py, radius, px, py, radius + 10);
+                gradient.addColorStop(0, team.colorGlow);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Icono estrella
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeText('⭐', px, py - (radius + 20));
+                ctx.fillText('⭐', px, py - (radius + 20));
+            }
             
             // Glow effect si hover
             if (isHovered) {
@@ -2380,16 +2376,16 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             ctx.arc(px, py, radius, 0, 2 * Math.PI);
             ctx.fillStyle = team.color;
             ctx.fill();
-            ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255, 255, 255, 0.9)';
-            ctx.lineWidth = isHovered ? 3 : 2;
+            ctx.strokeStyle = hasMinDist ? '#FFD700' : (isHovered ? '#fff' : 'rgba(255, 255, 255, 0.9)');
+            ctx.lineWidth = hasMinDist ? 4 : (isHovered ? 3 : 2);
             ctx.stroke();
             
             // Etiqueta del jugador
             ctx.fillStyle = '#fff';
-            ctx.font = isHovered ? 'bold 12px sans-serif' : 'bold 10px sans-serif';
+            ctx.font = (isHovered || hasMinDist) ? 'bold 13px sans-serif' : 'bold 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.strokeText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
             ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
         });
