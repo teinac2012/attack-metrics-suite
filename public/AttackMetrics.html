@@ -739,15 +739,24 @@
         <button class="btn-tool" style="background:#e74c3c" onclick="voronoiClearAll()">🗑 Limpiar</button>
     </div>
 
-    <div id="lineControls" style="display:none; gap:5px; margin:0 5px; align-items:center; color:#ccc; font-size:0.7rem;">
-        <span style="color:#aaa;">Líneas:</span>
-        <select id="lineCount" class="header-select" style="width:65px;" onchange="drawPitch()">
-            <option value="3">3</option>
-            <option value="4" selected>4</option>
-        </select>
-        <span style="color:#aaa;">Largo (m):</span>
-        <input id="lineFieldLength" type="number" value="105" step="1" min="60" max="130" style="width:70px; background:#222; color:#fff; border:1px solid #444; padding:2px 4px; border-radius:4px;" oninput="drawPitch()" />
-    </div>
+<div id="lineControls" style="display:none; gap:5px; margin:0 5px; align-items:center; color:#ccc; font-size:0.7rem;">
+    <span style="color:#aaa;">Líneas:</span>
+    <select id="lineCount" class="header-select" style="width:45px;" onchange="drawPitch()">
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="5">5</option>
+    </select>
+    
+    <span style="color:#aaa;">L(m):</span>
+    <input id="lineFieldLength" type="number" value="105" step="1" min="90" max="120" 
+           style="width:45px; background:#222; color:#fff; border:1px solid #444; padding:2px; border-radius:4px; text-align:center; font-weight:bold;" 
+           oninput="drawPitch()" />
+
+    <span style="color:#aaa;">A(m):</span>
+    <input id="lineFieldWidth" type="number" value="68" step="1" min="45" max="90" 
+           style="width:40px; background:#222; color:#fff; border:1px solid #444; padding:2px; border-radius:4px; text-align:center; font-weight:bold;" 
+           oninput="drawPitch()" />
+</div>
     
     <select class="header-select" id="teamView" onchange="onTeamSelect()"><option value="HOME">L</option><option value="AWAY">V</option><option value="ALL">T</option></select>
     
@@ -1028,6 +1037,8 @@ let STATE = {
     // --- NUEVA VARIABLE ---
     invertSides: false // false = Local empieza a la Izq, true = Local empieza a la Der
 };
+// Variable global para guardar la ruta de medición (IMPRESCINDIBLE)
+let measurePath = [];
 
 function ensureStateShape() {
     if (!DB.state) {
@@ -2189,10 +2200,14 @@ function computeLineBands(points, lineCount) {
 let lineHoverState = { player: null, team: null };
 
 function drawLineDistances(ctx, w, h, actions, shouldInvert) {
+    // 1. OBTENER DIMENSIONES REALES DEL INPUT
     const lineCountSel = document.getElementById('lineCount');
     const fieldLenInput = document.getElementById('lineFieldLength');
+    const fieldWidInput = document.getElementById('lineFieldWidth');
+
     const lineCount = parseInt(lineCountSel ? lineCountSel.value : '4', 10) || 4;
     const fieldLength = parseFloat(fieldLenInput ? fieldLenInput.value : '105') || 105;
+    const fieldWidth = parseFloat(fieldWidInput ? fieldWidInput.value : '68') || 68;
 
     seedLinePointsFromActions(actions || []);
 
@@ -2200,7 +2215,7 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         let px = p.x, py = p.y;
         if (shouldInvert) { px = 100 - px; py = 100 - py; }
         const pos = clampToFieldPercent({ x: px, y: py });
-        return { ...p, x: pos.x, y: pos.y };
+        return { ...p, x: pos.x, y: pos.y, _orig: p };
     });
 
     const teams = [
@@ -2208,200 +2223,242 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         { key: 'AWAY', color: '#e74c3c', colorGlow: 'rgba(231, 76, 60, 0.5)', colorFaint: 'rgba(231, 76, 60, 0.15)', points: mapPoints(voronoiState.points_AWAY) }
     ];
 
-    // Calcular distancias euclidianas entre todos los jugadores
-    const calcDist = (p1, p2) => {
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        return Math.sqrt(dx * dx + dy * dy);
+    // --- CÁLCULO DE DISTANCIA REAL (METROS) ---
+    const calcDistReal = (p1, p2) => {
+        const dxPct = Math.abs(p2.x - p1.x);
+        const dyPct = Math.abs(p2.y - p1.y);
+        const dxMeters = (dxPct / 100) * fieldLength;
+        const dyMeters = (dyPct / 100) * fieldWidth;
+        return Math.sqrt((dxMeters * dxMeters) + (dyMeters * dyMeters));
     };
 
+    // --- FUNCIÓN PARA CONTAR PASES ENTRE DOS JUGADORES ---
+    const countPassesBetween = (p1, p2) => {
+        if (!actions || actions.length === 0) return 0;
+        return actions.filter(a => {
+            const isSamePair = (a.player === p1.name && a.endX !== null) ||
+                             (a.player === p2.name && a.endX !== null);
+            return isSamePair;
+        }).length;
+    };
+
+    // --- 1. DIBUJO DE LÍNEAS AUTOMÁTICAS (VECINOS) ---
+    // (Esto dibuja las líneas azules/rojas tenues de fondo)
     teams.forEach(team => {
         if (team.points.length < 2) return;
-
         const res = computeLineBands(team.points, lineCount);
-        const clusters = res ? kMeans1D(team.points, lineCount) : [team.points];
         
         ctx.save();
         
-        // Líneas de referencia entre centroides (muy discretas)
+        // Configuración para máxima nitidez
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        // Líneas verticales de referencia (opcional)
         if (res && res.centroids.length >= 2) {
-            const { centroids, distances } = res;
-            centroids.forEach((c, idx) => {
+            res.centroids.forEach((c) => {
                 const x = (c.x / 100) * w;
-                ctx.setLineDash([3, 6]);
-                ctx.strokeStyle = team.colorFaint;
-                ctx.lineWidth = 1;
-                ctx.globalAlpha = 0.3;
-                ctx.beginPath();
-                ctx.moveTo(x, h * 0.05);
-                ctx.lineTo(x, h * 0.95);
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-                ctx.setLineDash([]);
+                ctx.setLineDash([3, 6]); ctx.strokeStyle = team.colorFaint; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(x, h * 0.05); ctx.lineTo(x, h * 0.95); ctx.stroke(); ctx.setLineDash([]);
             });
         }
 
-        // Encontrar la distancia mínima absoluta del equipo
-        let minDistGlobal = Infinity;
-        let minDistPlayerIdx = -1;
-        
-        team.points.forEach((p1, idx1) => {
+        // Calcular vecinos más cercanos para dibujar red automática
+        let minDistGlobal = Infinity; let minDistPlayerIdx = -1;
+        const playerNeighbors = team.points.map((p1, idx1) => {
             const neighbors = team.points
-                .map((p2, idx2) => ({ dist: calcDist(p1, p2), idx: idx2 }))
-                .filter(n => n.idx !== idx1 && n.dist > 0)
-                .sort((a, b) => a.dist - b.dist);
-            
-            if (neighbors.length > 0 && neighbors[0].dist < minDistGlobal) {
-                minDistGlobal = neighbors[0].dist;
-                minDistPlayerIdx = idx1;
-            }
+                .map((p2, idx2) => ({ player: p2, distMeters: calcDistReal(p1, p2), idx: idx2 }))
+                .filter(n => n.idx !== idx1 && n.distMeters > 0).sort((a, b) => a.distMeters - b.distMeters);
+            if (neighbors.length > 0 && neighbors[0].distMeters < minDistGlobal) { minDistGlobal = neighbors[0].distMeters; minDistPlayerIdx = idx1; }
+            return { p1, idx1, closest: neighbors[0] };
         });
 
-        // Dibujar SOLO la conexión al vecino más cercano de cada jugador
-        team.points.forEach((p1, idx1) => {
-            const neighbors = team.points
-                .map((p2, idx2) => ({ player: p2, dist: calcDist(p1, p2), idx: idx2 }))
-                .filter(n => n.idx !== idx1 && n.dist > 0)
-                .sort((a, b) => a.dist - b.dist);
+        playerNeighbors.forEach(item => {
+            if (!item.closest) return;
+            const { p1, idx1, closest } = item; const p2 = closest.player;
+            
+            // Si el jugador está en nuestra RUTA MANUAL, no dibujamos su línea automática para no ensuciar
+            const inPath = measurePath.some(mp => mp === p1._orig);
+            if (inPath) return; 
 
-            if (neighbors.length === 0) return;
-
-            const px1 = (p1.x / 100) * w;
-            const py1 = (p1.y / 100) * h;
+            const px1 = (p1.x / 100) * w; const py1 = (p1.y / 100) * h;
+            const px2 = (p2.x / 100) * w; const py2 = (p2.y / 100) * h;
             const isHovered = lineHoverState.player === p1 && lineHoverState.team === team.key;
             const hasMinDist = idx1 === minDistPlayerIdx;
+            
+            // CONTAR PASES ENTRE JUGADORES para determinar grosor
+            const passesBetween = countPassesBetween(p1, p2);
+            const baseWidth = 2;
+            const passWidth = Math.min(passesBetween * 0.5, 6); // Máximo 6px de grosor
 
-            // SOLO dibujar conexión con el más cercano
-            const closest = neighbors[0];
-            const p2 = closest.player;
-            const px2 = (p2.x / 100) * w;
-            const py2 = (p2.y / 100) * h;
-            const distMeters = (closest.dist / 100) * fieldLength;
+            let lineAlpha = 0.4, lineWidth = baseWidth + passWidth, lineColor = team.color;
+            if (isHovered) { lineAlpha = 1; lineWidth = Math.max(baseWidth + passWidth, 5); lineColor = team.colorGlow; }
+            else if (hasMinDist) { lineAlpha = 0.8; lineWidth = Math.max(baseWidth + passWidth, 4); }
 
-            // Estilo según si es hover o no
-            let lineAlpha, lineWidth, lineColor;
-            if (isHovered) {
-                lineAlpha = 1;
-                lineWidth = 5;
-                lineColor = team.colorGlow;
-            } else if (hasMinDist) {
-                // Jugador con distancia mínima del equipo: muy destacado
-                lineAlpha = 0.95;
-                lineWidth = 4.5;
-                lineColor = team.color;
-            } else {
-                // Resto: visible pero no tanto
-                lineAlpha = 0.7;
-                lineWidth = 3.5;
-                lineColor = team.color;
-            }
-
-            // Línea de conexión (solo al más cercano)
-            ctx.strokeStyle = lineColor;
+            // Dibujar línea con sombra para mejor contraste
+            ctx.globalAlpha = Math.min(lineAlpha, 0.3);
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = lineWidth + 2;
+            ctx.beginPath(); 
+            ctx.moveTo(px1, py1); 
+            ctx.lineTo(px2, py2); 
+            ctx.stroke();
+            
+            // Línea principal
             ctx.globalAlpha = lineAlpha;
+            ctx.strokeStyle = lineColor;
             ctx.lineWidth = lineWidth;
-            ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.moveTo(px1, py1);
-            ctx.lineTo(px2, py2);
+            ctx.beginPath(); 
+            ctx.moveTo(px1, py1); 
+            ctx.lineTo(px2, py2); 
             ctx.stroke();
             ctx.globalAlpha = 1;
 
-            // Etiqueta de distancia con fondo muy visible
-            const midX = (px1 + px2) / 2;
-            const midY = (py1 + py2) / 2;
-            
-            const labelText = `${distMeters.toFixed(1)}m`;
-            const fontSize = hasMinDist ? 15 : 13;
-            ctx.font = `bold ${fontSize}px sans-serif`;
+            // Etiqueta pequeña automática
+            const midX = (px1 + px2) / 2; const midY = (py1 + py2) / 2;
+            const labelText = `${closest.distMeters.toFixed(1)}m`;
+            ctx.font = `900 ${hasMinDist?12:11}px sans-serif`;
             const metrics = ctx.measureText(labelText);
-            const pad = 6;
             
-            // Fondo negro sólido
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
-            ctx.fillRect(midX - metrics.width/2 - pad, midY - 12, metrics.width + pad*2, 22);
+            // Fondo con mejor contraste
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            ctx.shadowBlur = 2;
+            ctx.fillRect(midX - metrics.width/2 - 3, midY - 9, metrics.width + 6, 18);
             
-            // Borde de color
-            ctx.strokeStyle = lineColor;
-            ctx.lineWidth = hasMinDist ? 3 : 2;
-            ctx.strokeRect(midX - metrics.width/2 - pad, midY - 12, metrics.width + pad*2, 22);
-            
-            // Texto blanco
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'center';
+            // Texto legible
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center'; 
             ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 2;
             ctx.fillText(labelText, midX, midY);
+            ctx.shadowColor = 'transparent';
         });
 
-        // Dibujar jugadores como círculos (encima de las líneas)
+        // Dibujar Círculos de Jugadores
         team.points.forEach((player, idx) => {
-            const px = (player.x / 100) * w;
-            const py = (player.y / 100) * h;
-            const isHovered = lineHoverState.player === player && lineHoverState.team === team.key;
-            const hasMinDist = idx === minDistPlayerIdx;
-            const radius = isHovered ? 11 : (hasMinDist ? 10 : 8);
+            const px = (player.x / 100) * w; const py = (player.y / 100) * h;
+            const isSel = measurePath.includes(player._orig); // ¿Está en mi ruta manual?
             
-            // Indicador especial para el jugador con distancia mínima del equipo
-            if (hasMinDist) {
-                // Glow exterior grande
-                ctx.beginPath();
-                ctx.arc(px, py, radius + 10, 0, 2 * Math.PI);
-                const gradient = ctx.createRadialGradient(px, py, radius, px, py, radius + 10);
-                gradient.addColorStop(0, team.colorGlow);
-                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                
-                // Icono estrella
-                ctx.fillStyle = '#FFD700';
-                ctx.font = 'bold 16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.strokeText('⭐', px, py - (radius + 20));
-                ctx.fillText('⭐', px, py - (radius + 20));
-            }
-            
-            // Glow effect si hover
-            if (isHovered) {
-                ctx.beginPath();
-                ctx.arc(px, py, radius + 6, 0, 2 * Math.PI);
-                ctx.fillStyle = team.colorGlow;
-                ctx.fill();
-            }
-            
-            // Círculo del jugador
-            ctx.beginPath();
-            ctx.arc(px, py, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = team.color;
-            ctx.fill();
-            ctx.strokeStyle = hasMinDist ? '#FFD700' : (isHovered ? '#fff' : 'rgba(255, 255, 255, 0.9)');
-            ctx.lineWidth = hasMinDist ? 4 : (isHovered ? 3 : 2);
+            ctx.beginPath(); ctx.arc(px, py, isSel ? 10 : 6, 0, 2 * Math.PI);
+            ctx.fillStyle = team.color; ctx.fill();
+            if (isSel) { ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 3; } else { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; }
             ctx.stroke();
             
-            // Etiqueta del jugador
-            ctx.fillStyle = '#fff';
-            ctx.font = (isHovered || hasMinDist) ? 'bold 13px sans-serif' : 'bold 10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 4;
-            ctx.strokeText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
-            ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - (radius + 8));
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; 
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+            ctx.shadowBlur = 2;
+            ctx.strokeText(player.name.substr(0, 3).toUpperCase(), px, py - 12);
+            ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - 12);
+            ctx.shadowColor = 'transparent';
         });
-        
         ctx.restore();
     });
 
+    // ============================================================
+    // --- 2. DIBUJO DE RUTA MANUAL (TU PETICIÓN) ---
+    // ============================================================
+    if (measurePath.length > 1) {
+        ctx.save();
+        
+        // Configuración para máxima nitidez
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        // Función auxiliar para obtener posición en pantalla
+        const getScreenPos = (rawP) => {
+            let px = rawP.x, py = rawP.y;
+            if (shouldInvert) { px = 100 - px; py = 100 - py; }
+            px = Math.min(95, Math.max(5, px)); py = Math.min(95, Math.max(5, py));
+            return { x: (px/100)*w, y: (py/100)*h, pctX: px, pctY: py };
+        };
+
+        // Recorrer la ruta secuencialmente
+        for (let i = 0; i < measurePath.length - 1; i++) {
+            const pStart = measurePath[i];
+            const pEnd = measurePath[i+1];
+            
+            const s1 = getScreenPos(pStart);
+            const s2 = getScreenPos(pEnd);
+            
+            // CÁLCULO DE DISTANCIA
+            const dist = calcDistReal({x: s1.pctX, y: s1.pctY}, {x: s2.pctX, y: s2.pctY});
+
+            // LÍNEA SÓLIDA AMARILLA (Más nítida, sin punteado)
+            ctx.strokeStyle = "#FFD700";
+            ctx.lineWidth = 5;
+            ctx.globalAlpha = 0.95;
+            ctx.beginPath(); 
+            ctx.moveTo(s1.x, s1.y); 
+            ctx.lineTo(s2.x, s2.y); 
+            ctx.stroke();
+            
+            // Sombra suave para contraste
+            ctx.globalAlpha = 0.3;
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 7;
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // ETIQUETA DE DISTANCIA (Grande y con fondo)
+            const midX = (s1.x + s2.x) / 2;
+            const midY = (s1.y + s2.y) / 2;
+            const txt = dist.toFixed(1) + "m";
+            
+            ctx.font = "900 16px sans-serif";
+            const tm = ctx.measureText(txt);
+            const padding = 8;
+
+            // Caja negra de fondo (más opaca)
+            ctx.fillStyle = "rgba(0,0,0,0.92)";
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+            
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28, 6);
+            } else {
+                ctx.fillRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28);
+            }
+            ctx.fill();
+            
+            // Borde amarillo brillante a la caja
+            ctx.strokeStyle = "#FFED4E";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Texto blanco puro (más legible)
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            ctx.shadowBlur = 3;
+            ctx.fillStyle = "#FFFFFF";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(txt, midX, midY);
+            
+            // Reset shadow
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
+        }
+        
+        ctx.restore();
+    }
+
     // Instrucciones
     ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = 2;
-    ctx.fillText('🖱 Click: añadir | Arrastrar: mover | Doble-click: eliminar | Hover: info detallada', 10, h - 10);
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+    ctx.shadowColor = '#000'; ctx.shadowBlur = 2;
+    ctx.fillText('🖱 Clic secuencial en jugadores para medir ruta | Doble clic vacio para borrar', 10, h - 25);
+    ctx.fillText(`📏 Dimensiones Campo: ${fieldLength}m x ${fieldWidth}m`, 10, h - 10);
     ctx.restore();
 }
 
@@ -2760,35 +2817,39 @@ function voronoiAnalyze() {
 
 function voronoiInputStart(e) {
     const viewMode = document.getElementById('viewMode').value;
+    
+    // Solo permitimos interactuar si estamos en las vistas adecuadas
     if (viewMode !== 'VORONOI' && viewMode !== 'LINES') return;
     
     const p = clampToFieldPercent(getPos(e));
-    const mode = voronoiState.currentMode;
+    const mode = voronoiState.currentMode; // ¿Está activo LOCAL, VISITANTE o BALÓN?
     
-    // Detectar doble toque en tablets
+    // --- 1. DETECCIÓN DE DOBLE TOQUE (Para borrar jugadores en Tablets) ---
     if (e.type === 'touchstart') {
         const currentTime = new Date().getTime();
         const tapLength = currentTime - voronoiState.lastTap;
         if (tapLength < 300 && tapLength > 0) {
-            // Es un doble toque - eliminar elemento
-            voronoiInputDblClick(e);
+            measurePath = []; // Limpiar líneas
+            voronoiInputDblClick(e); // Borrar jugador
             voronoiState.lastTap = 0;
             return;
         }
         voronoiState.lastTap = currentTime;
     }
     
-    // Primero: si clic en un jugador o balón, arrastrar (aunque haya modo de agregar activo)
+    // Buscar si hemos clicado encima de algo existente
     let found = null;
-    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'HOME' }; });
-    if (!found) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'AWAY' }; });
+    voronoiState.points_HOME.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'HOME', data: pt }; });
+    if (!found) voronoiState.points_AWAY.forEach((pt, idx) => { if (getDist(p, pt) < 5) found = { type: 'player', idx, team: 'AWAY', data: pt }; });
     if (!found && voronoiState.ball && getDist(p, voronoiState.ball) < 5) found = { type: 'ball' };
-    if (found) { voronoiState.dragTarget = found; return; }
 
-    // Si no tocó un jugador/ball y hay modo de agregar
+    // =========================================================================
+    // PRIORIDAD 1: AÑADIR JUGADORES O BALÓN (Si hay un botón activado arriba)
+    // =========================================================================
     if (mode === 'HOME' || mode === 'AWAY') {
         const array = mode === 'HOME' ? voronoiState.points_HOME : voronoiState.points_AWAY;
         const playerNum = array.length + 1;
+        // Añadimos jugador y terminamos. NO medimos.
         array.push({ x: p.x, y: p.y, team: mode, name: `${mode === 'HOME' ? 'L' : 'V'}${playerNum}` });
         drawPitch();
         return;
@@ -2796,9 +2857,38 @@ function voronoiInputStart(e) {
     
     if (mode === 'BALL') {
         voronoiState.ball = { x: p.x, y: p.y };
-        voronoiState.currentMode = null;
+        voronoiState.currentMode = null; // Soltar botón balón
         drawPitch();
         return;
+    }
+
+    // =========================================================================
+    // PRIORIDAD 2: HERRAMIENTA DE LÍNEAS (Solo si NO estamos añadiendo)
+    // =========================================================================
+    if (viewMode === 'LINES') {
+        // A) Si clicamos en un JUGADOR -> Lo añadimos a la ruta de medición
+        if (found && found.type === 'player') {
+            measurePath.push(found.data);
+            drawPitch();
+            // Permitimos arrastrarlo también
+            voronoiState.dragTarget = found; 
+            return;
+        } 
+        
+        // B) Si clicamos en el VACÍO (Césped) -> Limpiamos la medición
+        else if (!found) {
+            measurePath = []; // Borrar líneas amarillas
+            drawPitch();
+            return; 
+        }
+    }
+
+    // =========================================================================
+    // PRIORIDAD 3: ARRASTRAR (Mover jugadores si no es ninguno de los anteriores)
+    // =========================================================================
+    if (found) { 
+        voronoiState.dragTarget = found; 
+        return; 
     }
 }
 
@@ -4239,7 +4329,7 @@ function drawAvgPos() {
         }
     }
 
-    // --- DIBUJAR RED DE PASES (CON FLECHAS GRANDES Y HOVER) ---
+    // --- DIBUJAR RED DE PASES (MODIFICADO PARA GROSOR VARIABLE) ---
     if(showNet) {
         ctx.lineCap = "round";
         Object.keys(passMatrix).forEach(key => {
@@ -4253,16 +4343,21 @@ function drawAvgPos() {
             const toPos = screenCoords[p2];
 
             if(fromPos && toPos) {
-                let alpha = Math.min(0.2 + (count * 0.05), 0.8);
+                // =====================================================
+                // AQUÍ ESTÁ EL CAMBIO DE GROSOR SOLICITADO
+                // =====================================================
+                // Multiplicador 1.5 para que crezca rápido. Máximo 18px.
+                let width = Math.min(Math.max(count * 1.5, 2), 18); 
+                
+                let alpha = Math.min(0.3 + (count * 0.05), 0.9);
                 let color = "rgba(255, 255, 255, "; 
-                let width = Math.min(Math.max(count * 0.5, 1), 8);
 
                 if (avgPosHover) {
                     if (p1 === avgPosHover || p2 === avgPosHover) {
                         alpha = 1.0;
                         if (p1 === avgPosHover) color = "rgba(52, 152, 219, "; // Azul saliente
                         else color = "rgba(231, 76, 60, "; // Rojo entrante
-                        width = Math.max(width, 2); 
+                        width = Math.max(width, 3); 
                         ctx.globalCompositeOperation = 'source-over'; 
                     } else {
                         alpha = 0.05;
@@ -4286,8 +4381,8 @@ function drawAvgPos() {
                 // Línea principal
                 ctx.beginPath(); ctx.moveTo(fromPos.x, fromPos.y); ctx.lineTo(endX, endY); ctx.stroke();
 
-                // --- CABEZA DE FLECHA MÁS GRANDE ---
-                const headLen = 14 + (width * 1.0); 
+                // --- CABEZA DE FLECHA MÁS GRANDE (Proporcional al grosor) ---
+                const headLen = 14 + (width * 1.2); 
                 
                 ctx.beginPath();
                 ctx.moveTo(endX, endY);
