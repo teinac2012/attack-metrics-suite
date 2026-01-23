@@ -2349,28 +2349,35 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 4; ctx.setLineDash([8, 4]);
             ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke(); ctx.setLineDash([]);
 
-            // ETIQUETA DE DISTANCIA (Grande y con fondo)
+            // ETIQUETA DE DISTANCIA (Grande y con fondo mejorado)
             const midX = (s1.x + s2.x) / 2;
             const midY = (s1.y + s2.y) / 2;
             const txt = dist.toFixed(1) + "m";
             
-            ctx.font = "900 14px sans-serif";
+            ctx.font = "900 18px sans-serif";
             const tm = ctx.measureText(txt);
-            const padding = 6;
+            const padding = 8;
 
-            // Caja negra de fondo
-            ctx.fillStyle = "rgba(0,0,0,0.85)";
+            // Caja negra de fondo (más opaca)
+            ctx.fillStyle = "rgba(0,0,0,0.95)";
             ctx.beginPath();
-            // Soporte para navegadores antiguos que no tengan roundRect
-            if (ctx.roundRect) ctx.roundRect(midX - tm.width/2 - padding, midY - 12, tm.width + padding*2, 24, 6);
-            else ctx.fillRect(midX - tm.width/2 - padding, midY - 12, tm.width + padding*2, 24);
+            if (ctx.roundRect) ctx.roundRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28, 6);
+            else ctx.fillRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28);
             ctx.fill();
             
-            // Borde amarillo a la caja
-            ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 1; ctx.stroke();
+            // Borde amarillo más grueso
+            ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 2; ctx.stroke();
 
-            // Texto
-            ctx.fillStyle = "#FFD700"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            // Texto blanco con contorno oscuro (mejor legibilidad)
+            ctx.fillStyle = "#FFFFFF"; 
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 3;
+            ctx.textAlign = "center"; 
+            ctx.textBaseline = "middle";
+            
+            // Trazo primero (contorno)
+            ctx.strokeText(txt, midX, midY);
+            // Texto blanco después
             ctx.fillText(txt, midX, midY);
         }
         
