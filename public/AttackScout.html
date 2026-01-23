@@ -2,10 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Attack Scout Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Scout Pro v6.0 (Dual Engine)</title>
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,8 +14,8 @@
             --bg: #0f0f0f; --panel: #1a1a1a; --border: #333;
             --accent: #00e676; --secondary: #2980b9; --text: #ecf0f1; --text-muted: #888;
         }
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+        * { box-sizing: border-box; outline: none; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* HEADER */
         header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #000; border-bottom: 1px solid var(--border); height: 50px; }
@@ -120,7 +118,7 @@
 </div>
 
 <header>
-    <h1>ATTACK<span>SCOUT</span> <span style="font-size:0.6em; color:#888;">PRO v5.3</span></h1>
+    <h1>ATTACK<span>SCOUT</span> <span style="font-size:0.6em; color:#888;">PRO v6.0</span></h1>
     <div class="tabs">
         <div class="tab-btn active" onclick="switchTab('viewProfile', this)">🍕 RADAR COMPARISON</div>
         <div class="tab-btn" onclick="switchTab('viewScatter', this)">📉 SCATTER</div>
@@ -152,15 +150,25 @@
 
         <div class="control-group" style="border:none;">
             <div class="accordion-header" onclick="toggleSliders()">
-                <span>4. PESOS ALGORITMO</span>
+                <span>4. PESOS Y MODO</span>
                 <span id="sliderIcon">▼</span>
             </div>
+            
+            <div style="padding-top: 10px;">
+                <label style="display:block; font-size:0.7rem; color:#888; font-weight:bold; margin-bottom:4px;">MODO ALGORITMO</label>
+                <select id="algoMode" style="margin-bottom:5px;">
+                    <option value="EUCLID">📏 Rendimiento (Distancia)</option>
+                    <option value="COSINE">🎨 Estilo (Similitud Coseno)</option>
+                </select>
+            </div>
+
             <div id="slidersPanel" class="accordion-content">
                 <div style="display:flex; justify-content:flex-end; margin-bottom:5px;">
                     <span style="font-size:0.6rem; cursor:pointer; color:var(--secondary);" onclick="resetWeights()">Resetear</span>
                 </div>
                 <div id="slidersContainer"></div>
             </div>
+
             <button class="btn-main" id="btnSearch" onclick="findSimilars()" disabled>🔍 BUSCAR SIMILARES</button>
         </div>
 
@@ -190,7 +198,7 @@
 
             <div class="analysis-panel">
                 <label style="color:#fff; margin-bottom:10px; display:block; font-size:0.8rem;">
-                    📊 COMPARATIVA DE RENDIMIENTO (vs Escala Fija)
+                    📊 COMPARATIVA DE RENDIMIENTO (Standard Scaler)
                 </label>
                 <div id="statsBarsContainer" class="stat-bars"></div>
             </div>
@@ -212,35 +220,12 @@
 <script>
 // --- CONFIGURACIÓN DE MÉTRICAS ---
 const METRICS = ['xG', 'xBuild', 'xThreat', 'Creacion', 'Ataque', 'Defensa', 'Pases'];
-
-// --- [MAPEO DE EXCEL] CONFIGURACIÓN DE COLUMNAS ---
-// Aquí le decimos al programa cómo se llaman tus columnas en el Excel.
-// Basado en tus archivos: la columna de pases se llama "Pases OK".
-const EXCEL_MAP = {
-    'xG': 'xG',
-    'xBuild': 'xBuild',
-    'xThreat': 'xThreat',
-    'Creacion': 'Creacion',
-    'Ataque': 'Ataque',
-    'Defensa': 'Defensa',
-    'Pases': 'Pases OK'   // <--- CORREGIDO: Busca la columna "Pases OK"
-};
-
 const METRIC_LABELS = {
     'xG': 'Goles Esp.', 'xBuild': 'Construcción', 'xThreat': 'Amenaza (xT)',
     'Creacion': 'Creación', 'Ataque': 'Ataque Dir.', 'Defensa': 'Defensa', 'Pases': 'Pases'
 };
 
-// --- LÍMITES FIJOS (Escalas máximas) ---
-const MAX_LIMITS = { 
-    'xG': 1.2, 
-    'xBuild': 1.5, 
-    'xThreat': 1.0, 
-    'Creacion': 30.0, 
-    'Ataque': 15.0, 
-    'Defensa': 15.0, 
-    'Pases': 60.0 
-};
+// NOTA: Se ha eliminado MAX_LIMITS porque ahora usamos StandardScaler dinámico.
 
 // Variables globales
 let RAW_DB = [], NORMALIZED_DB = [], WEIGHTS = {}, chartInstance = null, scatterInstance = null;
@@ -295,12 +280,7 @@ async function loadDatabase() {
                     const wb = XLSX.read(e.target.result, {type:'array'});
                     const ws = wb.Sheets["Jugadores"] || Object.values(wb.Sheets)[0];
                     if(ws) {
-                        const jsonData = XLSX.utils.sheet_to_json(ws);
-                        
-                        // [DEBUG] Para ver en consola (F12) qué lee realmente
-                        if(jsonData.length > 0) console.log("Columnas detectadas:", Object.keys(jsonData[0]));
-
-                        jsonData.forEach(row => {
+                        XLSX.utils.sheet_to_json(ws).forEach(row => {
                             const name = row["Jugador"];
                             if(!name) return;
                             const team = row["Equipo"] || "Free Agent";
@@ -311,31 +291,9 @@ async function loadDatabase() {
                             const id = `${name}|${team}`;
                             if(!pMap[id]) pMap[id] = { id, name, team, pos, age, matches:0, stats:{} };
                             pMap[id].matches++;
-                            
                             METRICS.forEach(m => {
                                 if(!pMap[id].stats[m]) pMap[id].stats[m] = 0;
-                                
-                                // --- CORRECCIÓN DE PARSEO DE DATOS ---
-                                // 1. Buscamos el nombre de columna definido en EXCEL_MAP
-                                const colName = EXCEL_MAP[m] || m;
-                                let val = row[colName];
-
-                                // 2. Si el valor es texto (ej: "6/13" o "13/14"), lo arreglamos
-                                if (typeof val === 'string') {
-                                    // Si tiene barra, tomamos el primer número (ej: "6/13" -> "6")
-                                    if(val.includes('/')) {
-                                        val = val.split('/')[0];
-                                    }
-                                    // Intentamos convertir a número
-                                    val = parseFloat(val);
-                                }
-
-                                // 3. Si no es un número válido, usamos 0
-                                if (typeof val !== 'number' || isNaN(val)) {
-                                    val = 0;
-                                }
-
-                                pMap[id].stats[m] += val;
+                                pMap[id].stats[m] += (row[m] || 0);
                             });
                         });
                     }
@@ -348,28 +306,49 @@ async function loadDatabase() {
 
     RAW_DB = Object.values(pMap).map(p => {
         const obj = { id:p.id, name:p.name, team:p.team, pos:p.pos, age:p.age };
-        // Calculamos el promedio (aunque sea 1 partido)
         METRICS.forEach(m => obj[m] = p.stats[m] / p.matches);
         return obj;
     });
 
-    normalizeData(); 
+    normalizeData(); // NUEVA NORMALIZACIÓN DINÁMICA
     populateUI();
     document.getElementById('loader').style.display = 'none';
     document.getElementById('targetSelect').disabled = false;
     document.getElementById('btnSearch').disabled = false;
 }
 
-// --- NORMALIZACIÓN ---
+// --- NORMALIZACIÓN STANDARD SCALER (Z-SCORE) ---
 function normalizeData() {
+    console.log("Normalizando con StandardScaler...");
+    const stats = {};
+    
+    // 1. Calcular Media y Desviación Estándar
+    METRICS.forEach(m => {
+        const values = RAW_DB.map(p => p[m] || 0);
+        const sum = values.reduce((a, b) => a + b, 0);
+        const mean = sum / values.length;
+        const variance = values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) / values.length;
+        const stdDev = Math.sqrt(variance);
+        stats[m] = { mean, stdDev };
+    });
+
+    // 2. Aplicar Z-Score y Mapear a 0-1
     NORMALIZED_DB = RAW_DB.map(p => {
-        const n = { ...p, raw: { ...p } }; // Guardar valores originales
+        const n = { ...p, raw: { ...p } }; 
         METRICS.forEach(m => {
             const val = p[m] || 0;
-            const max = MAX_LIMITS[m] || 1; 
-            let norm = val / max;
-            if(norm > 1) norm = 1; 
-            n[m] = norm;
+            const { mean, stdDev } = stats[m];
+            
+            if (stdDev === 0) {
+                n[m] = 0.5; // Si no hay variación, al centro.
+            } else {
+                const zScore = (val - mean) / stdDev;
+                // Ajuste visual: Consideramos +-2.5 desviaciones como los extremos (0% y 100%)
+                let norm = (zScore + 2.5) / 5.0; 
+                if(norm > 1) norm = 1;
+                if(norm < 0) norm = 0;
+                n[m] = norm;
+            }
         });
         return n;
     });
@@ -406,6 +385,9 @@ function findSimilars() {
     const targetId = document.getElementById('targetSelect').value;
     if(!targetId) return;
     
+    // Leer el modo seleccionado
+    const mode = document.getElementById('algoMode').value;
+    
     currentTarget = NORMALIZED_DB.find(p => p.id === targetId);
     
     // Filtros
@@ -421,21 +403,56 @@ function findSimilars() {
     });
 
     const results = pool.map(other => {
-        let sumSq = 0, sumW = 0;
-        METRICS.forEach(m => {
-            const diff = currentTarget[m] - other[m];
-            sumSq += (diff*diff) * WEIGHTS[m];
-            sumW += WEIGHTS[m];
-        });
-        const dist = sumW > 0 ? Math.sqrt(sumSq/sumW) : 1;
-        // Escala de similitud ajustada
-        const sim = Math.max(0, 100 - (dist*100*1.5));
-        return { ...other, similarity: sim };
+        let similarity = 0;
+
+        // --- MODO: RENDIMIENTO (Euclidiana) ---
+        if (mode === 'EUCLID') {
+            let sumSq = 0, sumW = 0;
+            METRICS.forEach(m => {
+                const w = WEIGHTS[m] || 0.5;
+                const diff = currentTarget[m] - other[m];
+                sumSq += (diff*diff) * w;
+                sumW += w;
+            });
+            const dist = sumW > 0 ? Math.sqrt(sumSq/sumW) : 1;
+            similarity = Math.max(0, 100 - (dist*100*1.5)); 
+        } 
+        
+        // --- MODO: ESTILO (Similitud Coseno) ---
+        else if (mode === 'COSINE') {
+            const vecA = [];
+            const vecB = [];
+            
+            METRICS.forEach(m => {
+                const w = Math.sqrt(WEIGHTS[m] || 0.5); 
+                vecA.push(currentTarget[m] * w);
+                vecB.push(other[m] * w);
+            });
+
+            const cosSim = calculateCosineSimilarity(vecA, vecB);
+            similarity = cosSim * 100; // Convertir a 0-100
+        }
+
+        return { ...other, similarity: similarity };
     });
 
     results.sort((a,b) => b.similarity - a.similarity);
     renderResults(results.slice(0, 15));
     updateProfile(currentTarget, null); 
+}
+
+// Función auxiliar matemática para Coseno
+function calculateCosineSimilarity(vecA, vecB) {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 function renderResults(list) {
@@ -458,7 +475,7 @@ function renderResults(list) {
     });
 }
 
-// --- GRÁFICOS ---
+// --- GRÁFICO RADAR ---
 function updateProfile(target, comparison) {
     currentComparison = comparison;
     
@@ -516,13 +533,13 @@ function updateProfile(target, comparison) {
         }
     });
 
-    // 2. BARRAS (con valores originales RAW)
+    // 2. BARRAS (Ahora muestran % respecto a tu límite fijo)
     const container = document.getElementById('statsBarsContainer');
     container.innerHTML = '';
 
     METRICS.forEach(m => {
-        const tVal = target.raw[m]; // Valor real
-        const tPct = (target[m] * 100).toFixed(0); // Porcentaje normalizado
+        const tVal = target.raw[m];
+        const tPct = (target[m] * 100).toFixed(0); // Porcentaje directo del valor normalizado
         
         let compMarker = '';
         if(comparison) {

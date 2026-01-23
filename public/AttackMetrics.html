@@ -570,10 +570,23 @@
                 <button class="close" onclick="closeModal('modalSankey')">✕</button>
             </div>
         </div>
-        <div style="display:flex; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; justify-content:center; align-items:center;">
+        <div style="display:flex; gap:10px; background:#222; padding:10px; border-radius:6px; margin-bottom:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
             <button class="t-opt active-home" id="btnSankeyHome" onclick="updateSankey('HOME')" style="padding:5px 15px;">LOCAL</button>
             <button class="t-opt" id="btnSankeyAway" onclick="updateSankey('AWAY')" style="padding:5px 15px;">RIVAL</button>
-            <span style="color:#aaa; font-size:0.7rem; margin-left:10px;">Muestra: Zona Inicio Posesión ➔ Zona Fin Posesión</span>
+            <div style="width:1px; height:25px; background:#444; margin:0 5px;"></div>
+            <label style="color:#aaa; font-size:0.75rem; display:flex; align-items:center; gap:5px;">
+                <span>Filtrar Zonas:</span>
+                <select id="sankeyZoneFilter" onchange="updateSankey(document.getElementById('btnSankeyHome').classList.contains('active-home')?'HOME':'AWAY')" style="background:#111; color:#f39c12; border:1px solid #555; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.75rem;">
+                    <option value="ALL">Todas (1-4)</option>
+                    <option value="1">Zona 1: Salida</option>
+                    <option value="2">Zona 2: Progresión</option>
+                    <option value="3">Zona 3: Creación</option>
+                    <option value="4">Zona 4: Finalización</option>
+                    <option value="1-2">Zonas 1-2 (Defensa/Progresión)</option>
+                    <option value="3-4">Zonas 3-4 (Creación/Finalización)</option>
+                </select>
+            </label>
+            <span style="color:#aaa; font-size:0.65rem; margin-left:10px;">Ver red de pases en zonas específicas</span>
         </div>
         <div id="sankeyChartContainer" style="flex:1; width:100%; background:#fff; border-radius:6px; overflow:hidden;"></div>
     </div>
@@ -586,6 +599,7 @@
                 <button class="btn-tool" style="background:#27ae60;" onclick="downloadFlowImg()">📷 IMG</button>
                 <button class="btn-tool" style="background:#1abc9c;" onclick="downloadPossessionData()">💾 DATOS POS.</button>
                 <button class="close" onclick="closeModal('modalFlowViz')">✕</button>
+                <button class="btn-tool" style="background:#8e44ad; font-size:0.8rem; margin-left:10px;" onclick="toggleFlowHeatmap()">🔥 MAPA GLOBAL</button>
             </div>
         </div>
         
@@ -2232,16 +2246,6 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         return Math.sqrt((dxMeters * dxMeters) + (dyMeters * dyMeters));
     };
 
-    // --- FUNCIÓN PARA CONTAR PASES ENTRE DOS JUGADORES ---
-    const countPassesBetween = (p1, p2) => {
-        if (!actions || actions.length === 0) return 0;
-        return actions.filter(a => {
-            const isSamePair = (a.player === p1.name && a.endX !== null) ||
-                             (a.player === p2.name && a.endX !== null);
-            return isSamePair;
-        }).length;
-    };
-
     // --- 1. DIBUJO DE LÍNEAS AUTOMÁTICAS (VECINOS) ---
     // (Esto dibuja las líneas azules/rojas tenues de fondo)
     teams.forEach(team => {
@@ -2249,13 +2253,6 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
         const res = computeLineBands(team.points, lineCount);
         
         ctx.save();
-        
-        // Configuración para máxima nitidez
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        
         // Líneas verticales de referencia (opcional)
         if (res && res.centroids.length >= 2) {
             res.centroids.forEach((c) => {
@@ -2287,55 +2284,23 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             const px2 = (p2.x / 100) * w; const py2 = (p2.y / 100) * h;
             const isHovered = lineHoverState.player === p1 && lineHoverState.team === team.key;
             const hasMinDist = idx1 === minDistPlayerIdx;
-            
-            // CONTAR PASES ENTRE JUGADORES para determinar grosor
-            const passesBetween = countPassesBetween(p1, p2);
-            const baseWidth = 2;
-            const passWidth = Math.min(passesBetween * 0.5, 6); // Máximo 6px de grosor
 
-            let lineAlpha = 0.4, lineWidth = baseWidth + passWidth, lineColor = team.color;
-            if (isHovered) { lineAlpha = 1; lineWidth = Math.max(baseWidth + passWidth, 5); lineColor = team.colorGlow; }
-            else if (hasMinDist) { lineAlpha = 0.8; lineWidth = Math.max(baseWidth + passWidth, 4); }
+            let lineAlpha = 0.4, lineWidth = 2, lineColor = team.color;
+            if (isHovered) { lineAlpha = 1; lineWidth = 4; lineColor = team.colorGlow; }
+            else if (hasMinDist) { lineAlpha = 0.8; lineWidth = 3; }
 
-            // Dibujar línea con sombra para mejor contraste
-            ctx.globalAlpha = Math.min(lineAlpha, 0.3);
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = lineWidth + 2;
-            ctx.beginPath(); 
-            ctx.moveTo(px1, py1); 
-            ctx.lineTo(px2, py2); 
-            ctx.stroke();
-            
-            // Línea principal
-            ctx.globalAlpha = lineAlpha;
-            ctx.strokeStyle = lineColor;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath(); 
-            ctx.moveTo(px1, py1); 
-            ctx.lineTo(px2, py2); 
-            ctx.stroke();
-            ctx.globalAlpha = 1;
+            ctx.strokeStyle = lineColor; ctx.globalAlpha = lineAlpha; ctx.lineWidth = lineWidth;
+            ctx.beginPath(); ctx.moveTo(px1, py1); ctx.lineTo(px2, py2); ctx.stroke(); ctx.globalAlpha = 1;
 
             // Etiqueta pequeña automática
             const midX = (px1 + px2) / 2; const midY = (py1 + py2) / 2;
             const labelText = `${closest.distMeters.toFixed(1)}m`;
-            ctx.font = `900 ${hasMinDist?12:11}px sans-serif`;
+            ctx.font = `bold ${hasMinDist?12:10}px sans-serif`;
             const metrics = ctx.measureText(labelText);
-            
-            // Fondo con mejor contraste
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-            ctx.shadowBlur = 2;
-            ctx.fillRect(midX - metrics.width/2 - 3, midY - 9, metrics.width + 6, 18);
-            
-            // Texto legible
-            ctx.fillStyle = '#FFFFFF';
-            ctx.textAlign = 'center'; 
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 2;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(midX - metrics.width/2 - 2, midY - 8, metrics.width + 4, 16);
+            ctx.fillStyle = '#ccc'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(labelText, midX, midY);
-            ctx.shadowColor = 'transparent';
         });
 
         // Dibujar Círculos de Jugadores
@@ -2349,11 +2314,8 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             ctx.stroke();
             
             ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; 
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-            ctx.shadowBlur = 2;
             ctx.strokeText(player.name.substr(0, 3).toUpperCase(), px, py - 12);
             ctx.fillText(player.name.substr(0, 3).toUpperCase(), px, py - 12);
-            ctx.shadowColor = 'transparent';
         });
         ctx.restore();
     });
@@ -2363,12 +2325,6 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
     // ============================================================
     if (measurePath.length > 1) {
         ctx.save();
-        
-        // Configuración para máxima nitidez
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
         
         // Función auxiliar para obtener posición en pantalla
         const getScreenPos = (rawP) => {
@@ -2389,65 +2345,33 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
             // CÁLCULO DE DISTANCIA
             const dist = calcDistReal({x: s1.pctX, y: s1.pctY}, {x: s2.pctX, y: s2.pctY});
 
-            // LÍNEA SÓLIDA AMARILLA (Más nítida, sin punteado)
-            ctx.strokeStyle = "#FFD700";
-            ctx.lineWidth = 5;
-            ctx.globalAlpha = 0.95;
-            ctx.beginPath(); 
-            ctx.moveTo(s1.x, s1.y); 
-            ctx.lineTo(s2.x, s2.y); 
-            ctx.stroke();
-            
-            // Sombra suave para contraste
-            ctx.globalAlpha = 0.3;
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = 7;
-            ctx.beginPath();
-            ctx.moveTo(s1.x, s1.y);
-            ctx.lineTo(s2.x, s2.y);
-            ctx.stroke();
-            ctx.globalAlpha = 1;
+            // LÍNEA AMARILLA (Muy visible)
+            ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 4; ctx.setLineDash([8, 4]);
+            ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke(); ctx.setLineDash([]);
 
             // ETIQUETA DE DISTANCIA (Grande y con fondo)
             const midX = (s1.x + s2.x) / 2;
             const midY = (s1.y + s2.y) / 2;
             const txt = dist.toFixed(1) + "m";
             
-            ctx.font = "900 16px sans-serif";
+            ctx.font = "900 14px sans-serif";
             const tm = ctx.measureText(txt);
-            const padding = 8;
+            const padding = 6;
 
-            // Caja negra de fondo (más opaca)
-            ctx.fillStyle = "rgba(0,0,0,0.92)";
-            ctx.shadowColor = "rgba(0,0,0,0.5)";
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 2;
-            
+            // Caja negra de fondo
+            ctx.fillStyle = "rgba(0,0,0,0.85)";
             ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28, 6);
-            } else {
-                ctx.fillRect(midX - tm.width/2 - padding, midY - 14, tm.width + padding*2, 28);
-            }
+            // Soporte para navegadores antiguos que no tengan roundRect
+            if (ctx.roundRect) ctx.roundRect(midX - tm.width/2 - padding, midY - 12, tm.width + padding*2, 24, 6);
+            else ctx.fillRect(midX - tm.width/2 - padding, midY - 12, tm.width + padding*2, 24);
             ctx.fill();
             
-            // Borde amarillo brillante a la caja
-            ctx.strokeStyle = "#FFED4E";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            // Borde amarillo a la caja
+            ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 1; ctx.stroke();
 
-            // Texto blanco puro (más legible)
-            ctx.shadowColor = "rgba(0,0,0,0.8)";
-            ctx.shadowBlur = 3;
-            ctx.fillStyle = "#FFFFFF";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            // Texto
+            ctx.fillStyle = "#FFD700"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.fillText(txt, midX, midY);
-            
-            // Reset shadow
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
         }
         
         ctx.restore();
@@ -2680,12 +2604,23 @@ function getPolygonArea(points) {
 
 function arrow(ctx, x1, y1, x2, y2) {
     const head = 10, ang = Math.atan2(y2-y1, x2-x1);
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x2, y2);
-    ctx.lineTo(x2-head*Math.cos(ang-Math.PI/7), y2-head*Math.sin(ang-Math.PI/7));
-    ctx.lineTo(x2-head*Math.cos(ang+Math.PI/7), y2-head*Math.sin(ang+Math.PI/7));
-    ctx.lineTo(x2, y2); ctx.fill();
+    
+    // Línea principal - más robusta para tablets
+    ctx.beginPath(); 
+    ctx.moveTo(x1, y1); 
+    ctx.lineTo(x2, y2); 
+    ctx.stroke();
+    
+    // Cabeza de flecha mejorada - más compatible con tablets
+    ctx.beginPath(); 
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - head * Math.cos(ang - Math.PI / 7), y2 - head * Math.sin(ang - Math.PI / 7));
+    ctx.lineTo(x2 - head * Math.cos(ang + Math.PI / 7), y2 - head * Math.sin(ang + Math.PI / 7));
+    ctx.closePath(); // Cierra explícitamente el triángulo
+    ctx.fill();
+    ctx.stroke(); // Trazo del contorno también
 }
+
 
 function editTeamNames() {
     let h = prompt("Nombre LOCAL:", DB.config.homeName); if(h) DB.config.homeName = h;
@@ -3072,12 +3007,15 @@ function autoManagePossession(team, type, res) {
 
 // --- FUNCIÓN SAVE ACTUALIZADA (Mantiene toda tu lógica anterior) ---
 function save(res) {
+    // 1. CORRECCIÓN IMPORTANTE: Capturamos el nombre ANTES de que autoManagePossession lo reinicie
+    // Si no hacemos esto aquí, al cambiar la posesión se leería "Jugador 1" o "UNK"
+    const pName = document.getElementById('selPlayer').value;
+
     // [NUEVO] GESTIÓN AUTOMÁTICA DEL CRONÓMETRO
-    // Se ejecuta al principio para leer STATE.subShot antes de que se borre
+    // Se ejecuta al principio para leer STATE.subShot antes de que se borre, y gestionar la posesión
     autoManagePossession(STATE.team, STATE.type, res);
 
-    // [PRESERVADO] Obtención de datos del DOM
-    const pName = document.getElementById('selPlayer').value;
+    // [PRESERVADO] Obtención de datos del DOM (El resto de variables se leen igual)
     const xg = parseFloat(document.getElementById('ixG').value) || 0;
     const xgot = parseFloat(document.getElementById('ixGOT').value) || 0;
     const currentPhase = document.getElementById('gamePhase') ? document.getElementById('gamePhase').value : ''; 
@@ -3127,7 +3065,7 @@ function save(res) {
         min: timeStamp,
         period: STATE.isSecondHalf ? '2T' : '1T',
         team: STATE.team, 
-        player: pName, 
+        player: pName, // Aquí usa la variable capturada al principio (CORRECTO)
         type: STATE.type, 
         res: res,
         phase: currentPhase,
@@ -4510,6 +4448,21 @@ function updateSankey(team) {
     document.getElementById('btnSankeyHome').className = team==='HOME'?'t-opt active-home':'t-opt';
     document.getElementById('btnSankeyAway').className = team==='AWAY'?'t-opt active-away':'t-opt';
 
+    // Obtener el filtro de zonas seleccionado
+    const zoneFilterEl = document.getElementById('sankeyZoneFilter');
+    const zoneFilter = zoneFilterEl ? zoneFilterEl.value : 'ALL';
+    
+    // Mapear el filtro a rangos de zonas
+    let allowedZones = ['Salida', 'Progresion', 'Creacion', 'Finalizacion'];
+    if (zoneFilter !== 'ALL') {
+        if (zoneFilter === '1') allowedZones = ['Salida'];
+        else if (zoneFilter === '2') allowedZones = ['Progresion'];
+        else if (zoneFilter === '3') allowedZones = ['Creacion'];
+        else if (zoneFilter === '4') allowedZones = ['Finalizacion'];
+        else if (zoneFilter === '1-2') allowedZones = ['Salida', 'Progresion'];
+        else if (zoneFilter === '3-4') allowedZones = ['Creacion', 'Finalizacion'];
+    }
+
     const possessions = []; 
     let currentPossession = null;
     const sortedActions = [...DB.actions].sort((a,b) => a.id - b.id);
@@ -4550,22 +4503,51 @@ function updateSankey(team) {
     
     if(currentPossession) possessions.push(currentPossession);
 
+    // FILTRAR POSESIONES POR ZONA
+    const filteredPossessions = possessions.filter(p => 
+        allowedZones.includes(p.start) && allowedZones.includes(p.end)
+    );
+
     // Definimos los nodos de Origen (Recup) y Destino (Fin)
-    const nodes = [
+    const allNodes = [
         "Recup: Salida (1)", "Recup: Progresión (2)", "Recup: Creación (3)", "Recup: Finalización (4)", 
         "Fin: Salida (1)", "Fin: Progresión (2)", "Fin: Creación (3)", "Fin: Finalización (4)"
     ];
     
-    const nodeMap = { 
-        "Salida": 0, "Progresion": 1, "Creacion": 2, "Finalizacion": 3, 
-        "Fin: Salida": 4, "Fin: Progresion": 5, "Fin: Creacion": 6, "Fin: Finalizacion": 7 
-    };
+    // Crear nodos filtr según las zonas permitidas
+    let nodes = [];
+    let nodeMap = {};
+    let nodeIndex = 0;
+    
+    // Agregar nodos de origen (Recup)
+    const zoneNames = ['Salida', 'Progresion', 'Creacion', 'Finalizacion'];
+    const displayNames = ['Salida (1)', 'Progresión (2)', 'Creación (3)', 'Finalización (4)'];
+    
+    const startNodeIndex = {};
+    const endNodeIndex = {};
+    
+    for (let i = 0; i < zoneNames.length; i++) {
+        if (allowedZones.includes(zoneNames[i])) {
+            startNodeIndex[zoneNames[i]] = nodeIndex;
+            nodes.push("Inicio: " + displayNames[i]);
+            nodeIndex++;
+        }
+    }
+    
+    // Agregar nodos de destino (Fin)
+    for (let i = 0; i < zoneNames.length; i++) {
+        if (allowedZones.includes(zoneNames[i])) {
+            endNodeIndex[zoneNames[i]] = nodeIndex;
+            nodes.push("Fin: " + displayNames[i]);
+            nodeIndex++;
+        }
+    }
 
+    // Construir links solo con zonas filtradas
     const linksDict = {};
-    possessions.forEach(p => {
-        const srcIdx = nodeMap[p.start]; 
-        const tgtStr = "Fin: " + p.end; 
-        const tgtIdx = nodeMap[tgtStr];
+    filteredPossessions.forEach(p => {
+        const srcIdx = startNodeIndex[p.start]; 
+        const tgtIdx = endNodeIndex[p.end];
 
         if (srcIdx !== undefined && tgtIdx !== undefined) {
             const key = srcIdx + "-" + tgtIdx; 
@@ -4583,7 +4565,14 @@ function updateSankey(team) {
     const color = team === 'HOME' ? "rgba(52, 152, 219, 0.8)" : "rgba(231, 76, 60, 0.8)";
     const gray = "#95a5a6"; // Gris para las recuperaciones
     
-    const nodeColors = [gray, gray, gray, gray, color, color, color, color];
+    // Crear colores para nodos filtr
+    let nodeColors = [];
+    for (let i = 0; i < nodes.length / 2; i++) {
+        nodeColors.push(gray); // Nodos de inicio en gris
+    }
+    for (let i = 0; i < nodes.length / 2; i++) {
+        nodeColors.push(color); // Nodos de fin en color del equipo
+    }
 
     const data = {
         type: "sankey", orientation: "h",
@@ -4603,7 +4592,11 @@ function updateSankey(team) {
         font: { size: 12, color: "black" }, 
         paper_bgcolor: "#fff", 
         plot_bgcolor: "#fff", 
-        margin: { t: 30, l: 10, r: 10, b: 10 } 
+        margin: { t: 30, l: 10, r: 10, b: 10 },
+        title: { 
+            text: zoneFilter === 'ALL' ? 'Red de Pases: Todas las Zonas' : `Red de Pases: ${document.querySelector('#sankeyZoneFilter option:checked').text}`,
+            font: { size: 16, color: "black" }
+        }
     };
     
     Plotly.newPlot('sankeyChartContainer', [data], layout, {responsive: true, displayModeBar: false});
@@ -4756,7 +4749,8 @@ function downloadViolinImg() {
 // ==========================================
 // VISOR DE POSESIONES (FLOW VIZ)
 // ==========================================
-let flowVizDB = { team: 'HOME', allPossessions: [], currentIndex: 0 };
+// Añadimos 'viewMode' para saber si estamos en vista individual o mapa de calor
+let flowVizDB = { team: 'HOME', allPossessions: [], currentIndex: 0, viewMode: 'SEQ' };
 
 function openFlowVizModal() {
     document.getElementById('modalFlowViz').style.display = 'flex';
@@ -4792,25 +4786,48 @@ function setFlowTeam(team) {
 function calculatePossessions() {
     flowVizDB.allPossessions = [];
     let currentPossession = [];
-    // Ordenar por ID para asegurar cronologia
+    
+    // 1. Ordenar cronológicamente para asegurar la secuencia real
     const sortedActions = [...DB.actions].sort((a, b) => a.id - b.id);
     
     sortedActions.forEach(a => {
-        if (a.x < 0) return; // Ignorar acciones sin coordenadas
+        // Ignorar acciones sin coordenadas o fuera de campo
+        if (a.x < 0) return; 
 
+        // LÓGICA DE CORTE ESTRICTO
         if (a.team === flowVizDB.team) {
-            // Acción de MI equipo: añadir a la posesión actual
+            // Es mi equipo, añado la acción
             currentPossession.push(a);
+
+            // --- EL CAMBIO CLAVE ESTÁ AQUÍ ---
+            // Si la acción es explícitamente negativa, CERRAMOS LA POSESIÓN AQUÍ.
+            const isLoss = a.type === 'Perdida';
+            const isFail = a.res === 'Fallado' || a.res === 'Fuera' || a.res === 'Bloqueado'; // Incluimos tiros bloqueados/fuera
+            
+            // Excepción: No cortamos si es un "Duelo" fallado, porque a veces el duelo sigue vivo.
+            // Pero sí cortamos Pases, Regates, Tiros o Pérdidas directas.
+            const isDuel = a.type.includes('Duelo');
+
+            if (isLoss || (isFail && !isDuel)) {
+                flowVizDB.allPossessions.push(currentPossession);
+                currentPossession = []; // Reiniciamos el saco
+            }
+
         } else {
-            // Acción del RIVAL: Corta la posesión anterior si existe
+            // Es el RIVAL:
+            // Si teníamos una posesión abierta (que no se cortó por fallo), la cerramos ahora.
             if (currentPossession.length > 0) {
                 flowVizDB.allPossessions.push(currentPossession);
             }
-            currentPossession = [];
+            currentPossession = []; // Reiniciamos el saco
         }
     });
-    // Añadir la última si quedó pendiente
+
+    // Guardar la última si quedó pendiente
     if (currentPossession.length > 0) flowVizDB.allPossessions.push(currentPossession);
+
+    // Guardar copia de seguridad para los filtros
+    flowVizDB.rawPossessions = [...flowVizDB.allPossessions];
 }
 
 function navigatePossession(delta) {
@@ -4864,106 +4881,83 @@ function drawFlowViz(index) {
     cv.height = cv.parentElement.clientHeight;
     const w = cv.width, h = cv.height;
 
-    // --- 1. CONFIGURACIÓN GEOMÉTRICA DEL CAMPO ---
-    // Definimos márgenes y dimensiones relativas al canvas
-    const marginX = w * 0.05;
-    const marginY = h * 0.05;
-    const fieldW = w * 0.9;
-    const fieldH = h * 0.9;
-    
-    // Coordenadas clave
-    const xLeft = marginX;
-    const xRight = marginX + fieldW;
-    const yTop = marginY;
-    const yBottom = marginY + fieldH;
-    const xCenter = marginX + fieldW / 2;
-    const yCenter = marginY + fieldH / 2;
-
-    // Proporciones estándar (aprox)
-    const boxH = fieldH * 0.6;       // Altura Área Grande
-    const boxW = fieldW * 0.18;      // Anchura Área Grande (aumentado de 0.16 a 0.18)
-    const smBoxH = fieldH * 0.30;    // Altura Área Pequeña (aumentado de 0.25 a 0.30)
-    const smBoxW = fieldW * 0.08;    // Anchura Área Pequeña (aumentado de 0.06 a 0.08)
-    const penSpotDist = fieldW * 0.11; // Distancia punto penalti (11m aprox)
-    const centerRad = fieldH * 0.15; // Radio círculo central
-    const goalH = fieldH * 0.12;     // Tamaño portería
-
-    // --- DIBUJO DEL CAMPO ---
-    
-    // 1.1 Fondo
-    ctx.fillStyle = "#204a2e"; 
-    ctx.fillRect(0, 0, w, h); 
-    
-    // Estilo de líneas
-    ctx.strokeStyle = "rgba(255,255,255,0.7)"; 
+    // =========================================
+    // --- 1. FONDO CAMPO (GEOMETRÍA EXACTA) ---
+    // =========================================
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h); 
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; 
     ctx.lineWidth = 2;
-    ctx.lineCap = "round";
 
-    // 1.2 Contorno y Línea Media
-    ctx.beginPath();
-    ctx.rect(xLeft, yTop, fieldW, fieldH); // Perímetro
-    ctx.moveTo(xCenter, yTop);             // Línea media
-    ctx.lineTo(xCenter, yBottom);
-    ctx.stroke();
+    // Definir márgenes y dimensiones relativas
+    const mX = w * 0.05; // Margen X
+    const mY = h * 0.05; // Margen Y
+    const pW = w * 0.9;  // Ancho campo útil
+    const pH = h * 0.9;  // Alto campo útil
+    const centerY = h / 2;
 
-    // 1.3 Círculo Central
-    ctx.beginPath();
-    ctx.arc(xCenter, yCenter, centerRad, 0, Math.PI * 2);
-    ctx.stroke();
-    // Punto central
-    ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.arc(xCenter, yCenter, 2, 0, Math.PI*2); ctx.fill();
+    // 1. Contorno exterior
+    ctx.strokeRect(mX, mY, pW, pH);
 
-    // --- ÁREA IZQUIERDA (LOCAL por defecto en gráfico) ---
+    // 2. Línea central
+    ctx.beginPath(); ctx.moveTo(w/2, mY); ctx.lineTo(w/2, h - mY); ctx.stroke();
+
+    // 3. Círculo y punto central
+    ctx.beginPath(); ctx.arc(w/2, centerY, h*0.1, 0, Math.PI*2); ctx.stroke(); 
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath(); ctx.arc(w/2, centerY, 4, 0, Math.PI*2); ctx.fill(); 
+
+    // Dimensiones Áreas
+    const penBoxW = w * 0.15; const penBoxH = h * 0.56; const penBoxY = (h - penBoxH) / 2;
+    const goalBoxW = w * 0.05; const goalBoxH = h * 0.25; const goalBoxY = (h - goalBoxH) / 2;
+
+    // 4. Dibujar Áreas Rectangulares
+    ctx.strokeRect(mX, penBoxY, penBoxW, penBoxH);
+    ctx.strokeRect(w - mX - penBoxW, penBoxY, penBoxW, penBoxH);
+    ctx.strokeRect(mX, goalBoxY, goalBoxW, goalBoxH);
+    ctx.strokeRect(w - mX - goalBoxW, goalBoxY, goalBoxW, goalBoxH);
+
+    // 5. Puntos de Penalti
+    const penSpotDist = mX + (w * 0.11); 
+    const penSpotL_X = penSpotDist;
+    const penSpotR_X = w - penSpotDist;
     
-    // Área Grande
-    const yBoxTop = yCenter - boxH / 2;
-    ctx.strokeRect(xLeft, yBoxTop, boxW, boxH);
+    ctx.beginPath(); ctx.arc(penSpotL_X, centerY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(penSpotR_X, centerY, 3, 0, Math.PI*2); ctx.fill();
 
-    // Área Pequeña
-    const ySmBoxTop = yCenter - smBoxH / 2;
-    ctx.strokeRect(xLeft, ySmBoxTop, smBoxW, smBoxH);
+    // 6. Semicírculos del Área
+    const arcRad = h * 0.1; 
+    const distToBoxEdge = (mX + penBoxW) - penSpotL_X;
 
-    // Portería Izquierda (Fuera del campo)
-    ctx.strokeRect(xLeft - 4, yCenter - goalH / 2, 4, goalH);
+    if (arcRad > distToBoxEdge) {
+        const angleOffset = Math.acos(distToBoxEdge / arcRad);
+        ctx.beginPath(); ctx.arc(penSpotL_X, centerY, arcRad, -angleOffset, angleOffset); ctx.stroke();
+        ctx.beginPath(); ctx.arc(penSpotR_X, centerY, arcRad, Math.PI - angleOffset, Math.PI + angleOffset); ctx.stroke();
+    }
 
-    // Punto de Penalti Izquierdo
-    const xPenLeft = xLeft + penSpotDist;
-    ctx.beginPath(); ctx.arc(xPenLeft, yCenter, 2, 0, Math.PI*2); ctx.fill();
-
-    // Arco del Área (Medialuna) Izquierda
-    // Dibujamos un arco desde el punto de penalti, pero solo la parte fuera del área
-    ctx.beginPath();
-    ctx.arc(xPenLeft, yCenter, centerRad, -0.92, 0.92); // Ángulos ajustados para "D"
-    ctx.stroke();
-
-
-    // --- ÁREA DERECHA (VISITANTE por defecto en gráfico) ---
-
-    // Área Grande
-    ctx.strokeRect(xRight - boxW, yBoxTop, boxW, boxH);
-
-    // Área Pequeña
-    ctx.strokeRect(xRight - smBoxW, ySmBoxTop, smBoxW, smBoxH);
-
-    // Portería Derecha (Fuera del campo)
-    ctx.strokeRect(xRight, yCenter - goalH / 2, 4, goalH);
-
-    // Punto de Penalti Derecho
-    const xPenRight = xRight - penSpotDist;
-    ctx.beginPath(); ctx.arc(xPenRight, yCenter, 2, 0, Math.PI*2); ctx.fill();
-
-    // Arco del Área (Medialuna) Derecha
-    ctx.beginPath();
-    ctx.arc(xPenRight, yCenter, centerRad, Math.PI - 0.92, Math.PI + 0.92);
-    ctx.stroke();
-
+    // 7. Porterías
+    const goalH = h * 0.12;
+    ctx.strokeRect(mX - 4, centerY - goalH/2, 4, goalH); 
+    ctx.strokeRect(w - mX, centerY - goalH/2, 4, goalH); 
 
     // ============================================================
-    // 2. LÓGICA DE VISUALIZACIÓN DE SECUENCIAS
+    // 2. LÓGICA DE VISUALIZACIÓN Y SEMÁFORO
     // ============================================================
     const possession = flowVizDB.allPossessions[index] || [];
+    const count = possession.length;
+
+    // --- LÓGICA DE SEMÁFORO ESTRICTA ---
+    let warningColor = "#27ae60"; // Verde (>= 4)
+    let warningStatus = "OK"; 
+
+    if (count <= 2) { // 1 y 2 acciones -> Rojo
+        warningColor = "#c0392b"; 
+        warningStatus = "PÉRDIDA";
+    } else if (count === 3) { // 3 acciones -> Amarillo
+        warningColor = "#f1c40f"; 
+        warningStatus = "CORTA";
+    }
     
+    // Detección de Fase
     let phaseLabel = "";
     let phaseColor = "transparent";
     
@@ -4979,19 +4973,26 @@ function drawFlowViz(index) {
         else if(p === 'Bloque_Medio') { phaseLabel = "BLOQUE"; phaseColor = "#7f8c8d"; }
     }
 
-    const displayTitle = `Pos #${index + 1} (${possession.length} acciones)`;
+    const displayTitle = `Pos #${index + 1} (${count} acciones)`;
+    // Punto del semáforo en el título
+    const trafficLightHtml = `<span style="color:${warningColor}; font-size:1.5rem; line-height:0; margin-left:5px; text-shadow:0 0 5px ${warningColor}">●</span>`;
+    
     let badgeHtml = phaseLabel ? `<span style="font-size:0.6rem; font-weight:900; color:#000; background:${phaseColor}; padding:1px 5px; border-radius:3px; margin-top:2px; box-shadow:0 0 5px ${phaseColor}">${phaseLabel}</span>` : '';
 
     const titleEl = document.getElementById('possessionDisplay');
     if (titleEl) {
         titleEl.innerHTML = `
             <div style="display:flex; flex-direction:column; align-items:center; line-height:1.1;">
-                <span style="font-size:0.8rem; color:#fff;">${displayTitle}</span>
+                <div style="display:flex; align-items:center;">
+                    <span style="font-size:0.8rem; color:#fff;">${displayTitle}</span>
+                    ${trafficLightHtml}
+                </div>
                 ${badgeHtml}
             </div>
         `;
     }
 
+    // Tabla de Logs
     const logBody = document.getElementById('flowLogBody');
     if (logBody) {
         logBody.innerHTML = possession.map((a, i) => {
@@ -5030,9 +5031,47 @@ function drawFlowViz(index) {
         arrow(ctx, w*0.6, h*0.03, w*0.4, h*0.03); 
         ctx.fillText("◄ ATAQUE", w*0.5, h*0.07); 
     }
+
+    // --- CAJA DE INFORMACIÓN CON SEMÁFORO INTEGRADO (CORREGIDO) ---
+    if (possession.length > 0) {
+        const first = possession[0];
+        const last = possession[possession.length - 1];
+        
+        const startZone = getSimpleZone(first, flowVizDB.team);
+        const endZone = getSimpleZone({x: last.endX || last.x, y: last.endY || last.y}, flowVizDB.team);
+
+        // Fondo caja (AUMENTADO ANCHO A 180)
+        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+        ctx.fillRect(10, 10, 180, 40);
+        
+        // Borde caja (AUMENTADO ANCHO A 180)
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, 10, 180, 40);
+
+        // --- BARRA LATERAL DE COLOR (SEMÁFORO) ---
+        ctx.fillStyle = warningColor;
+        ctx.fillRect(10, 10, 6, 40); 
+
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "left";
+        
+        // Textos Inicio / Fin
+        ctx.fillStyle = "#2ecc71"; // Verde para inicio
+        ctx.fillText("INICIO: " + startZone.replace("Zona ", "Z"), 22, 25);
+        
+        ctx.fillStyle = "#e74c3c"; // Rojo para fin
+        ctx.fillText("FIN:    " + endZone.replace("Zona ", "Z"), 22, 40);
+
+        // Texto de Estado (AJUSTADO A LA DERECHA)
+        ctx.textAlign = "right";
+        ctx.fillStyle = warningColor;
+        // Posición X=185 para que quede dentro de la caja de 190px de ancho total
+        ctx.fillText(warningStatus, 185, 25); 
+    }
     ctx.restore();
 
-    // Dibujar cada acción
+    // Dibujar cada acción (Flechas y Círculos)
     possession.forEach((a, i) => {
         const sx = (a.x/100)*w, sy = (a.y/100)*h;
         let color = ACTION_COLORS[a.type] || teamColor;
@@ -5061,7 +5100,6 @@ function drawFlowViz(index) {
     });
     ctx.globalAlpha = 1;
 }
-
 function downloadFlowImg() { downloadElementImage('modalFlowViz', 'Flujo_Posesiones'); }
 
 // ==========================================
@@ -5528,7 +5566,128 @@ function calculateLiverpoolMetrics() {
 
     return Object.values(stats);
 }
+// Asegúrate de que esta función existe en tu código:
+function getSimpleZone(action, team) {
+    if (action.x < 0) return 'DEFENSIVA';
+    const x = action.x;
+    if (team === 'HOME') {
+        if (x < 25) return "Zona 1: Salida";
+        if (x < 50) return "Zona 2: Progresión";
+        if (x < 75) return "Zona 3: Creación";
+        return "Zona 4: Finalización";
+    } else { 
+        if (x > 75) return "Zona 1: Salida";
+        if (x > 50) return "Zona 2: Progresión";
+        if (x > 25) return "Zona 3: Creación";
+        return "Zona 4: Finalización";
+    }
+}
 
+// --- NUEVAS FUNCIONES PARA EL MAPA DE CALOR DE POSESIONES ---
+
+function toggleFlowHeatmap() {
+    // Alternar modo
+    if (flowVizDB.viewMode === 'SEQ') {
+        flowVizDB.viewMode = 'HEAT';
+        drawFlowHeatmap();
+        // Usamos una comprobación segura por si showToast no existe en algún contexto
+        if(typeof showToast === 'function') showToast("🔥 Mapa de Calor: Origen de Posesiones");
+    } else {
+        flowVizDB.viewMode = 'SEQ';
+        drawFlowViz(flowVizDB.currentIndex); // Volver a la vista normal
+        if(typeof showToast === 'function') showToast("⏪ Vista Secuencial");
+    }
+}
+
+function drawFlowHeatmap() {
+    const cv = document.getElementById('flowVizCanvas');
+    const ctx = cv.getContext('2d');
+    const w = cv.width, h = cv.height;
+
+    // 1. DIBUJAR CAMPO LIMPIO
+    ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h); 
+    ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
+    
+    // Dibujo rápido de líneas estructurales
+    const mX = w * 0.05; const mY = h * 0.05; const pW = w * 0.9; const pH = h * 0.9;
+    ctx.strokeRect(mX, mY, pW, pH); // Contorno
+    ctx.beginPath(); ctx.moveTo(w/2, mY); ctx.lineTo(w/2, h - mY); ctx.stroke(); // Medio
+    ctx.strokeRect(mX, (h-h*0.56)/2, w*0.15, h*0.56); // Área Izq
+    ctx.strokeRect(w-mX-w*0.15, (h-h*0.56)/2, w*0.15, h*0.56); // Área Der
+
+    // 2. ACTUALIZAR TÍTULO
+    const titleEl = document.getElementById('possessionDisplay');
+    if (titleEl) {
+        titleEl.innerHTML = `<span style="color:#fff; font-weight:bold;">MAPA DE CALOR: INICIOS DE POSESIÓN</span>`;
+    }
+    const logEl = document.getElementById('flowLogBody');
+    if (logEl) logEl.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa; padding:10px;">
+        🔴 1-2 toques (Pérdida)<br>🟡 3 toques (Corta)<br>🟢 4+ toques (Consolidada)
+    </td></tr>`;
+
+    // 3. DIBUJAR PUNTOS DE CALOR
+    ctx.globalCompositeOperation = 'screen'; 
+
+    if (flowVizDB.allPossessions && flowVizDB.allPossessions.length > 0) {
+        flowVizDB.allPossessions.forEach(pos => {
+            if (pos.length === 0) return;
+
+            // Tomamos la PRIMERA acción de la posesión (El Origen)
+            const startAction = pos[0];
+            const count = pos.length;
+
+            // --- TU LÓGICA DE SEMÁFORO ---
+            let color = "#27ae60"; // Verde (>= 4)
+            if (count <= 2) color = "#c0392b"; // Rojo (1-2)
+            else if (count === 3) color = "#f1c40f"; // Amarillo (3)
+
+            // Calcular coordenadas
+            const x = (startAction.x / 100) * w;
+            const y = (startAction.y / 100) * h;
+
+            // Dibujar un "brillo" difuso
+            const radius = 15;
+            const grd = ctx.createRadialGradient(x, y, 2, x, y, radius);
+            
+            // Convertir HEX a RGB para la opacidad
+            if(color === "#c0392b") { // Rojo
+                grd.addColorStop(0, "rgba(231, 76, 60, 0.8)"); 
+                grd.addColorStop(1, "rgba(231, 76, 60, 0)"); 
+            } else if(color === "#f1c40f") { // Amarillo
+                grd.addColorStop(0, "rgba(241, 196, 15, 0.8)"); 
+                grd.addColorStop(1, "rgba(241, 196, 15, 0)"); 
+            } else { // Verde
+                grd.addColorStop(0, "rgba(46, 204, 113, 0.8)"); 
+                grd.addColorStop(1, "rgba(46, 204, 113, 0)"); 
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = grd;
+            ctx.fill();
+            
+            // Dibujar un punto sólido pequeño
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI*2); 
+            ctx.fillStyle = "#fff"; ctx.fill();
+            ctx.globalCompositeOperation = 'screen';
+        });
+    }
+
+    // Restaurar modo de dibujo
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 4. DIBUJAR LEYENDA EN EL CANVAS
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(10, h - 50, 240, 40);
+    ctx.strokeStyle = "#555"; ctx.strokeRect(10, h - 50, 240, 40);
+    
+    ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+    
+    ctx.fillStyle = "#c0392b"; ctx.fillText("● PÉRDIDA INMEDIATA (1-2 Acc)", 20, h - 35);
+    ctx.fillStyle = "#f1c40f"; ctx.fillText("● POSESIÓN CORTA (3 Acc)", 20, h - 22);
+    ctx.fillStyle = "#27ae60"; ctx.fillText("● CONSOLIDADA (4+ Acc)", 20, h - 9);
+}
 </script>
 </body>
 </html>
