@@ -737,13 +737,23 @@
         <option value="Centro">Centro</option>
     </select>
     
-    <select class="header-select" id="viewMode" onchange="drawPitch()" style="background:#2c3e50;color:#fff;width:85px">
+    <select class="header-select" id="viewMode" onchange="handleViewModeChange()" style="background:#2c3e50;color:#fff;width:85px">
         <option value="LIVE">🎥 VIVO</option>
         <option value="ALL">🏹 TAC</option>
         <option value="HEAT">🔥 MAP</option>
         <option value="XBUILD">🏗 xBUILD</option>
         <option value="LINES">📏 LÍNEAS</option>
         <option value="VORONOI">🗺️ VOR</option>
+        <option value="PASS_NET">🕸️ RED</option>
+    </select>
+    
+    <!-- NUEVO: Selector de Zona/Fase para filtrado automático -->
+    <select class="header-select" id="phaseFilter" onchange="drawPitch()" style="background:#16a085;color:#fff;width:90px;display:none;">
+        <option value="ALL">🌐 TODAS</option>
+        <option value="Salida">🏗️ Inicio</option>
+        <option value="Progresion">🚀 Progre.</option>
+        <option value="Creacion">🎨 Creac.</option>
+        <option value="Finalizacion">🎯 Final.</option>
     </select>
     
     <div id="voronoiControls" style="display:none; gap:5px; margin:0 5px;">
@@ -1211,6 +1221,9 @@ window.onload = () => {
     STATE.sec = (DB.possession.home + DB.possession.away + DB.possession.out) || 0;
     restoreStateFromDB();
     setupCanvas(); renderUI(); updateTeamLabels(); refreshPlayersFilter(); updateDash(); updateTimerDisplay();
+    
+    // Inicializar visibilidad de controles según modo de vista
+    handleViewModeChange();
 };
 
 function saveDB() { 
@@ -1892,6 +1905,30 @@ function finishDrag(e) {
     if(DB.lastEnd) { drawPitch(DB.lastClick, DB.lastEnd); } else { drawPitch(); }
 }
 
+// --- FUNCIÓN PARA MANEJAR CAMBIO DE MODO DE VISTA ---
+function handleViewModeChange() {
+    const viewMode = document.getElementById('viewMode').value;
+    const phaseFilter = document.getElementById('phaseFilter');
+    const voronoiControls = document.getElementById('voronoiControls');
+    const lineControls = document.getElementById('lineControls');
+    
+    // Ocultar todos los controles específicos
+    if (phaseFilter) phaseFilter.style.display = 'none';
+    if (voronoiControls) voronoiControls.style.display = 'none';
+    if (lineControls) lineControls.style.display = 'none';
+    
+    // Mostrar controles según el modo
+    if (viewMode === 'PASS_NET') {
+        if (phaseFilter) phaseFilter.style.display = 'inline-block';
+    } else if (viewMode === 'VORONOI') {
+        if (voronoiControls) voronoiControls.style.display = 'flex';
+    } else if (viewMode === 'LINES') {
+        if (lineControls) lineControls.style.display = 'flex';
+    }
+    
+    drawPitch();
+}
+
 // --- FUNCIÓN DRAW PITCH CORREGIDA CON INVERSIÓN ---
 function drawPitch(dragS, dragE) {
     // 1. OBTENER CONFIGURACIÓN ACTUAL
@@ -1959,11 +1996,28 @@ function drawPitch(dragS, dragE) {
     ctx.restore();
 
    // 4. FILTRAR ACCIONES
+    const phaseFilter = document.getElementById('phaseFilter') ? document.getElementById('phaseFilter').value : 'ALL';
+    
+    // Función auxiliar para determinar la fase según X
+    const getPhaseFromX = (x) => {
+        if (x < 25) return 'Salida';
+        else if (x < 50) return 'Progresion';
+        else if (x < 75) return 'Creacion';
+        else return 'Finalizacion';
+    };
+    
     let filtered = DB.actions.filter(a => {
         if(a.x < 0) return false;
         if(tView !== 'ALL' && a.team !== tView) return false;
         if(pFilter !== 'ALL' && a.player !== pFilter) return false;
         if(aFilter !== 'ALL' && a.type !== aFilter) return false;
+        
+        // Aplicar filtro de fase solo en modo PASS_NET
+        if(viewMode === 'PASS_NET' && phaseFilter !== 'ALL') {
+            const actionPhase = getPhaseFromX(a.x);
+            if(actionPhase !== phaseFilter) return false;
+        }
+        
         return true;
     });
 
@@ -1973,6 +2027,7 @@ function drawPitch(dragS, dragE) {
     else if(viewMode === 'HEAT') actionsToDraw = []; // El Heatmap va aparte
     else if(viewMode === 'VORONOI') actionsToDraw = []; // El Voronoi va aparte
     else if(viewMode === 'LINES') actionsToDraw = []; // Distancias entre líneas va aparte
+    else if(viewMode === 'PASS_NET') actionsToDraw = []; // Red de pases va aparte
 
     // Lógica para invertir visualización de acciones pasadas
     const shouldInvertVisuals = (STATE.invertSides !== STATE.isSecondHalf);
@@ -2038,7 +2093,37 @@ function drawPitch(dragS, dragE) {
         }
 
         hCtx.putImageData(imageData, 0, 0);
+        
+        // *** MEJORA: Dibujar heatmap primero, luego las líneas del campo encima ***
         ctx.drawImage(heatCanvas, 0, 0);
+        
+        // Redibujar líneas del campo sobre el heatmap para mejor visibilidad
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.4)"; 
+        ctx.lineWidth = 2;
+        
+        // Contorno y Medio
+        ctx.strokeRect(w*0.05, h*0.05, w*0.9, h*0.9);
+        ctx.beginPath(); ctx.moveTo(w/2, h*0.05); ctx.lineTo(w/2, h*0.95); ctx.stroke();
+        ctx.beginPath(); ctx.arc(w/2, h/2, h*0.1, 0, 7); ctx.stroke();
+        
+        // Áreas
+        ctx.strokeRect(w*0.05, h*0.22, w*0.15, h*0.56); 
+        ctx.strokeRect(w*0.05, h*0.36, w*0.05, h*0.28);
+        ctx.strokeRect(w*0.8, h*0.22, w*0.15, h*0.56); 
+        ctx.strokeRect(w*0.9, h*0.36, w*0.05, h*0.28);
+        
+        // Puntos de penalti
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.beginPath(); ctx.arc(w*0.16, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(w*0.84, h*0.5, 3, 0, 2*Math.PI); ctx.fill();
+        
+        // Arcos de área
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.beginPath(); ctx.arc(w*0.16, h*0.5, h*0.1, -0.92, 0.92); ctx.stroke();
+        ctx.beginPath(); ctx.arc(w*0.84, h*0.5, h*0.1, Math.PI - 0.92, Math.PI + 0.92); ctx.stroke();
+        
+        ctx.restore();
     }
 
     // PINTAR VORONOI (Si está activo)
@@ -2049,6 +2134,11 @@ function drawPitch(dragS, dragE) {
     // PINTAR DISTANCIAS ENTRE LÍNEAS (Si está activo)
     if(viewMode === 'LINES') {
         drawLineDistances(ctx, w, h, filtered, shouldInvertVisuals);
+    }
+    
+    // PINTAR RED DE PASES (Si está activo)
+    if(viewMode === 'PASS_NET') {
+        drawPassNetwork(ctx, w, h, filtered, shouldInvertVisuals);
     }
 
     // 6. PINTAR FLECHAS (CON SEMÁFORO xBUILD)
@@ -2390,6 +2480,192 @@ function drawLineDistances(ctx, w, h, actions, shouldInvert) {
     ctx.shadowColor = '#000'; ctx.shadowBlur = 2;
     ctx.fillText('🖱 Clic secuencial en jugadores para medir ruta | Doble clic vacio para borrar', 10, h - 25);
     ctx.fillText(`📏 Dimensiones Campo: ${fieldLength}m x ${fieldWidth}m`, 10, h - 10);
+    ctx.restore();
+}
+
+// --- FUNCIÓN RED DE PASES POR ZONAS ---
+function drawPassNetwork(ctx, w, h, actions, shouldInvert) {
+    const phaseFilter = document.getElementById('phaseFilter').value;
+    const tView = document.getElementById('teamView').value;
+    
+    // Mapeo de fases según coordenadas X
+    const getPhaseFromX = (x) => {
+        if (x < 25) return 'Salida';
+        else if (x < 50) return 'Progresion';
+        else if (x < 75) return 'Creacion';
+        else return 'Finalizacion';
+    };
+    
+    // Filtrar acciones de pase
+    const passActions = actions.filter(a => {
+        if (!['Pase', 'Clave', 'Asist'].includes(a.type)) return false;
+        if (a.res !== 'Completado') return false;
+        if (tView !== 'ALL' && a.team !== tView) return false;
+        if (a.endX == null || a.endY == null) return false;
+        
+        // Filtrar por fase si está seleccionada
+        if (phaseFilter !== 'ALL') {
+            const actionPhase = getPhaseFromX(a.x);
+            if (actionPhase !== phaseFilter) return false;
+        }
+        
+        return true;
+    });
+    
+    // Calcular posiciones promedio de jugadores
+    const playerPositions = {};
+    const passConnections = {};
+    
+    actions.forEach(a => {
+        if (a.x < 0 || a.player === 'UNK') return;
+        if (tView !== 'ALL' && a.team !== tView) return;
+        
+        if (!playerPositions[a.player]) {
+            playerPositions[a.player] = { x: 0, y: 0, count: 0, team: a.team };
+        }
+        playerPositions[a.player].x += a.x;
+        playerPositions[a.player].y += a.y;
+        playerPositions[a.player].count++;
+    });
+    
+    // Calcular conexiones de pases
+    passActions.forEach(a => {
+        // Encontrar receptor (jugador más cercano al punto final)
+        let closestPlayer = null;
+        let minDist = Infinity;
+        
+        Object.keys(playerPositions).forEach(pName => {
+            if (pName === a.player) return;
+            const p = playerPositions[pName];
+            if (p.count === 0) return;
+            
+            const avgX = p.x / p.count;
+            const avgY = p.y / p.count;
+            const dist = Math.sqrt(Math.pow(avgX - a.endX, 2) + Math.pow(avgY - a.endY, 2));
+            
+            if (dist < minDist && dist < 20) { // Umbral de 20% del campo
+                minDist = dist;
+                closestPlayer = pName;
+            }
+        });
+        
+        if (closestPlayer) {
+            const key = [a.player, closestPlayer].sort().join('->');
+            if (!passConnections[key]) {
+                passConnections[key] = { from: a.player, to: closestPlayer, count: 0 };
+            }
+            passConnections[key].count++;
+        }
+    });
+    
+    // Dibujar líneas de pases
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    const maxPasses = Math.max(...Object.values(passConnections).map(c => c.count), 1);
+    
+    Object.values(passConnections).forEach(conn => {
+        if (conn.count < 2) return; // Mínimo 2 pases para mostrar
+        
+        const p1 = playerPositions[conn.from];
+        const p2 = playerPositions[conn.to];
+        
+        if (!p1 || !p2 || p1.count === 0 || p2.count === 0) return;
+        
+        let x1 = (p1.x / p1.count), y1 = (p1.y / p1.count);
+        let x2 = (p2.x / p2.count), y2 = (p2.y / p2.count);
+        
+        if (shouldInvert) {
+            x1 = 100 - x1; y1 = 100 - y1;
+            x2 = 100 - x2; y2 = 100 - y2;
+        }
+        
+        const sx1 = (x1/100)*w, sy1 = (y1/100)*h;
+        const sx2 = (x2/100)*w, sy2 = (y2/100)*h;
+        
+        // Grosor proporcional al número de pases (1-8px)
+        const lineWidth = 1 + (conn.count / maxPasses) * 7;
+        const alpha = 0.3 + (conn.count / maxPasses) * 0.5;
+        
+        const color = p1.team === 'HOME' ? '#3498db' : '#e74c3c';
+        
+        // Sombra
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = lineWidth + 2;
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.lineTo(sx2, sy2);
+        ctx.stroke();
+        
+        // Línea principal
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.lineTo(sx2, sy2);
+        ctx.stroke();
+        
+        // Etiqueta de número de pases
+        const midX = (sx1 + sx2) / 2;
+        const midY = (sy1 + sy2) / 2;
+        
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.font = 'bold 11px sans-serif';
+        const txt = conn.count.toString();
+        const metrics = ctx.measureText(txt);
+        ctx.fillRect(midX - metrics.width/2 - 3, midY - 8, metrics.width + 6, 16);
+        
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(txt, midX, midY);
+    });
+    
+    ctx.globalAlpha = 1;
+    
+    // Dibujar nodos de jugadores
+    Object.keys(playerPositions).forEach(pName => {
+        const p = playerPositions[pName];
+        if (p.count === 0) return;
+        
+        let px = p.x / p.count, py = p.y / p.count;
+        if (shouldInvert) { px = 100 - px; py = 100 - py; }
+        
+        const sx = (px/100)*w, sy = (py/100)*h;
+        const color = p.team === 'HOME' ? '#3498db' : '#e74c3c';
+        
+        ctx.beginPath();
+        ctx.arc(sx, sy, 8, 0, 2*Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Nombre del jugador
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 3;
+        ctx.textAlign = 'center';
+        ctx.fillText(pName.substr(0, 4).toUpperCase(), sx, sy - 12);
+        ctx.shadowBlur = 0;
+    });
+    
+    ctx.restore();
+    
+    // Instrucciones
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = '12px sans-serif';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 3;
+    const phaseText = phaseFilter === 'ALL' ? 'TODAS LAS ZONAS' : phaseFilter.toUpperCase();
+    ctx.fillText(`🕸️ Red de Pases | Zona: ${phaseText}`, 10, h - 10);
     ctx.restore();
 }
 
