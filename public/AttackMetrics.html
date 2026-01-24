@@ -536,13 +536,21 @@
             
             <div style="width:1px; height:20px; background:#444; margin:0 5px;"></div>
             
-            <select id="avgPosPhaseFilter" onchange="drawAvgPos()" style="background:#16a085; color:#fff; border:1px solid #1abc9c; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem; height:26px;">
-                <option value="ALL">🌐 TODAS LAS ZONAS</option>
-                <option value="Salida">🏗️ Inicio (0-25%)</option>
-                <option value="Progresion">🚀 Progresión (25-50%)</option>
-                <option value="Creacion">🎨 Creación (50-75%)</option>
-                <option value="Finalizacion">🎯 Finalización (75-100%)</option>
-            </select>
+            <div style="display:flex; gap:8px; align-items:center; background:#1a1a1a; padding:6px 10px; border-radius:4px; border:1px solid #16a085;">
+                <span style="color:#16a085; font-size:0.7rem; font-weight:bold;">🌐 ZONAS:</span>
+                <label style="color:#fff; font-size:0.65rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="zoneZ1" class="zone-filter" value="Salida" onchange="updateZoneFilter()" checked> Z1
+                </label>
+                <label style="color:#fff; font-size:0.65rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="zoneZ2" class="zone-filter" value="Progresion" onchange="updateZoneFilter()" checked> Z2
+                </label>
+                <label style="color:#fff; font-size:0.65rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="zoneZ3" class="zone-filter" value="Creacion" onchange="updateZoneFilter()" checked> Z3
+                </label>
+                <label style="color:#fff; font-size:0.65rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="zoneZ4" class="zone-filter" value="Finalizacion" onchange="updateZoneFilter()" checked> Z4
+                </label>
+            </div>
             
             <div style="width:1px; height:20px; background:#444; margin:0 5px;"></div>
             
@@ -4043,6 +4051,15 @@ let passMatrix = {};
 let avgPosHover = null; // Jugador sobre el que está el ratón
 let avgNodePositions = []; // Almacena coordenadas para detectar el ratón
 let avgListenersAdded = false; // Evita duplicar eventos
+let selectedZones = ['Salida', 'Progresion', 'Creacion', 'Finalizacion']; // Por defecto todas las zonas
+
+function updateZoneFilter() {
+    selectedZones = [];
+    document.querySelectorAll('.zone-filter:checked').forEach(cb => {
+        selectedZones.push(cb.value);
+    });
+    drawAvgPos();
+}
 
 function openAvgPosModal() {
     const modal = document.getElementById('modalAvgPos');
@@ -4108,7 +4125,6 @@ function drawAvgPos() {
     const showNet = document.getElementById('chkShowNet').checked;
     const showSonar = document.getElementById('chkShowSonar').checked;
     
-    const phaseFilter = document.getElementById('avgPosPhaseFilter').value;
     const minPasses = parseInt(document.getElementById('minPassInput').value) || 2;
 
     cv.width = cv.parentElement.clientWidth; 
@@ -4215,10 +4231,10 @@ function drawAvgPos() {
         if (a.team !== currentAvgTeam) return false;
         if (a.x < 0 || a.player === 'UNK' || a.player === 'EQUIPO') return false;
         
-        // Aplicar filtro de zona si no es "ALL"
-        if (phaseFilter !== 'ALL') {
+        // Aplicar filtro de zonas seleccionadas
+        if (selectedZones.length > 0 && selectedZones.length < 4) {
             const actionZone = getZoneFromX(a.x);
-            if (actionZone !== phaseFilter) return false;
+            if (!selectedZones.includes(actionZone)) return false;
         }
         
         return true;
