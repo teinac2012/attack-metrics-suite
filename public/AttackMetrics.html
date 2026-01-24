@@ -4200,10 +4200,14 @@ function drawAvgPos() {
     if(DB.rosters[currentAvgTeam]) DB.rosters[currentAvgTeam].forEach(p => numMap[p.name] = p.num);
 
     // Función para determinar la zona según la coordenada X
+    // Para el equipo visitante, invertimos las zonas (efecto espejo)
     const getZoneFromX = (x) => {
-        if (x < 25) return 'Salida';
-        else if (x < 50) return 'Progresion';
-        else if (x < 75) return 'Creacion';
+        // Si es equipo visitante (AWAY), invertir las coordenadas
+        const effectiveX = currentAvgTeam === 'AWAY' ? (100 - x) : x;
+        
+        if (effectiveX < 25) return 'Salida';
+        else if (effectiveX < 50) return 'Progresion';
+        else if (effectiveX < 75) return 'Creacion';
         else return 'Finalizacion';
     };
 
