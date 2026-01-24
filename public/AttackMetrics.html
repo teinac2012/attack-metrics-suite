@@ -1902,10 +1902,13 @@ function getPos(e) {
 
 function finishDrag(e) {
     if(!isDrag) return; isDrag=false;
-    const endP = getPos(e);
+    const isTouch = e.type && e.type.startsWith('touch');
+    // En tablets el touchend puede no traer coordenadas; usamos la última posición conocida
+    const endP = getPos(e) || DB.lastClick || startP;
+    const minDist = isTouch ? 0.5 : 2; // Umbral más bajo para táctil
     const dist = Math.hypot(endP.x-startP.x, endP.y-startP.y);
     DB.lastClick = startP;
-    DB.lastEnd = dist > 2 ? endP : null;
+    DB.lastEnd = dist > minDist ? endP : null;
     if(DB.lastEnd) { drawPitch(DB.lastClick, DB.lastEnd); } else { drawPitch(); }
 }
 
