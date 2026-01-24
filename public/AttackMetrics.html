@@ -4135,6 +4135,8 @@ function drawAvgPos() {
     const showSonar = document.getElementById('chkShowSonar').checked;
     
     const minPasses = parseInt(document.getElementById('minPassInput').value) || 2;
+    const hasZoneFilter = selectedZones.length > 0 && selectedZones.length < 4;
+    const zoneLabel = hasZoneFilter ? selectedZones.join(', ') : 'Todas las zonas';
 
     cv.width = cv.parentElement.clientWidth; 
     cv.height = cv.parentElement.clientHeight;
@@ -4524,11 +4526,11 @@ function drawAvgPos() {
         ctx.restore();
     }
 
-    // --- ETIQUETA FASE ---
-    if(phaseFilter !== 'ALL') {
+    // --- ETIQUETA FILTRO DE ZONAS ---
+    if(hasZoneFilter) {
         ctx.fillStyle = "rgba(255,255,255,0.9)"; 
         ctx.font = "bold 14px monospace"; ctx.textAlign = "left";
-        ctx.fillText("FASE: " + phaseFilter.toUpperCase(), 10, h - 15);
+        ctx.fillText("ZONAS: " + zoneLabel.toUpperCase(), 10, h - 15);
     }
 }
 
