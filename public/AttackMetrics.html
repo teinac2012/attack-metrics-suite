@@ -5706,14 +5706,58 @@ function drawFlowHeatmap() {
 
     // 1. DIBUJAR CAMPO LIMPIO
     ctx.fillStyle = "#204a2e"; ctx.fillRect(0,0,w,h); 
-    ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2;
     
-    // Dibujo rápido de líneas estructurales
+    // Dibujo completo de líneas del campo
     const mX = w * 0.05; const mY = h * 0.05; const pW = w * 0.9; const pH = h * 0.9;
-    ctx.strokeRect(mX, mY, pW, pH); // Contorno
-    ctx.beginPath(); ctx.moveTo(w/2, mY); ctx.lineTo(w/2, h - mY); ctx.stroke(); // Medio
-    ctx.strokeRect(mX, (h-h*0.56)/2, w*0.15, h*0.56); // Área Izq
-    ctx.strokeRect(w-mX-w*0.15, (h-h*0.56)/2, w*0.15, h*0.56); // Área Der
+    const centerY = h / 2;
+    
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; 
+    ctx.lineWidth = 2;
+    
+    // 1. Contorno exterior
+    ctx.strokeRect(mX, mY, pW, pH);
+    
+    // 2. Línea central
+    ctx.beginPath(); ctx.moveTo(w/2, mY); ctx.lineTo(w/2, h - mY); ctx.stroke();
+    
+    // 3. Círculo y punto central
+    ctx.beginPath(); ctx.arc(w/2, centerY, h*0.1, 0, Math.PI*2); ctx.stroke(); 
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.beginPath(); ctx.arc(w/2, centerY, 4, 0, Math.PI*2); ctx.fill(); 
+    
+    // 4. Áreas de penalti
+    const penBoxW = w * 0.15; const penBoxH = h * 0.56; const penBoxY = (h - penBoxH) / 2;
+    const goalBoxW = w * 0.05; const goalBoxH = h * 0.25; const goalBoxY = (h - goalBoxH) / 2;
+    
+    ctx.strokeRect(mX, penBoxY, penBoxW, penBoxH);
+    ctx.strokeRect(w - mX - penBoxW, penBoxY, penBoxW, penBoxH);
+    ctx.strokeRect(mX, goalBoxY, goalBoxW, goalBoxH);
+    ctx.strokeRect(w - mX - goalBoxW, goalBoxY, goalBoxW, goalBoxH);
+    
+    // 5. Puntos de penalti
+    const penSpotDist = mX + (w * 0.11); 
+    const penSpotL_X = penSpotDist;
+    const penSpotR_X = w - penSpotDist;
+    
+    ctx.beginPath(); ctx.arc(penSpotL_X, centerY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(penSpotR_X, centerY, 3, 0, Math.PI*2); ctx.fill();
+    
+    // 6. Semicírculos del área
+    const arcRad = h * 0.1; 
+    const distToBoxEdge = (mX + penBoxW) - penSpotL_X;
+    
+    if (arcRad > distToBoxEdge) {
+        const angleOffset = Math.acos(distToBoxEdge / arcRad);
+        ctx.beginPath(); ctx.arc(penSpotL_X, centerY, arcRad, -angleOffset, angleOffset); ctx.stroke();
+        ctx.beginPath(); ctx.arc(penSpotR_X, centerY, arcRad, Math.PI - angleOffset, Math.PI + angleOffset); ctx.stroke();
+    }
+    
+    // 7. Arcos de córner
+    const cornerRad = h * 0.025;
+    ctx.beginPath(); ctx.arc(mX, mY, cornerRad, 0, Math.PI/2); ctx.stroke(); 
+    ctx.beginPath(); ctx.arc(w-mX, mY, cornerRad, Math.PI/2, Math.PI); ctx.stroke(); 
+    ctx.beginPath(); ctx.arc(w-mX, h-mY, cornerRad, Math.PI, Math.PI*1.5); ctx.stroke(); 
+    ctx.beginPath(); ctx.arc(mX, h-mY, cornerRad, Math.PI*1.5, Math.PI*2); ctx.stroke();
 
     // 2. ACTUALIZAR TÍTULO
     const titleEl = document.getElementById('possessionDisplay');
