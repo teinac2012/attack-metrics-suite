@@ -62,40 +62,48 @@ export default function ChangePasswordForm({ userId }: { userId: string }) {
 
   if (success) {
     return (
-      <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 text-center">
-        <p className="text-green-300 font-semibold mb-2">✅ Contraseña actualizada</p>
+      <div className="bg-green-500/15 border border-green-500/40 rounded-xl p-6 text-center animate-fade-in">
+        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/20 flex items-center justify-center">
+          <span className="text-2xl">✅</span>
+        </div>
+        <p className="text-green-300 font-semibold mb-2">Contraseña actualizada</p>
         <p className="text-sm text-gray-400">Redirigiendo al login...</p>
+        <div className="mt-4 w-full h-1 bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full bg-green-500 rounded-full animate-pulse" style={{width: '100%'}}></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm">
-          {error}
+        <div className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 text-red-300 text-sm flex items-center gap-2">
+          <span>⚠️</span> {error}
         </div>
       )}
 
       <div>
-        <label className="block text-sm text-gray-400 mb-2">Contraseña Actual</label>
+        <label className="block text-sm font-medium text-gray-300 mb-2">Contraseña Actual</label>
         <input
           type="password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
-          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+          className="input-premium"
+          placeholder="••••••••"
           required
           disabled={loading}
         />
       </div>
 
       <div>
-        <label className="block text-sm text-gray-400 mb-2">Nueva Contraseña</label>
+        <label className="block text-sm font-medium text-gray-300 mb-2">Nueva Contraseña</label>
         <input
           type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
-          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+          className="input-premium"
+          placeholder="Mínimo 6 caracteres"
           required
           disabled={loading}
           minLength={6}
@@ -103,12 +111,13 @@ export default function ChangePasswordForm({ userId }: { userId: string }) {
       </div>
 
       <div>
-        <label className="block text-sm text-gray-400 mb-2">Confirmar Nueva Contraseña</label>
+        <label className="block text-sm font-medium text-gray-300 mb-2">Confirmar Nueva Contraseña</label>
         <input
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+          className="input-premium"
+          placeholder="Repite la nueva contraseña"
           required
           disabled={loading}
           minLength={6}
@@ -118,9 +127,16 @@ export default function ChangePasswordForm({ userId }: { userId: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+        className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
       >
-        {loading ? "Cambiando..." : "Cambiar Contraseña"}
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="spinner"></span>
+            Cambiando...
+          </span>
+        ) : (
+          "🔐 Cambiar Contraseña"
+        )}
       </button>
 
       <p className="text-xs text-gray-500 text-center">

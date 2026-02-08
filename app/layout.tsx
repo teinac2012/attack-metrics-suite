@@ -25,9 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-noise`}
       >
-        {children}
+        {/* Fondo con grid sutil */}
+        <div className="fixed inset-0 bg-grid pointer-events-none opacity-30" />
+        
+        {/* Contenido principal */}
+        <div className="relative z-10">
+          {children}
+        </div>
       </body>
     </html>
   );

@@ -96,34 +96,37 @@ export default function LoginClient() {
   return (
     <>
       <Toaster position="top-center" />
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center bg-[#080c14] text-white p-4 relative overflow-hidden">
+        {/* Grid pattern background */}
+        <div className="absolute inset-0 bg-grid opacity-20 pointer-events-none" />
+        
         {/* Animated background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
-            className="absolute top-1/4 -left-48 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"
+            className="absolute top-0 -left-24 w-[500px] h-[500px] bg-gradient-to-br from-blue-600/30 to-cyan-500/20 rounded-full blur-[100px]"
             animate={{ 
-              x: [0, 100, 0],
-              y: [0, 50, 0],
+              x: [0, 80, 0],
+              y: [0, 40, 0],
+              scale: [1, 1.15, 1]
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div 
+            className="absolute bottom-0 -right-24 w-[500px] h-[500px] bg-gradient-to-br from-purple-600/30 to-pink-500/20 rounded-full blur-[100px]"
+            animate={{ 
+              x: [0, -80, 0],
+              y: [0, -40, 0],
               scale: [1, 1.2, 1]
             }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div 
-            className="absolute bottom-1/4 -right-48 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-[120px]"
             animate={{ 
-              x: [0, -100, 0],
-              y: [0, -50, 0],
-              scale: [1, 1.3, 1]
+              scale: [1, 1.3, 1],
+              rotate: [0, 90, 0]
             }}
             transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div 
-            className="absolute top-1/2 left-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"
-            animate={{ 
-              scale: [1, 1.5, 1],
-              rotate: [0, 180, 360]
-            }}
-            transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
           />
         </div>
 
@@ -141,7 +144,7 @@ export default function LoginClient() {
             transition={{ delay: 0.2, duration: 0.6 }}
           >
             <motion.h1 
-              className="text-5xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-orange-400"
+              className="text-5xl font-black mb-3 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500"
               animate={{ 
                 backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
               }}

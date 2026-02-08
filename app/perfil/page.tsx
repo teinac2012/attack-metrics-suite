@@ -26,9 +26,18 @@ export default async function PerfilPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div className="min-h-screen bg-[#080c14] text-white relative overflow-hidden">
+      {/* Grid pattern background */}
+      <div className="absolute inset-0 bg-grid opacity-15 pointer-events-none" />
+      
+      {/* Efectos de fondo */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/4 left-0 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-1/4 right-0 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[120px]" />
+      </div>
+      
       <SessionHeartbeat />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl relative z-10">
         <PerfilClient 
           username={user.username}
           email={user.email}
