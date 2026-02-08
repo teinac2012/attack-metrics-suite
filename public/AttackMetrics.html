@@ -186,6 +186,23 @@
         }
         select.header-select:focus { border-color: var(--accent); outline: none; }
         
+        /* Estilos para las opciones del select */
+        select.header-select option {
+            background: #1e1e1e;
+            color: #ecf0f1;
+            padding: 4px 8px;
+        }
+        
+        select.header-select option:hover {
+            background: #2a2a2a;
+            color: #fff;
+        }
+        
+        select.header-select option:checked {
+            background: #f39c12;
+            color: #000;
+        }
+        
         #viewMode { 
             background: linear-gradient(180deg, #34495e 0%, #2c3e50 100%);
             border: 1px solid #3498db; 
